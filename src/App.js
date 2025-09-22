@@ -103,7 +103,7 @@ const App = () => {
         const hotlistItems = hotlistSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
         setHotlist(hotlistItems);
 
-    }, [user, db, monthYearId, appId]);
+    }, [user, db, monthYearId]);
 
 
     const fetchAnalytics = useCallback(async () => {
@@ -138,7 +138,7 @@ const App = () => {
             return totals;
         });
         setAnalyticsData(processedData);
-    }, [user, db, appId]);
+    }, [user, db]);
 
     useEffect(() => {
         if (user && db) {
@@ -153,7 +153,7 @@ const App = () => {
             const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', monthYearId);
             await setDoc(docRef, { dailyData: newData, monthlyGoal: newGoal }, { merge: true });
         }, 1000),
-        [user, db, monthYearId, appId]
+        [user, db, monthYearId]
     );
 
     const handleDataChange = (day, field, value) => {
