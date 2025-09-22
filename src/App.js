@@ -8,7 +8,7 @@ import {
 } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, query, limit, addDoc, deleteDoc } from 'firebase/firestore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { ChevronUp, ChevronDown, Plus, X, Calendar, List, BarChart2, Target, Users, PhoneCall, Briefcase, Trash2 } from 'lucide-react';
+import { ChevronUp, ChevronDown, Plus, X, Calendar, List, BarChart2, Target, Users, PhoneCall, Briefcase, Trash2, Trophy } from 'lucide-react';
 
 // --- Firebase Configuration ---
 const firebaseConfig = {
@@ -34,6 +34,8 @@ const App = () => {
     const [, setAuth] = useState(null); // 'auth' state is not read, so we can omit it.
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [displayName, setDisplayName] = useState('');
+    const [showNameModal, setShowNameModal] = useState(false);
 
     const [currentDate, setCurrentDate] = useState(new Date());
     const [monthlyData, setMonthlyData] = useState({});
@@ -58,7 +60,6 @@ const App = () => {
                     setUser(currentUser);
                 } else {
                     try {
-                        // Check for an environment-injected auth token
                         const initialAuthToken = typeof window.__initial_auth_token !== 'undefined' ? window.__initial_auth_token : null;
                         if (initialAuthToken) {
                             await signInWithCustomToken(authInstance, initialAuthToken);
@@ -86,6 +87,15 @@ const App = () => {
     const fetchData = useCallback(async () => {
         if (!user || !db) return;
 
+        // Fetch user profile
+        const profileRef = doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'data');
+        const profileSnap = await getDoc(profileRef);
+        if (profileSnap.exists() && profileSnap.data().displayName) {
+            setDisplayName(profileSnap.data().displayName);
+        } else {
+            setShowNameModal(true);
+        }
+
         const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', monthYearId);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
@@ -104,6 +114,19 @@ const App = () => {
         setHotlist(hotlistItems);
 
     }, [user, db, monthYearId]);
+
+    const handleSetDisplayName = async (name) => {
+        if (!user || !db || !name.trim()) {
+            // If user provides no name, just close modal for now.
+            setShowNameModal(false);
+            return;
+        }
+        const trimmedName = name.trim();
+        const profileRef = doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'data');
+        await setDoc(profileRef, { displayName: trimmedName });
+        setDisplayName(trimmedName);
+        setShowNameModal(false);
+    };
 
 
     const fetchAnalytics = useCallback(async () => {
@@ -208,7 +231,7 @@ const App = () => {
     return (
         <div className="bg-gray-50 min-h-screen font-sans text-gray-800">
             <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
-                <Header />
+                <Header displayName={displayName} />
                 <TabBar activeTab={activeTab} setActiveTab={setActiveTab} />
                 
                 <main className="mt-6">
@@ -217,6 +240,7 @@ const App = () => {
                     {activeTab === 'analytics' && <AnalyticsDashboard data={analyticsData} />}
                 </main>
                 
+                {showNameModal && <DisplayNameModal onSave={handleSetDisplayName} />}
                 {showAddHotlistModal && <AddHotlistItemModal onClose={() => setShowAddHotlistModal(false)} onAdd={handleConfirmAddHotlistItem} />}
                 {deletingItemId && <ConfirmDeleteModal onClose={() => setDeletingItemId(null)} onConfirm={handleConfirmDelete} />}
             </div>
@@ -225,11 +249,13 @@ const App = () => {
 };
 
 // --- Child Components ---
-const Header = () => (
+const Header = ({ displayName }) => (
     <header className="mb-6">
         <div>
             <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight">Activity Tracker</h1>
-            <p className="text-md sm:text-lg text-gray-500 mt-1">Your dashboard for business growth.</p>
+            <p className="text-md sm:text-lg text-gray-500 mt-1">
+                {displayName ? `Welcome, ${displayName}` : 'Your dashboard for business growth.'}
+            </p>
         </div>
     </header>
 );
@@ -349,8 +375,8 @@ const ActivityTracker = ({ date, setDate, goal, onGoalChange, data, onDataChange
                             <>
                                 <span className="font-medium text-xs sm:text-sm">{day.day}</span>
                                 <div className="mt-auto text-[10px] sm:text-xs space-y-1">
-                                    {day.data.exposures > 0 && <div className="bg-blue-100 text-blue-800 rounded px-1.5 py-0.5">E: {day.data.exposures}</div>}
-                                    {day.data.sitdowns?.length > 0 && <div className="bg-green-100 text-green-800 rounded px-1.5 py-0.5">S: {day.data.sitdowns.length}</div>}
+                                    {day.data.exposures > 0 && <div className="bg-blue-100 text-blue-800 rounded px-1.5 py-0-5">E: {day.data.exposures}</div>}
+                                    {day.data.sitdowns?.length > 0 && <div className="bg-green-100 text-green-800 rounded px-1-5 py-0-5">S: {day.data.sitdowns.length}</div>}
                                 </div>
                             </>
                         )}
@@ -606,6 +632,42 @@ const ConfirmDeleteModal = ({ onClose, onConfirm }) => {
         </div>
     );
 };
+
+const DisplayNameModal = ({ onSave }) => {
+    const [name, setName] = useState('');
+
+    const handleSave = () => {
+        if (name.trim()) {
+            onSave(name.trim());
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
+                <div className="p-6 border-b">
+                    <h3 className="text-xl font-semibold">Welcome!</h3>
+                    <p className="text-sm text-gray-600 mt-1">Please set your display name for the leaderboard.</p>
+                </div>
+                <div className="p-6">
+                    <label htmlFor="display-name" className="block text-sm font-medium text-gray-700">Display Name</label>
+                    <input
+                        type="text"
+                        id="display-name"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        className="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                        autoFocus
+                    />
+                </div>
+                <div className="p-4 bg-gray-50 flex justify-end space-x-2 rounded-b-lg">
+                    <button onClick={handleSave} className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition">Save Name</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 
 const AnalyticsDashboard = ({ data }) => {
     return (
