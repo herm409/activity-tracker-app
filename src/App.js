@@ -129,7 +129,36 @@ const App = () => {
 
     const fetchAnalytics = useCallback(async () => {
         if (!user || !db) return;
-        // ... (analytics fetching logic remains the same)
+        const analyticsPromises = [];
+        const monthLabels = [];
+        let tempDate = new Date();
+
+        for (let i = 0; i < 6; i++) {
+            const y = tempDate.getFullYear();
+            const m = tempDate.getMonth();
+            const myId = `${y}-${String(m + 1).padStart(2, '0')}`;
+            monthLabels.unshift(tempDate.toLocaleString('default', { month: 'short', year: 'numeric' }));
+            
+            const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', myId);
+            analyticsPromises.unshift(getDoc(docRef));
+            
+            tempDate.setMonth(tempDate.getMonth() - 1);
+        }
+
+        const docSnaps = await Promise.all(analyticsPromises);
+        const processedData = docSnaps.map((snap, index) => {
+            const totals = { name: monthLabels[index], Exposures: 0, 'Follow Ups': 0, Sitdowns: 0 };
+            if (snap.exists()) {
+                const data = snap.data().dailyData || {};
+                Object.values(data).forEach(day => {
+                    totals.Exposures += Number(day.exposures) || 0;
+                    totals['Follow Ups'] += Number(day.followUps) || 0;
+                    totals.Sitdowns += Array.isArray(day.sitdowns) ? day.sitdowns.length : 0;
+                });
+            }
+            return totals;
+        });
+        setAnalyticsData(processedData);
     }, [user, db]);
 
     useEffect(() => {
@@ -234,7 +263,7 @@ const App = () => {
     );
 };
 
-// --- Child Components (Header, TabBar, etc. remain largely the same) ---
+// --- Child Components ---
 const Header = ({ displayName }) => (
     <header className="mb-6">
         <div>
@@ -419,7 +448,6 @@ const TotalsFooter = ({ totals }) => {
 
 
 const DayEntryModal = ({ day, data, onClose, onChange }) => {
-    // ... (DayEntryModal remains the same as previous version)
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
@@ -480,7 +508,6 @@ const CheckboxInput = (props) => (
 );
 
 const SitdownTracker = ({ value = [], onChange }) => {
-    // ... (SitdownTracker remains the same as previous version)
     const options = { 'P': 'Phone', 'Z': 'Zoom', 'V': 'Video', 'D': 'DM Mtg', 'E': 'Enroll' };
     const [isAdding, setIsAdding] = useState(false);
 
@@ -531,7 +558,6 @@ const SitdownTracker = ({ value = [], onChange }) => {
 
 
 const HotList = ({ list, onAdd, onUpdate, onDelete }) => {
-    // ... (HotList remains the same as previous version)
     return (
         <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
             <div className="flex justify-between items-center mb-4">
@@ -571,7 +597,6 @@ const HotList = ({ list, onAdd, onUpdate, onDelete }) => {
 };
 
 const AddHotlistItemModal = ({ onClose, onAdd }) => {
-    // ... (AddHotlistItemModal remains the same as previous version)
     const [name, setName] = useState('');
 
     const handleAdd = () => {
@@ -607,7 +632,6 @@ const AddHotlistItemModal = ({ onClose, onAdd }) => {
 };
 
 const ConfirmDeleteModal = ({ onClose, onConfirm }) => {
-    // ... (ConfirmDeleteModal remains the same as previous version)
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
@@ -625,7 +649,6 @@ const ConfirmDeleteModal = ({ onClose, onConfirm }) => {
 };
 
 const DisplayNameModal = ({ onSave }) => {
-    // ... (DisplayNameModal remains the same as previous version)
     const [name, setName] = useState('');
 
     const handleSave = () => {
@@ -662,7 +685,6 @@ const DisplayNameModal = ({ onSave }) => {
 
 
 const AnalyticsDashboard = ({ data }) => {
-    // ... (AnalyticsDashboard remains the same as previous version)
     return (
         <div className="bg-white p-2 sm:p-6 rounded-lg shadow-sm">
             <h2 className="text-xl sm:text-2xl font-semibold mb-6 text-center sm:text-left">Month-Over-Month Performance</h2>
