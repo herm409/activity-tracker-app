@@ -10,7 +10,7 @@ import {
 } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, query, limit, addDoc, deleteDoc, orderBy } from 'firebase/firestore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { ChevronUp, ChevronDown, Plus, X, Calendar, List, BarChart2, Target, Users, PhoneCall, Briefcase, Trash2, Trophy, LogOut } from 'lucide-react';
+import { ChevronUp, ChevronDown, Plus, X, Calendar, List, BarChart2, Target, Users, PhoneCall, Briefcase, Trash2, Trophy, LogOut, Share2 } from 'lucide-react';
 
 // --- Firebase Configuration ---
 const firebaseConfig = {
@@ -77,17 +77,14 @@ const App = () => {
     const fetchData = useCallback(async () => {
         if (!user || !db) return;
 
-        // Fetch user profile for display name
         const profileRef = doc(db, 'artifacts', appId, 'users', user.uid);
         const profileSnap = await getDoc(profileRef);
         if (profileSnap.exists() && profileSnap.data().displayName) {
             setDisplayName(profileSnap.data().displayName);
         } else {
-            // If they have an account but no display name, prompt for it.
             setShowNameModal(true);
         }
 
-        // Fetch the rest of the user data
         const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', monthYearId);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
@@ -162,17 +159,13 @@ const App = () => {
 
     const updateLeaderboard = useCallback(async (currentMonthData) => {
         if (!user || !db || !displayName) return;
-
         const totalExposures = Object.values(currentMonthData).reduce((sum, day) => sum + (Number(day.exposures) || 0), 0);
-        
         const leaderboardRef = doc(db, 'artifacts', appId, 'leaderboard', monthYearId, 'entries', user.uid);
-        
         await setDoc(leaderboardRef, {
             displayName: displayName,
             exposures: totalExposures,
             userId: user.uid
         });
-
     }, [user, db, displayName, monthYearId]);
 
     const debouncedSave = useMemo(
@@ -180,7 +173,6 @@ const App = () => {
             if (!user || !db) return;
             const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', monthYearId);
             await setDoc(docRef, { dailyData: newData, monthlyGoal: newGoal }, { merge: true });
-            
             updateLeaderboard(newData);
         }, 1500),
         [user, db, monthYearId, updateLeaderboard]
@@ -198,7 +190,6 @@ const App = () => {
         debouncedSave(monthlyData, newGoal);
     };
     
-    // --- Hotlist Actions ---
     const addHotlistItem = () => {
         if (hotlist.length >= 10) return;
         setShowAddHotlistModal(true);
@@ -234,8 +225,73 @@ const App = () => {
             await signOut(auth);
         }
     };
+    
+    const handleShareReport = async () => {
+        if (navigator.share) {
+            const today = new Date();
+            const dayOfWeek = today.getDay();
+            const startOfWeek = new Date(today);
+            startOfWeek.setDate(today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1));
+            startOfWeek.setHours(0,0,0,0);
+            const endOfWeek = new Date(startOfWeek);
+            endOfWeek.setDate(startOfWeek.getDate() + 6);
+            endOfWeek.setHours(23,59,59,999);
+            const startOfLastWeek = new Date(startOfWeek);
+            startOfLastWeek.setDate(startOfWeek.getDate() - 7);
+            const endOfLastWeek = new Date(startOfWeek);
+            endOfLastWeek.setDate(startOfWeek.getDate() - 1);
+            
+            const getWeekTotals = (startDate, endDate) => {
+                const totals = { Exposures: 0, 'Follow Ups': 0, Sitdowns: 0, PBRS: 0 };
+                let current = new Date(startDate);
+                while(current <= endDate) {
+                    const monthDataDocId = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}`;
+                    // This logic only supports fetching from the currently loaded month's data.
+                    // For a robust solution, you would fetch last month's data if the week spans across months.
+                    if (monthDataDocId === monthYearId) {
+                        const dayData = monthlyData[current.getDate()];
+                        if(dayData) {
+                            totals.Exposures += Number(dayData.exposures) || 0;
+                            totals['Follow Ups'] += Number(dayData.followUps) || 0;
+                            totals.Sitdowns += Array.isArray(dayData.sitdowns) ? dayData.sitdowns.length : 0;
+                            totals.PBRS += Number(dayData.pbrs) || 0;
+                        }
+                    }
+                    current.setDate(current.getDate() + 1);
+                }
+                return totals;
+            };
 
-    // --- Render Logic ---
+            const thisWeekTotals = getWeekTotals(startOfWeek, endOfWeek);
+            const lastWeekTotals = getWeekTotals(startOfLastWeek, endOfLastWeek);
+
+            let shareText = `My Activity Tracker Report\nFrom: ${displayName}\nWeek of: ${startOfWeek.toLocaleDateString()} - ${endOfWeek.toLocaleDateString()}\n\n`;
+            shareText += `**This Week's Numbers:**\n- Exposures: ${thisWeekTotals.Exposures}\n- Follow Ups: ${thisWeekTotals['Follow Ups']}\n- Sitdowns: ${thisWeekTotals.Sitdowns}\n- PBRS: ${thisWeekTotals.PBRS}\n\n`;
+            shareText += `**Last Week's Numbers:**\n- Exposures: ${lastWeekTotals.Exposures}\n- Follow Ups: ${lastWeekTotals['Follow Ups']}\n- Sitdowns: ${lastWeekTotals.Sitdowns}\n- PBRS: ${lastWeekTotals.PBRS}\n\n`;
+            shareText += "--------------------\n\n";
+            shareText += `My "10 in Play" Hotlist\n\n`;
+            if (hotlist.length === 0) {
+                shareText += "My list is currently empty.";
+            } else {
+                hotlist.forEach((item, index) => {
+                    shareText += `${index + 1}. ${item.name}\n`;
+                    if (item.notes) {
+                        shareText += `- Notes: ${item.notes}\n\n`;
+                    } else {
+                        shareText += `\n`;
+                    }
+                });
+            }
+            shareText += "\nSent from my Activity Tracker App";
+
+            try {
+                await navigator.share({ title: 'My Weekly Activity Report', text: shareText });
+            } catch (error) { console.error('Error sharing:', error); }
+        } else {
+            alert('Your browser does not support the share feature.');
+        }
+    };
+
     if (loading) {
         return <div className="flex items-center justify-center h-screen bg-gray-100"><div className="text-xl font-semibold">Loading Activity Tracker...</div></div>;
     }
@@ -249,14 +305,12 @@ const App = () => {
             <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
                 <Header displayName={displayName} onSignOut={handleSignOut} />
                 <TabBar activeTab={activeTab} setActiveTab={setActiveTab} />
-                
                 <main className="mt-6">
-                    {activeTab === 'tracker' && <ActivityTracker date={currentDate} setDate={setCurrentDate} goal={monthlyGoal} onGoalChange={handleGoalChange} data={monthlyData} onDataChange={handleDataChange} />}
+                    {activeTab === 'tracker' && <ActivityTracker date={currentDate} setDate={setCurrentDate} goal={monthlyGoal} onGoalChange={handleGoalChange} data={monthlyData} onDataChange={handleDataChange} onShare={handleShareReport} />}
                     {activeTab === 'hotlist' && <HotList list={hotlist} onAdd={addHotlistItem} onUpdate={updateHotlistItem} onDelete={deleteHotlistItem} />}
                     {activeTab === 'analytics' && <AnalyticsDashboard data={analyticsData} />}
                     {activeTab === 'leaderboard' && <Leaderboard db={db} monthYearId={monthYearId} />}
                 </main>
-                
                 {showNameModal && <DisplayNameModal onSave={handleSetDisplayName} />}
                 {showAddHotlistModal && <AddHotlistItemModal onClose={() => setShowAddHotlistModal(false)} onAdd={handleConfirmAddHotlistItem} />}
                 {deletingItemId && <ConfirmDeleteModal onClose={() => setDeletingItemId(null)} onConfirm={handleConfirmDelete} />}
@@ -271,51 +325,28 @@ const AuthPage = ({ auth }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
-
     const handleAction = async (e) => {
         e.preventDefault();
         setError('');
-        if (!auth) {
-            setError("Authentication service is not available.");
-            return;
-        }
+        if (!auth) { setError("Authentication service is not available."); return; }
         try {
-            if (isSignUp) {
-                await createUserWithEmailAndPassword(auth, email, password);
-            } else {
-                await signInWithEmailAndPassword(auth, email, password);
-            }
-        } catch (err) {
-            setError(err.message);
-        }
+            if (isSignUp) { await createUserWithEmailAndPassword(auth, email, password); } 
+            else { await signInWithEmailAndPassword(auth, email, password); }
+        } catch (err) { setError(err.message); }
     };
-    
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center p-4">
-            <div className="text-center mb-8">
-                <h1 className="text-4xl font-bold text-gray-900 tracking-tight">Activity Tracker</h1>
-                <p className="text-lg text-gray-500 mt-1">Sign in or create an account to continue.</p>
-            </div>
+            <div className="text-center mb-8"><h1 className="text-4xl font-bold">Activity Tracker</h1><p className="text-lg text-gray-500 mt-1">Sign in or create an account.</p></div>
             <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
                 <form onSubmit={handleAction}>
                     <div className="p-6 space-y-4">
                         {error && <p className="text-red-500 text-sm bg-red-100 p-3 rounded-md">{error}</p>}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Email</label>
-                            <input type="email" value={email} onChange={e => setEmail(e.target.value)} required className="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Password</label>
-                            <input type="password" value={password} onChange={e => setPassword(e.target.value)} required className="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500" />
-                        </div>
+                        <div><label className="block text-sm font-medium">Email</label><input type="email" value={email} onChange={e => setEmail(e.target.value)} required className="mt-1 block w-full p-2 border rounded-md" /></div>
+                        <div><label className="block text-sm font-medium">Password</label><input type="password" value={password} onChange={e => setPassword(e.target.value)} required className="mt-1 block w-full p-2 border rounded-md" /></div>
                     </div>
                     <div className="p-4 bg-gray-50 flex flex-col items-center space-y-2 rounded-b-lg">
-                        <button type="submit" className="w-full bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition">
-                            {isSignUp ? 'Sign Up' : 'Login'}
-                        </button>
-                        <button type="button" onClick={() => setIsSignUp(!isSignUp)} className="text-sm text-indigo-600 hover:underline">
-                           {isSignUp ? 'Already have an account? Login' : "Don't have an account? Sign Up"}
-                        </button>
+                        <button type="submit" className="w-full bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">{isSignUp ? 'Sign Up' : 'Login'}</button>
+                        <button type="button" onClick={() => setIsSignUp(!isSignUp)} className="text-sm text-indigo-600 hover:underline">{isSignUp ? 'Already have an account? Login' : "Don't have an account? Sign Up"}</button>
                     </div>
                 </form>
             </div>
@@ -323,55 +354,32 @@ const AuthPage = ({ auth }) => {
     );
 };
 
-
 const Header = ({ displayName, onSignOut }) => (
     <header className="mb-6 flex justify-between items-start">
         <div>
             <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight">Activity Tracker</h1>
-            <p className="text-md sm:text-lg text-gray-500 mt-1">
-                {displayName ? `Welcome, ${displayName}` : 'Your dashboard for business growth.'}
-            </p>
+            <p className="text-md sm:text-lg text-gray-500 mt-1">{displayName ? `Welcome, ${displayName}` : 'Your dashboard for business growth.'}</p>
         </div>
         <button onClick={onSignOut} className="flex items-center bg-gray-200 text-gray-700 px-3 py-2 rounded-md hover:bg-gray-300 transition text-sm">
-            <LogOut className="h-4 w-4 mr-2"/>
-            Sign Out
+            <LogOut className="h-4 w-4 mr-2"/>Sign Out
         </button>
     </header>
 );
 
 const TabBar = ({ activeTab, setActiveTab }) => {
-    const tabs = [
-        { id: 'tracker', name: 'Monthly Tracker', icon: Calendar },
-        { id: 'leaderboard', name: 'Leaderboard', icon: Trophy },
-        { id: 'hotlist', name: '10 in Play', icon: List },
-        { id: 'analytics', name: 'Analytics', icon: BarChart2 },
-    ];
+    const tabs = [ { id: 'tracker', name: 'Tracker', icon: Calendar }, { id: 'leaderboard', name: 'Leaderboard', icon: Trophy }, { id: 'hotlist', name: '10 in Play', icon: List }, { id: 'analytics', name: 'Analytics', icon: BarChart2 } ];
     return (
-        <div className="border-b border-gray-200">
-            <nav className="-mb-px flex space-x-4 sm:space-x-6 overflow-x-auto" aria-label="Tabs">
-                {tabs.map(tab => (
-                    <button
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id)}
-                        className={`${
-                            activeTab === tab.id
-                                ? 'border-indigo-500 text-indigo-600'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                        } whitespace-nowrap py-3 px-1 sm:py-4 border-b-2 font-medium text-sm flex items-center transition-colors duration-200`}
-                    >
-                        <tab.icon className="mr-2 h-5 w-5" />
-                        {tab.name}
-                    </button>
-                ))}
-            </nav>
-        </div>
+        <div className="border-b border-gray-200"><nav className="-mb-px flex space-x-4 sm:space-x-6 overflow-x-auto" aria-label="Tabs">
+            {tabs.map(tab => (<button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`${ activeTab === tab.id ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' } whitespace-nowrap py-3 px-1 sm:py-4 border-b-2 font-medium text-sm flex items-center`}>
+                <tab.icon className="mr-2 h-5 w-5" />{tab.name}
+            </button>))}
+        </nav></div>
     );
 };
 
 const Leaderboard = ({ db, monthYearId }) => {
     const [scores, setScores] = useState([]);
     const [loading, setLoading] = useState(true);
-
     useEffect(() => {
         const fetchScores = async () => {
             if (!db) return;
@@ -380,34 +388,22 @@ const Leaderboard = ({ db, monthYearId }) => {
             const q = query(scoresColRef, orderBy('exposures', 'desc'), limit(25));
             try {
                 const querySnapshot = await getDocs(q);
-                const scoresData = querySnapshot.docs.map(doc => doc.data());
-                setScores(scoresData);
-            } catch (error) {
-                console.error("Error fetching leaderboard:", error);
-            }
+                setScores(querySnapshot.docs.map(doc => doc.data()));
+            } catch (error) { console.error("Error fetching leaderboard:", error); }
             setLoading(false);
         };
-
         fetchScores();
     }, [db, monthYearId]);
 
-    if (loading) {
-        return <div className="text-center p-10">Loading Leaderboard...</div>;
-    }
-
+    if (loading) return <div className="text-center p-10">Loading Leaderboard...</div>;
     return (
         <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
             <h2 className="text-xl sm:text-2xl font-semibold mb-4">Top 25 Performers</h2>
-            {scores.length === 0 ? (
-                <p className="text-gray-500">The leaderboard for this month is still empty. Be the first to get on the board!</p>
-            ) : (
+            {scores.length === 0 ? (<p className="text-gray-500">The leaderboard is empty.</p>) : (
                 <ol className="space-y-3">
                     {scores.map((score, index) => (
                         <li key={score.userId} className="flex items-center justify-between p-3 rounded-md bg-gray-50">
-                            <div className="flex items-center">
-                                <span className="text-lg font-bold text-gray-400 w-8">{index + 1}</span>
-                                <span className="font-medium text-gray-800">{score.displayName}</span>
-                            </div>
+                            <div className="flex items-center"><span className="text-lg font-bold text-gray-400 w-8">{index + 1}</span><span className="font-medium">{score.displayName}</span></div>
                             <span className="font-bold text-lg text-indigo-600">{score.exposures}</span>
                         </li>
                     ))}
@@ -417,30 +413,26 @@ const Leaderboard = ({ db, monthYearId }) => {
     );
 };
 
-
-const ActivityTracker = ({ date, setDate, goal, onGoalChange, data, onDataChange }) => {
+const ActivityTracker = ({ date, setDate, goal, onGoalChange, data, onDataChange, onShare }) => {
     const [selectedDay, setSelectedDay] = useState(null);
     const year = date.getFullYear();
     const month = date.getMonth();
-    const changeMonth = (offset) => {
-        const newDate = new Date(date);
-        newDate.setMonth(date.getMonth() + offset);
-        setDate(newDate);
-    };
+    const changeMonth = (offset) => { const newDate = new Date(date); newDate.setMonth(date.getMonth() + offset); setDate(newDate); };
     const calendarDays = useMemo(() => {
         const daysInMonth = new Date(year, month + 1, 0).getDate();
         const firstDayOfMonth = new Date(year, month, 1).getDay();
         const days = [];
-        for (let i = 0; i < firstDayOfMonth; i++) { days.push({ isBlank: true }); }
+        for (let i = 0; i < firstDayOfMonth; i++) { days.push({ isBlank: true, day: `blank-${i}` }); }
         for (let day = 1; day <= daysInMonth; day++) { days.push({ day, isBlank: false, data: data[day] || {} }); }
         return days;
     }, [year, month, data]);
     const monthlyTotals = useMemo(() => {
-        const initTotals = { exposures: 0, followUps: 0, teamCalls: 0, threeWays: 0, sitdowns: 0, pbrs: 0, gameplans: 0 };
+        const initTotals = { exposures: 0, followUps: 0, sitdowns: 0, pbrs: 0 };
         return Object.values(data).reduce((acc, dayData) => {
             acc.exposures += Number(dayData.exposures) || 0;
             acc.followUps += Number(dayData.followUps) || 0;
             acc.sitdowns += Array.isArray(dayData.sitdowns) ? dayData.sitdowns.length : 0;
+            acc.pbrs += Number(dayData.pbrs) || 0;
             return acc;
         }, initTotals);
     }, [data]);
@@ -461,29 +453,34 @@ const ActivityTracker = ({ date, setDate, goal, onGoalChange, data, onDataChange
             </div>
             <div className="grid grid-cols-7 gap-1">
                 {weekDays.map((day, index) => <div key={`${day}-${index}`} className="text-center font-semibold text-xs text-gray-500 py-2">{day}</div>)}
-                {calendarDays.map((day, index) => (
-                    <div key={index} onClick={() => handleDayClick(day)} className={`border rounded-md aspect-square p-1 sm:p-2 flex flex-col ${day.isBlank ? 'bg-gray-50' : 'cursor-pointer hover:bg-indigo-50'}`}>
-                        {!day.isBlank && (
-                            <><span className="font-medium text-xs sm:text-sm">{day.day}</span>
+                {calendarDays.map((d, index) => (
+                    <div key={d.day} onClick={() => handleDayClick(d)} className={`border rounded-md aspect-square p-1 sm:p-2 flex flex-col ${d.isBlank ? 'bg-gray-50' : 'cursor-pointer hover:bg-indigo-50'}`}>
+                        {!d.isBlank && (
+                            <><span className="font-medium text-xs sm:text-sm">{d.day}</span>
                             <div className="mt-auto text-[10px] sm:text-xs space-y-1">
-                                {day.data.exposures > 0 && <div className="bg-blue-100 text-blue-800 rounded px-1.5 py-0.5">E: {day.data.exposures}</div>}
-                                {day.data.sitdowns?.length > 0 && <div className="bg-green-100 text-green-800 rounded px-1.5 py-0.5">S: {day.data.sitdowns.length}</div>}
+                                {d.data.exposures > 0 && <div className="bg-blue-100 text-blue-800 rounded px-1.5 py-0.5">E: {d.data.exposures}</div>}
+                                {d.data.sitdowns?.length > 0 && <div className="bg-green-100 text-green-800 rounded px-1.5 py-0.5">S: {d.data.sitdowns.length}</div>}
                             </div></>
                         )}
                     </div>
                 ))}
             </div>
-            <TotalsFooter totals={monthlyTotals} />
+            <TotalsFooter totals={monthlyTotals} onShare={onShare} />
             {selectedDay && <DayEntryModal day={selectedDay} data={data[selectedDay] || {}} onClose={closeModal} onChange={handleModalDataChange} />}
         </div>
     );
 };
 
-const TotalsFooter = ({ totals }) => {
+const TotalsFooter = ({ totals, onShare }) => {
     const primaryMetric = { label: 'Total Exposures', value: totals.exposures, icon: Target };
     const otherMetrics = [ { label: 'Follow Ups', value: totals.followUps, icon: Users }, { label: '3 Ways', value: totals.threeWays, icon: PhoneCall }, { label: 'Sitdowns', value: totals.sitdowns, icon: Briefcase } ];
     return (
         <div className="mt-6 pt-5 border-t border-gray-200">
+            <div className="flex justify-end mb-4">
+                 <button onClick={onShare} className="flex items-center bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition text-sm">
+                    <Share2 className="h-4 w-4 mr-2" /> Share Weekly Report
+                </button>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="lg:col-span-2 bg-indigo-100 border p-4 sm:p-6 rounded-lg flex items-center justify-between">
                     <div><h3 className="text-base sm:text-lg font-semibold text-indigo-800">{primaryMetric.label}</h3><p className="text-4xl sm:text-5xl font-bold text-indigo-600 mt-1">{primaryMetric.value}</p></div>
@@ -603,7 +600,6 @@ const AnalyticsDashboard = ({ data }) => {
     );
 };
 
-// --- Other Modals and Utility Functions ---
 const NumberInput = (props) => (
     <input type="number" min="0" className="w-20 p-1 border border-gray-300 rounded-md text-sm focus:ring-indigo-500 focus:border-indigo-500 transition" {...props} />
 );
@@ -640,10 +636,7 @@ const ConfirmDeleteModal = ({ onClose, onConfirm }) => {
 function debounce(func, wait) {
     let timeout;
     return function executedFunction(...args) {
-        const later = () => {
-            clearTimeout(timeout);
-            func(...args);
-        };
+        const later = () => { clearTimeout(timeout); func(...args); };
         clearTimeout(timeout);
         timeout = setTimeout(later, wait);
     };
