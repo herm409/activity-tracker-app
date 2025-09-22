@@ -8,7 +8,7 @@ import {
 } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, query, limit, addDoc, deleteDoc } from 'firebase/firestore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { ChevronUp, ChevronDown, Plus, X, Calendar, List, BarChart2, Target, Users, PhoneCall, Briefcase } from 'lucide-react';
+import { ChevronUp, ChevronDown, Plus, X, Calendar, List, BarChart2, Target, Users, PhoneCall, Briefcase, Trash2 } from 'lucide-react';
 
 // --- Firebase Configuration ---
 const firebaseConfig = {
@@ -431,10 +431,9 @@ const DayEntryModal = ({ day, data, onClose, onChange }) => {
                        <label className="font-medium text-gray-700 text-sm sm:text-base">3 Ways</label>
                        <NumberInput value={data.threeWays || ''} onChange={e => onChange('threeWays', e.target.value)} />
                    </div>
-                   <div className="flex items-center justify-between">
-                       <label className="font-medium text-gray-700 text-sm sm:text-base">Sitdown</label>
-                       <SitdownSelect value={data.sitdowns} onChange={val => onChange('sitdowns', val)} />
-                   </div>
+                   
+                   <SitdownTracker value={data.sitdowns} onChange={val => onChange('sitdowns', val)} />
+
                     <div className="flex items-center justify-between">
                        <label className="font-medium text-gray-700 text-sm sm:text-base">PBRS</label>
                        <NumberInput value={data.pbrs || ''} onChange={e => onChange('pbrs', e.target.value)} />
@@ -467,38 +466,51 @@ const CheckboxInput = (props) => (
     <input type="checkbox" className="h-5 w-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 transition" {...props} />
 );
 
-const SitdownSelect = ({ value = [], onChange }) => {
+const SitdownTracker = ({ value = [], onChange }) => {
     const options = { 'P': 'Phone', 'Z': 'Zoom', 'V': 'Video', 'D': 'DM Mtg', 'E': 'Enroll' };
-    const [isOpen, setIsOpen] = useState(false);
+    const [isAdding, setIsAdding] = useState(false);
 
-    const handleSelect = (optionKey) => {
-        const newValue = value.includes(optionKey)
-            ? value.filter(item => item !== optionKey)
-            : [...value, optionKey];
-        onChange(newValue.sort());
+    const handleAdd = (type) => {
+        const newValue = [...value, type];
+        onChange(newValue);
+        setIsAdding(false);
+    };
+
+    const handleRemove = (indexToRemove) => {
+        const newValue = value.filter((_, index) => index !== indexToRemove);
+        onChange(newValue);
     };
 
     return (
-        <div className="relative w-36">
-            <button onClick={() => setIsOpen(!isOpen)} className="w-full bg-white border border-gray-300 rounded-md p-1.5 text-left text-sm flex justify-between items-center">
-                <span className="truncate">{value.length > 0 ? value.map(k => options[k]).join(', ') : 'Select...'}</span>
-                <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-            </button>
-            {isOpen && (
-                <div className="absolute z-20 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
-                    {Object.entries(options).map(([key, label]) => (
-                        <label key={key} className="flex items-center px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={value.includes(key)}
-                                onChange={() => handleSelect(key)}
-                                className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                            />
-                            <span className="ml-2 text-gray-700">{label}</span>
-                        </label>
-                    ))}
-                </div>
-            )}
+        <div className="pt-2">
+            <label className="font-medium text-gray-700 text-sm sm:text-base">Sitdowns ({value.length})</label>
+            <div className="mt-2 space-y-2">
+                {value.map((sitdown, index) => (
+                    <div key={index} className="flex items-center justify-between bg-gray-100 p-2 rounded-md">
+                        <span className="text-sm text-gray-800">{options[sitdown] || 'Unknown'}</span>
+                        <button onClick={() => handleRemove(index)} className="text-red-500 hover:text-red-700">
+                            <Trash2 className="h-4 w-4" />
+                        </button>
+                    </div>
+                ))}
+                {isAdding ? (
+                     <select 
+                        onChange={(e) => handleAdd(e.target.value)} 
+                        onBlur={() => setIsAdding(false)}
+                        className="w-full bg-white border border-gray-300 rounded-md p-2 text-sm"
+                        autoFocus
+                     >
+                        <option value="">Select type...</option>
+                        {Object.entries(options).map(([key, label]) => (
+                            <option key={key} value={key}>{label}</option>
+                        ))}
+                     </select>
+                ) : (
+                    <button onClick={() => setIsAdding(true)} className="w-full flex items-center justify-center bg-indigo-100 text-indigo-700 px-3 py-2 rounded-md hover:bg-indigo-200 transition text-sm">
+                        <Plus className="h-4 w-4 mr-2" /> Add Sitdown
+                    </button>
+                )}
+            </div>
         </div>
     );
 };
