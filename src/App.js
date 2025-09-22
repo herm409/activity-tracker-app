@@ -4,11 +4,13 @@ import {
     getAuth, 
     onAuthStateChanged, 
     signInWithCustomToken,
-    signInAnonymously
+    createUserWithEmailAndPassword,
+    signInWithEmailAndPassword,
+    signOut
 } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, query, limit, addDoc, deleteDoc, orderBy } from 'firebase/firestore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { ChevronUp, ChevronDown, Plus, X, Calendar, List, BarChart2, Target, Users, PhoneCall, Briefcase, Trash2, Trophy } from 'lucide-react';
+import { ChevronUp, ChevronDown, Plus, X, Calendar, List, BarChart2, Target, Users, PhoneCall, Briefcase, Trash2, Trophy, LogOut } from 'lucide-react';
 
 // --- Firebase Configuration ---
 const firebaseConfig = {
@@ -29,7 +31,7 @@ const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : 'defaul
 const App = () => {
     // --- State Management ---
     const [db, setDb] = useState(null);
-    const [, setAuth] = useState(null);
+    const [auth, setAuth] = useState(null);
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [displayName, setDisplayName] = useState('');
@@ -44,7 +46,7 @@ const App = () => {
     const [showAddHotlistModal, setShowAddHotlistModal] = useState(false);
     const [deletingItemId, setDeletingItemId] = useState(null);
 
-    // --- Firebase Initialization & Anonymous Auth ---
+    // --- Firebase Initialization ---
     useEffect(() => {
         try {
             const app = initializeApp(finalFirebaseConfig);
@@ -54,19 +56,9 @@ const App = () => {
             setDb(dbInstance);
 
             const unsubscribe = onAuthStateChanged(authInstance, async (currentUser) => {
-                if (currentUser) {
-                    setUser(currentUser);
-                } else {
-                    try {
-                        const initialAuthToken = typeof window.__initial_auth_token !== 'undefined' ? window.__initial_auth_token : null;
-                        if (initialAuthToken) {
-                            await signInWithCustomToken(authInstance, initialAuthToken);
-                        } else {
-                            await signInAnonymously(authInstance);
-                        }
-                    } catch (error) {
-                        console.error("Error signing in anonymously:", error);
-                    }
+                setUser(currentUser);
+                if (!currentUser && typeof window.__initial_auth_token !== 'undefined' && window.__initial_auth_token) {
+                     await signInWithCustomToken(authInstance, window.__initial_auth_token);
                 }
                 setLoading(false);
             });
@@ -85,15 +77,17 @@ const App = () => {
     const fetchData = useCallback(async () => {
         if (!user || !db) return;
 
-        // Fetch user profile
+        // Fetch user profile for display name
         const profileRef = doc(db, 'artifacts', appId, 'users', user.uid);
         const profileSnap = await getDoc(profileRef);
         if (profileSnap.exists() && profileSnap.data().displayName) {
             setDisplayName(profileSnap.data().displayName);
         } else {
+            // If they have an account but no display name, prompt for it.
             setShowNameModal(true);
         }
 
+        // Fetch the rest of the user data
         const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', monthYearId);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
@@ -234,16 +228,26 @@ const App = () => {
         await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'hotlist', deletingItemId));
         setDeletingItemId(null);
     };
+    
+    const handleSignOut = async () => {
+        if (auth) {
+            await signOut(auth);
+        }
+    };
 
     // --- Render Logic ---
-    if (loading || !user) {
+    if (loading) {
         return <div className="flex items-center justify-center h-screen bg-gray-100"><div className="text-xl font-semibold">Loading Activity Tracker...</div></div>;
     }
     
+    if (!user) {
+        return <AuthPage auth={auth} />;
+    }
+
     return (
         <div className="bg-gray-50 min-h-screen font-sans text-gray-800">
             <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
-                <Header displayName={displayName} />
+                <Header displayName={displayName} onSignOut={handleSignOut} />
                 <TabBar activeTab={activeTab} setActiveTab={setActiveTab} />
                 
                 <main className="mt-6">
@@ -262,14 +266,76 @@ const App = () => {
 };
 
 // --- Child Components ---
-const Header = ({ displayName }) => (
-    <header className="mb-6">
+const AuthPage = ({ auth }) => {
+    const [isSignUp, setIsSignUp] = useState(true);
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
+
+    const handleAction = async (e) => {
+        e.preventDefault();
+        setError('');
+        if (!auth) {
+            setError("Authentication service is not available.");
+            return;
+        }
+        try {
+            if (isSignUp) {
+                await createUserWithEmailAndPassword(auth, email, password);
+            } else {
+                await signInWithEmailAndPassword(auth, email, password);
+            }
+        } catch (err) {
+            setError(err.message);
+        }
+    };
+    
+    return (
+        <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center p-4">
+            <div className="text-center mb-8">
+                <h1 className="text-4xl font-bold text-gray-900 tracking-tight">Activity Tracker</h1>
+                <p className="text-lg text-gray-500 mt-1">Sign in or create an account to continue.</p>
+            </div>
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
+                <form onSubmit={handleAction}>
+                    <div className="p-6 space-y-4">
+                        {error && <p className="text-red-500 text-sm bg-red-100 p-3 rounded-md">{error}</p>}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Email</label>
+                            <input type="email" value={email} onChange={e => setEmail(e.target.value)} required className="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Password</label>
+                            <input type="password" value={password} onChange={e => setPassword(e.target.value)} required className="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500" />
+                        </div>
+                    </div>
+                    <div className="p-4 bg-gray-50 flex flex-col items-center space-y-2 rounded-b-lg">
+                        <button type="submit" className="w-full bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition">
+                            {isSignUp ? 'Sign Up' : 'Login'}
+                        </button>
+                        <button type="button" onClick={() => setIsSignUp(!isSignUp)} className="text-sm text-indigo-600 hover:underline">
+                           {isSignUp ? 'Already have an account? Login' : "Don't have an account? Sign Up"}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
+
+
+const Header = ({ displayName, onSignOut }) => (
+    <header className="mb-6 flex justify-between items-start">
         <div>
             <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight">Activity Tracker</h1>
             <p className="text-md sm:text-lg text-gray-500 mt-1">
                 {displayName ? `Welcome, ${displayName}` : 'Your dashboard for business growth.'}
             </p>
         </div>
+        <button onClick={onSignOut} className="flex items-center bg-gray-200 text-gray-700 px-3 py-2 rounded-md hover:bg-gray-300 transition text-sm">
+            <LogOut className="h-4 w-4 mr-2"/>
+            Sign Out
+        </button>
     </header>
 );
 
