@@ -8,7 +8,7 @@ import {
 } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, query, limit, addDoc, deleteDoc } from 'firebase/firestore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { ChevronUp, ChevronDown, Plus, X, Calendar, List, BarChart2, Target, Users, PhoneCall, Briefcase, Trash2, Trophy } from 'lucide-react';
+import { ChevronUp, ChevronDown, Plus, X, Calendar, List, BarChart2, Target, Users, PhoneCall, Briefcase, Trash2 } from 'lucide-react';
 
 // --- Firebase Configuration ---
 const firebaseConfig = {
@@ -709,4 +709,5 @@ function debounce(func, wait) {
 }
 
 export default App;
+
 
