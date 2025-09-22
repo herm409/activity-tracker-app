@@ -31,7 +31,7 @@ const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : 'defaul
 const App = () => {
     // --- State Management ---
     const [db, setDb] = useState(null);
-    const [auth, setAuth] = useState(null);
+    const [, setAuth] = useState(null); // 'auth' state is not read, so we can omit it.
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
 
@@ -103,7 +103,7 @@ const App = () => {
         const hotlistItems = hotlistSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
         setHotlist(hotlistItems);
 
-    }, [user, db, monthYearId]);
+    }, [user, db, monthYearId, appId]);
 
 
     const fetchAnalytics = useCallback(async () => {
@@ -138,22 +138,22 @@ const App = () => {
             return totals;
         });
         setAnalyticsData(processedData);
-    }, [user, db]);
+    }, [user, db, appId]);
 
     useEffect(() => {
         if (user && db) {
            if(activeTab === 'tracker' || (activeTab === 'hotlist' && !hotlist.length)) fetchData();
            if(activeTab === 'analytics') fetchAnalytics();
         }
-    }, [user, db, currentDate, fetchData, fetchAnalytics, activeTab]);
+    }, [user, db, currentDate, fetchData, fetchAnalytics, activeTab, hotlist.length]);
 
-    const debouncedSave = useCallback(
-        debounce(async (newData, newGoal) => {
+    const debouncedSave = useMemo(
+        () => debounce(async (newData, newGoal) => {
             if (!user || !db) return;
             const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', monthYearId);
             await setDoc(docRef, { dailyData: newData, monthlyGoal: newGoal }, { merge: true });
         }, 1000),
-        [user, db, monthYearId]
+        [user, db, monthYearId, appId]
     );
 
     const handleDataChange = (day, field, value) => {
