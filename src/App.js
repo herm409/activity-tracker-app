@@ -3,14 +3,13 @@ import { initializeApp } from 'firebase/app';
 import { 
     getAuth, 
     onAuthStateChanged, 
-    signInWithCustomToken,
     createUserWithEmailAndPassword,
     signInWithEmailAndPassword,
     signOut
 } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, query, limit, addDoc, deleteDoc, orderBy } from 'firebase/firestore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { ChevronUp, ChevronDown, Plus, X, Calendar, List, BarChart2, Target, Users, PhoneCall, Briefcase, Trash2, Trophy, LogOut, Share2 } from 'lucide-react';
+import { ChevronUp, ChevronDown, Plus, X, Calendar, List, BarChart2, Target, Users, PhoneCall, Briefcase, Trash2, Trophy, LogOut, Share2, Flame } from 'lucide-react';
 
 // --- Firebase Configuration ---
 const firebaseConfig = {
@@ -23,9 +22,62 @@ const firebaseConfig = {
     appId: "1:242270405649:web:4492617a8bac02d551ddb0",
     measurementId: "G-PJ70LQMDVG"
 };
-// Check for environment-injected config, otherwise use the hardcoded one.
 const finalFirebaseConfig = typeof window.__firebase_config !== 'undefined' ? JSON.parse(window.__firebase_config) : firebaseConfig;
 const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : 'default-app-id';
+
+// --- Helper Functions ---
+const calculateStreak = (monthlyData, activityKey) => {
+    let streak = 0;
+    const today = new Date();
+    const currentMonthDataForStreak = monthlyData || {};
+    
+    const startDay = new Date(today);
+    startDay.setDate(today.getDate() - 1);
+
+    for (let i = 0; i < today.getDate(); i++) {
+        const dayToCheck = new Date(startDay);
+        dayToCheck.setDate(startDay.getDate() - i);
+        
+        if (dayToCheck.getMonth() !== today.getMonth()) break;
+
+        const dayData = currentMonthDataForStreak[dayToCheck.getDate()];
+        let hasActivity = false;
+        if (dayData) {
+            if (Array.isArray(dayData[activityKey])) {
+                hasActivity = dayData[activityKey].length > 0;
+            } else {
+                hasActivity = Number(dayData[activityKey]) > 0;
+            }
+        }
+        
+        if (hasActivity) {
+            streak++;
+        } else {
+            break;
+        }
+    }
+    const todayData = currentMonthDataForStreak[today.getDate()];
+    if(todayData){
+        let todayHasActivity = false;
+        if (Array.isArray(todayData[activityKey])) {
+            todayHasActivity = todayData[activityKey].length > 0;
+        } else {
+            todayHasActivity = Number(todayData[activityKey]) > 0;
+        }
+        if(todayHasActivity) streak++;
+    }
+
+    return streak;
+};
+
+const debounce = (func, wait) => {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => { clearTimeout(timeout); func(...args); };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+};
 
 // --- Main App Component ---
 const App = () => {
@@ -55,11 +107,8 @@ const App = () => {
             setAuth(authInstance);
             setDb(dbInstance);
 
-            const unsubscribe = onAuthStateChanged(authInstance, async (currentUser) => {
+            const unsubscribe = onAuthStateChanged(authInstance, (currentUser) => {
                 setUser(currentUser);
-                if (!currentUser && typeof window.__initial_auth_token !== 'undefined' && window.__initial_auth_token) {
-                     await signInWithCustomToken(authInstance, window.__initial_auth_token);
-                }
                 setLoading(false);
             });
             return () => unsubscribe();
@@ -99,8 +148,7 @@ const App = () => {
         const hotlistColRef = collection(db, 'artifacts', appId, 'users', user.uid, 'hotlist');
         const hotlistQuery = query(hotlistColRef, limit(10));
         const hotlistSnapshot = await getDocs(hotlistQuery);
-        const hotlistItems = hotlistSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-        setHotlist(hotlistItems);
+        setHotlist(hotlistSnapshot.docs.map(d => ({ id: d.id, ...d.data() })));
 
     }, [user, db, monthYearId]);
 
@@ -121,19 +169,15 @@ const App = () => {
         const analyticsPromises = [];
         const monthLabels = [];
         let tempDate = new Date();
-
         for (let i = 0; i < 6; i++) {
             const y = tempDate.getFullYear();
             const m = tempDate.getMonth();
             const myId = `${y}-${String(m + 1).padStart(2, '0')}`;
             monthLabels.unshift(tempDate.toLocaleString('default', { month: 'short', year: 'numeric' }));
-            
             const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', myId);
             analyticsPromises.unshift(getDoc(docRef));
-            
             tempDate.setMonth(tempDate.getMonth() - 1);
         }
-
         const docSnaps = await Promise.all(analyticsPromises);
         const processedData = docSnaps.map((snap, index) => {
             const totals = { name: monthLabels[index], Exposures: 0, 'Follow Ups': 0, Sitdowns: 0 };
@@ -152,8 +196,10 @@ const App = () => {
 
     useEffect(() => {
         if (user && db) {
-           if(activeTab === 'tracker' || (activeTab === 'hotlist' && !hotlist.length)) fetchData();
+           if(activeTab === 'hotlist' && !hotlist.length) fetchData();
            if(activeTab === 'analytics') fetchAnalytics();
+           // Simplified to avoid re-fetching on every tab change
+           if (activeTab === 'tracker') fetchData();
         }
     }, [user, db, currentDate, fetchData, fetchAnalytics, activeTab, hotlist.length]);
 
@@ -168,15 +214,12 @@ const App = () => {
         });
     }, [user, db, displayName, monthYearId]);
 
-    const debouncedSave = useMemo(
-        () => debounce(async (newData, newGoal) => {
-            if (!user || !db) return;
-            const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', monthYearId);
-            await setDoc(docRef, { dailyData: newData, monthlyGoal: newGoal }, { merge: true });
-            updateLeaderboard(newData);
-        }, 1500),
-        [user, db, monthYearId, updateLeaderboard]
-    );
+    const debouncedSave = useMemo(() => debounce(async (newData, newGoal) => {
+        if (!user || !db) return;
+        const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', monthYearId);
+        await setDoc(docRef, { dailyData: newData, monthlyGoal: newGoal }, { merge: true });
+        updateLeaderboard(newData);
+    }, 1500), [user, db, monthYearId, updateLeaderboard]);
 
     const handleDataChange = (day, field, value) => {
         const updatedData = { ...monthlyData, [day]: { ...monthlyData[day], [field]: value } };
@@ -190,10 +233,7 @@ const App = () => {
         debouncedSave(monthlyData, newGoal);
     };
     
-    const addHotlistItem = () => {
-        if (hotlist.length >= 10) return;
-        setShowAddHotlistModal(true);
-    };
+    const addHotlistItem = () => setShowAddHotlistModal(true);
     
     const handleConfirmAddHotlistItem = async (name) => {
         if (!user || !db || !name) { setShowAddHotlistModal(false); return; }
@@ -220,11 +260,7 @@ const App = () => {
         setDeletingItemId(null);
     };
     
-    const handleSignOut = async () => {
-        if (auth) {
-            await signOut(auth);
-        }
-    };
+    const handleSignOut = async () => auth && await signOut(auth);
     
     const handleShareReport = async () => {
         if (navigator.share) {
@@ -246,8 +282,6 @@ const App = () => {
                 let current = new Date(startDate);
                 while(current <= endDate) {
                     const monthDataDocId = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}`;
-                    // This logic only supports fetching from the currently loaded month's data.
-                    // For a robust solution, you would fetch last month's data if the week spans across months.
                     if (monthDataDocId === monthYearId) {
                         const dayData = monthlyData[current.getDate()];
                         if(dayData) {
@@ -292,13 +326,9 @@ const App = () => {
         }
     };
 
-    if (loading) {
-        return <div className="flex items-center justify-center h-screen bg-gray-100"><div className="text-xl font-semibold">Loading Activity Tracker...</div></div>;
-    }
+    if (loading) return <div className="flex items-center justify-center h-screen bg-gray-100"><div className="text-xl font-semibold">Loading...</div></div>;
     
-    if (!user) {
-        return <AuthPage auth={auth} />;
-    }
+    if (!user) return <AuthPage auth={auth} />;
 
     return (
         <div className="bg-gray-50 min-h-screen font-sans text-gray-800">
@@ -319,7 +349,6 @@ const App = () => {
     );
 };
 
-// --- Child Components ---
 const AuthPage = ({ auth }) => {
     const [isSignUp, setIsSignUp] = useState(true);
     const [email, setEmail] = useState('');
@@ -367,10 +396,26 @@ const Header = ({ displayName, onSignOut }) => (
 );
 
 const TabBar = ({ activeTab, setActiveTab }) => {
-    const tabs = [ { id: 'tracker', name: 'Tracker', icon: Calendar }, { id: 'leaderboard', name: 'Leaderboard', icon: Trophy }, { id: 'hotlist', name: '10 in Play', icon: List }, { id: 'analytics', name: 'Analytics', icon: BarChart2 } ];
+    const tabs = [
+        { id: 'leaderboard', name: 'Leaderboard', icon: Trophy }, 
+        { id: 'hotlist', name: '10 in Play', icon: List }, 
+        { id: 'analytics', name: 'Analytics', icon: BarChart2 } 
+    ];
+
+    const handleTabClick = (tabId) => {
+        // If clicking the currently active tab, it defaults to tracker
+        if (tabId === activeTab) {
+            setActiveTab('tracker');
+        } else {
+            setActiveTab(tabId);
+        }
+    };
+    
+    // The main calendar view is now the default "home", not a tab.
+    // The header "Activity Tracker" serves as its title.
     return (
         <div className="border-b border-gray-200"><nav className="-mb-px flex space-x-4 sm:space-x-6 overflow-x-auto" aria-label="Tabs">
-            {tabs.map(tab => (<button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`${ activeTab === tab.id ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' } whitespace-nowrap py-3 px-1 sm:py-4 border-b-2 font-medium text-sm flex items-center`}>
+            {tabs.map(tab => (<button key={tab.id} onClick={() => handleTabClick(tab.id)} className={`${ activeTab === tab.id ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' } whitespace-nowrap py-3 px-1 sm:py-4 border-b-2 font-medium text-sm flex items-center`}>
                 <tab.icon className="mr-2 h-5 w-5" />{tab.name}
             </button>))}
         </nav></div>
@@ -418,14 +463,23 @@ const ActivityTracker = ({ date, setDate, goal, onGoalChange, data, onDataChange
     const year = date.getFullYear();
     const month = date.getMonth();
     const changeMonth = (offset) => { const newDate = new Date(date); newDate.setMonth(date.getMonth() + offset); setDate(newDate); };
+    
     const calendarDays = useMemo(() => {
+        const today = new Date();
+        const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
         const daysInMonth = new Date(year, month + 1, 0).getDate();
         const firstDayOfMonth = new Date(year, month, 1).getDay();
         const days = [];
         for (let i = 0; i < firstDayOfMonth; i++) { days.push({ isBlank: true, day: `blank-${i}` }); }
-        for (let day = 1; day <= daysInMonth; day++) { days.push({ day, isBlank: false, data: data[day] || {} }); }
+        for (let day = 1; day <= daysInMonth; day++) {
+            const dayData = data[day] || {};
+            const isPast = isCurrentMonth && day < today.getDate();
+            const noActivity = Object.keys(dayData).filter(k => k !== 'exerc' && k !== 'read').length === 0 || (Number(dayData.exposures || 0) === 0 && Number(dayData.followUps || 0) === 0 && (dayData.sitdowns || []).length === 0);
+            days.push({ day, isBlank: false, data: dayData, hasNoActivity: isPast && noActivity });
+        }
         return days;
     }, [year, month, data]);
+
     const monthlyTotals = useMemo(() => {
         const initTotals = { exposures: 0, followUps: 0, sitdowns: 0, pbrs: 0 };
         return Object.values(data).reduce((acc, dayData) => {
@@ -436,10 +490,24 @@ const ActivityTracker = ({ date, setDate, goal, onGoalChange, data, onDataChange
             return acc;
         }, initTotals);
     }, [data]);
+
+    const streaks = useMemo(() => ({
+        exposures: calculateStreak(data, 'exposures'),
+        followUps: calculateStreak(data, 'followUps'),
+        sitdowns: calculateStreak(data, 'sitdowns'),
+    }), [data]);
+
     const weekDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
     const handleDayClick = (day) => { if(!day.isBlank) setSelectedDay(day.day); };
     const closeModal = () => setSelectedDay(null);
     const handleModalDataChange = (field, value) => onDataChange(selectedDay, field, value);
+
+    const activityColors = {
+        exposures: 'bg-blue-500',
+        followUps: 'bg-green-500',
+        sitdowns: 'bg-amber-500',
+        pbrs: 'bg-purple-500',
+    };
 
     return (
         <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
@@ -453,27 +521,42 @@ const ActivityTracker = ({ date, setDate, goal, onGoalChange, data, onDataChange
             </div>
             <div className="grid grid-cols-7 gap-1">
                 {weekDays.map((day, index) => <div key={`${day}-${index}`} className="text-center font-semibold text-xs text-gray-500 py-2">{day}</div>)}
-                {calendarDays.map((d, index) => (
+                {calendarDays.map((d) => (
                     <div key={d.day} onClick={() => handleDayClick(d)} className={`border rounded-md aspect-square p-1 sm:p-2 flex flex-col ${d.isBlank ? 'bg-gray-50' : 'cursor-pointer hover:bg-indigo-50'}`}>
                         {!d.isBlank && (
-                            <><span className="font-medium text-xs sm:text-sm">{d.day}</span>
-                            <div className="mt-auto text-[10px] sm:text-xs space-y-1">
-                                {d.data.exposures > 0 && <div className="bg-blue-100 text-blue-800 rounded px-1.5 py-0.5">E: {d.data.exposures}</div>}
-                                {d.data.sitdowns?.length > 0 && <div className="bg-green-100 text-green-800 rounded px-1.5 py-0.5">S: {d.data.sitdowns.length}</div>}
-                            </div></>
+                            <>
+                                <span className={`font-medium text-xs sm:text-sm ${d.hasNoActivity ? 'text-red-500' : ''}`}>{d.day}</span>
+                                <div className="flex justify-center items-end space-x-1 mt-auto h-2">
+                                    {d.data.exposures > 0 && <div className={`h-2 w-2 ${activityColors.exposures} rounded-full`}></div>}
+                                    {d.data.followUps > 0 && <div className={`h-2 w-2 ${activityColors.followUps} rounded-full`}></div>}
+                                    {d.data.sitdowns?.length > 0 && <div className={`h-2 w-2 ${activityColors.sitdowns} rounded-full`}></div>}
+                                    {d.data.pbrs > 0 && <div className={`h-2 w-2 ${activityColors.pbrs} rounded-full`}></div>}
+                                </div>
+                            </>
                         )}
                     </div>
                 ))}
             </div>
-            <TotalsFooter totals={monthlyTotals} onShare={onShare} />
+            <TotalsFooter totals={monthlyTotals} onShare={onShare} streaks={streaks} />
             {selectedDay && <DayEntryModal day={selectedDay} data={data[selectedDay] || {}} onClose={closeModal} onChange={handleModalDataChange} />}
         </div>
     );
 };
 
-const TotalsFooter = ({ totals, onShare }) => {
-    const primaryMetric = { label: 'Total Exposures', value: totals.exposures, icon: Target };
-    const otherMetrics = [ { label: 'Follow Ups', value: totals.followUps, icon: Users }, { label: '3 Ways', value: totals.threeWays, icon: PhoneCall }, { label: 'Sitdowns', value: totals.sitdowns, icon: Briefcase } ];
+const TotalsFooter = ({ totals, onShare, streaks }) => {
+    const primaryMetric = { label: 'Total Exposures', value: totals.exposures, icon: Target, color: 'indigo' };
+    const otherMetrics = [ 
+        { label: 'Follow Ups', value: totals.followUps, icon: Users, color: 'green' }, 
+        { label: 'Sitdowns', value: totals.sitdowns, icon: Briefcase, color: 'amber' },
+        { label: 'PBRS', value: totals.pbrs, icon: PhoneCall, color: 'purple' } 
+    ];
+
+    const streakData = [
+        { label: 'Exposures', value: streaks.exposures, color: 'blue' },
+        { label: 'Follow Ups', value: streaks.followUps, color: 'green' },
+        { label: 'Sitdowns', value: streaks.sitdowns, color: 'amber' },
+    ];
+
     return (
         <div className="mt-6 pt-5 border-t border-gray-200">
             <div className="flex justify-end mb-4">
@@ -482,16 +565,31 @@ const TotalsFooter = ({ totals, onShare }) => {
                 </button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="lg:col-span-2 bg-indigo-100 border p-4 sm:p-6 rounded-lg flex items-center justify-between">
-                    <div><h3 className="text-base sm:text-lg font-semibold text-indigo-800">{primaryMetric.label}</h3><p className="text-4xl sm:text-5xl font-bold text-indigo-600 mt-1">{primaryMetric.value}</p></div>
-                    <primaryMetric.icon className="h-12 w-12 sm:h-16 sm:w-16 text-indigo-400" />
+                <div className={`lg:col-span-2 bg-indigo-100 border border-indigo-200 p-4 sm:p-6 rounded-lg flex items-center justify-between`}>
+                    <div><h3 className={`text-base sm:text-lg font-semibold text-indigo-800`}>{primaryMetric.label}</h3><p className={`text-4xl sm:text-5xl font-bold text-indigo-600 mt-1`}>{primaryMetric.value}</p></div>
+                    <primaryMetric.icon className={`h-12 w-12 sm:h-16 sm:w-16 text-indigo-400`} />
                 </div>
                 {otherMetrics.map(metric => (
-                     <div key={metric.label} className="bg-gray-100 border p-4 rounded-lg flex items-center justify-between">
-                        <div><h4 className="text-sm sm:text-md font-semibold text-gray-700">{metric.label}</h4><p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1">{metric.value}</p></div>
-                        <metric.icon className="h-8 w-8 sm:h-10 sm:w-10 text-gray-400" />
+                     <div key={metric.label} className={`bg-${metric.color}-100 border border-${metric.color}-200 p-4 rounded-lg flex items-center justify-between`}>
+                        <div><h4 className={`text-sm sm:text-md font-semibold text-${metric.color}-800`}>{metric.label}</h4><p className={`text-2xl sm:text-3xl font-bold text-${metric.color}-900 mt-1`}>{metric.value}</p></div>
+                        <metric.icon className={`h-8 w-8 sm:h-10 sm:w-10 text-${metric.color}-400`} />
                     </div>
                 ))}
+            </div>
+            <div className="mt-6 bg-white p-4 rounded-lg shadow-sm border">
+                <h3 className="text-lg font-semibold text-center mb-3">Activity Streaks</h3>
+                <div className="flex justify-around items-center">
+                    {streakData.map(streak => streak.value > 1 && (
+                        <div key={streak.label} className="text-center">
+                            <div className={`relative w-16 h-16 bg-${streak.color}-100 rounded-full flex items-center justify-center`}>
+                                <Flame className={`h-8 w-8 text-${streak.color}-500`} />
+                                <span className={`absolute -top-1 -right-1 bg-${streak.color}-500 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center`}>{streak.value}</span>
+                            </div>
+                            <p className="text-xs font-medium text-gray-600 mt-2">{streak.label}</p>
+                        </div>
+                    ))}
+                    {streakData.every(s => s.value <= 1) && <p className="text-sm text-gray-500">Log an activity for two days in a row to start a streak!</p>}
+                </div>
             </div>
         </div>
     );
@@ -632,15 +730,6 @@ const ConfirmDeleteModal = ({ onClose, onConfirm }) => {
         </div>
     );
 };
-
-function debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-        const later = () => { clearTimeout(timeout); func(...args); };
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-    };
-}
 
 export default App;
 
