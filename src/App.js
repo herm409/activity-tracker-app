@@ -9,7 +9,7 @@ import {
 } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, query, limit, addDoc, deleteDoc, orderBy } from 'firebase/firestore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { ChevronUp, ChevronDown, Plus, X, List, BarChart2, Target, Users, PhoneCall, Briefcase, Trash2, Trophy, LogOut, Share2, Flame, Edit2, Calendar } from 'lucide-react';
+import { ChevronUp, ChevronDown, Plus, X, List, BarChart2, Target, Users, PhoneCall, Briefcase, Trash2, Trophy, LogOut, Share2, Flame, Edit2 } from 'lucide-react';
 
 // --- Firebase Configuration ---
 const firebaseConfig = {
