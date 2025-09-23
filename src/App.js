@@ -9,7 +9,7 @@ import {
 } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, query, limit, addDoc, deleteDoc, orderBy } from 'firebase/firestore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { ChevronUp, ChevronDown, Plus, X, List, BarChart2, Target, Users, PhoneCall, Briefcase, Trash2, Trophy, LogOut, Share2, Flame } from 'lucide-react';
+import { ChevronUp, ChevronDown, Plus, X, List, BarChart2, Target, Users, PhoneCall, Briefcase, Trash2, Trophy, LogOut, Share2, Flame, Edit2, Calendar } from 'lucide-react';
 
 // --- Firebase Configuration ---
 const firebaseConfig = {
@@ -91,7 +91,7 @@ const App = () => {
 
     const [currentDate, setCurrentDate] = useState(new Date());
     const [monthlyData, setMonthlyData] = useState({});
-    const [monthlyGoal, setMonthlyGoal] = useState('');
+    const [monthlyGoals, setMonthlyGoals] = useState({ exposures: 0, followUps: 0, sitdowns: 0, pbrs: 0, threeWays: 0 });
     const [hotlist, setHotlist] = useState([]);
     const [analyticsData, setAnalyticsData] = useState([]);
     const [activeTab, setActiveTab] = useState('tracker');
@@ -139,10 +139,10 @@ const App = () => {
         if (docSnap.exists()) {
             const data = docSnap.data();
             setMonthlyData(data.dailyData || {});
-            setMonthlyGoal(data.monthlyGoal || '');
+            setMonthlyGoals(data.monthlyGoals || { exposures: 0, followUps: 0, sitdowns: 0, pbrs: 0, threeWays: 0 });
         } else {
             setMonthlyData({});
-            setMonthlyGoal('');
+            setMonthlyGoals({ exposures: 0, followUps: 0, sitdowns: 0, pbrs: 0, threeWays: 0 });
         }
 
         const hotlistColRef = collection(db, 'artifacts', appId, 'users', user.uid, 'hotlist');
@@ -198,7 +198,6 @@ const App = () => {
         if (user && db) {
            if(activeTab === 'hotlist' && !hotlist.length) fetchData();
            if(activeTab === 'analytics') fetchAnalytics();
-           // Simplified to avoid re-fetching on every tab change
            if (activeTab === 'tracker') fetchData();
         }
     }, [user, db, currentDate, fetchData, fetchAnalytics, activeTab, hotlist.length]);
@@ -214,23 +213,25 @@ const App = () => {
         });
     }, [user, db, displayName, monthYearId]);
 
-    const debouncedSave = useMemo(() => debounce(async (newData, newGoal) => {
+    const debouncedSave = useMemo(() => debounce(async (dataToSave, goalsToSave) => {
         if (!user || !db) return;
         const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', monthYearId);
-        await setDoc(docRef, { dailyData: newData, monthlyGoal: newGoal }, { merge: true });
-        updateLeaderboard(newData);
+        await setDoc(docRef, { dailyData: dataToSave, monthlyGoals: goalsToSave }, { merge: true });
+        if (dataToSave) {
+            updateLeaderboard(dataToSave);
+        }
     }, 1500), [user, db, monthYearId, updateLeaderboard]);
 
     const handleDataChange = (day, field, value) => {
         const updatedData = { ...monthlyData, [day]: { ...monthlyData[day], [field]: value } };
         setMonthlyData(updatedData);
-        debouncedSave(updatedData, monthlyGoal);
+        debouncedSave(updatedData, monthlyGoals);
     };
 
-    const handleGoalChange = (e) => {
-        const newGoal = e.target.value;
-        setMonthlyGoal(newGoal);
-        debouncedSave(monthlyData, newGoal);
+    const handleGoalChange = (goalKey, value) => {
+        const newGoals = { ...monthlyGoals, [goalKey]: Number(value) || 0 };
+        setMonthlyGoals(newGoals);
+        debouncedSave(monthlyData, newGoals);
     };
     
     const addHotlistItem = () => setShowAddHotlistModal(true);
@@ -336,7 +337,7 @@ const App = () => {
                 <Header displayName={displayName} onSignOut={handleSignOut} />
                 <TabBar activeTab={activeTab} setActiveTab={setActiveTab} />
                 <main className="mt-6">
-                    {activeTab === 'tracker' && <ActivityTracker date={currentDate} setDate={setCurrentDate} goal={monthlyGoal} onGoalChange={handleGoalChange} data={monthlyData} onDataChange={handleDataChange} onShare={handleShareReport} />}
+                    {activeTab === 'tracker' && <ActivityTracker date={currentDate} setDate={setCurrentDate} goals={monthlyGoals} onGoalChange={handleGoalChange} data={monthlyData} onDataChange={handleDataChange} onShare={handleShareReport} />}
                     {activeTab === 'hotlist' && <HotList list={hotlist} onAdd={addHotlistItem} onUpdate={updateHotlistItem} onDelete={deleteHotlistItem} />}
                     {activeTab === 'analytics' && <AnalyticsDashboard data={analyticsData} />}
                     {activeTab === 'leaderboard' && <Leaderboard db={db} monthYearId={monthYearId} />}
@@ -402,18 +403,9 @@ const TabBar = ({ activeTab, setActiveTab }) => {
         { id: 'analytics', name: 'Analytics', icon: BarChart2 } 
     ];
 
-    const handleTabClick = (tabId) => {
-        // If clicking the currently active tab, it defaults to tracker
-        if (tabId === activeTab) {
-            setActiveTab('tracker');
-        } else {
-            setActiveTab(tabId);
-        }
-    };
-    
     return (
         <div className="border-b border-gray-200"><nav className="-mb-px flex space-x-4 sm:space-x-6 overflow-x-auto" aria-label="Tabs">
-            {tabs.map(tab => (<button key={tab.id} onClick={() => handleTabClick(tab.id)} className={`${ activeTab === tab.id ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' } whitespace-nowrap py-3 px-1 sm:py-4 border-b-2 font-medium text-sm flex items-center`}>
+            {tabs.map(tab => (<button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`${ activeTab === tab.id ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' } whitespace-nowrap py-3 px-1 sm:py-4 border-b-2 font-medium text-sm flex items-center`}>
                 <tab.icon className="mr-2 h-5 w-5" />{tab.name}
             </button>))}
         </nav></div>
@@ -456,7 +448,7 @@ const Leaderboard = ({ db, monthYearId }) => {
     );
 };
 
-const ActivityTracker = ({ date, setDate, goal, onGoalChange, data, onDataChange, onShare }) => {
+const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChange, onShare }) => {
     const [selectedDay, setSelectedDay] = useState(null);
     const year = date.getFullYear();
     const month = date.getMonth();
@@ -479,12 +471,13 @@ const ActivityTracker = ({ date, setDate, goal, onGoalChange, data, onDataChange
     }, [year, month, data]);
 
     const monthlyTotals = useMemo(() => {
-        const initTotals = { exposures: 0, followUps: 0, sitdowns: 0, pbrs: 0 };
+        const initTotals = { exposures: 0, followUps: 0, sitdowns: 0, pbrs: 0, threeWays: 0 };
         return Object.values(data).reduce((acc, dayData) => {
             acc.exposures += Number(dayData.exposures) || 0;
             acc.followUps += Number(dayData.followUps) || 0;
             acc.sitdowns += Array.isArray(dayData.sitdowns) ? dayData.sitdowns.length : 0;
             acc.pbrs += Number(dayData.pbrs) || 0;
+            acc.threeWays += Number(dayData.threeWays) || 0;
             return acc;
         }, initTotals);
     }, [data]);
@@ -505,17 +498,17 @@ const ActivityTracker = ({ date, setDate, goal, onGoalChange, data, onDataChange
         followUps: 'bg-green-500',
         sitdowns: 'bg-amber-500',
         pbrs: 'bg-purple-500',
+        threeWays: 'bg-pink-500',
     };
 
     return (
         <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
+             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
                 <div className="flex items-center mb-4 sm:mb-0">
                     <button onClick={() => changeMonth(-1)} className="p-2 rounded-md hover:bg-gray-100"><ChevronDown className="h-5 w-5 rotate-90" /></button>
                     <h2 className="text-xl sm:text-2xl font-semibold w-36 sm:w-48 text-center">{date.toLocaleString('default', { month: 'long', year: 'numeric' })}</h2>
                     <button onClick={() => changeMonth(1)} className="p-2 rounded-md hover:bg-gray-100"><ChevronUp className="h-5 w-5 rotate-90" /></button>
                 </div>
-                <input type="text" placeholder="Set monthly goal..." value={goal} onChange={onGoalChange} className="w-full sm:w-1/2 p-2 border border-gray-300 rounded-md" />
             </div>
             <div className="grid grid-cols-7 gap-1">
                 {weekDays.map((day, index) => <div key={`${day}-${index}`} className="text-center font-semibold text-xs text-gray-500 py-2">{day}</div>)}
@@ -535,20 +528,32 @@ const ActivityTracker = ({ date, setDate, goal, onGoalChange, data, onDataChange
                     </div>
                 ))}
             </div>
-            <TotalsFooter totals={monthlyTotals} onShare={onShare} streaks={streaks} />
+            <TotalsFooter totals={monthlyTotals} onShare={onShare} streaks={streaks} goals={goals} onGoalChange={onGoalChange}/>
             {selectedDay && <DayEntryModal day={selectedDay} data={data[selectedDay] || {}} onClose={closeModal} onChange={handleModalDataChange} />}
         </div>
     );
 };
 
-const TotalsFooter = ({ totals, onShare, streaks }) => {
-    const primaryMetric = { label: 'Total Exposures', value: totals.exposures, icon: Target, color: 'indigo' };
-    const otherMetrics = [ 
-        { label: 'Follow Ups', value: totals.followUps, icon: Users, color: 'green' }, 
-        { label: 'Sitdowns', value: totals.sitdowns, icon: Briefcase, color: 'amber' },
-        { label: 'PBRS', value: totals.pbrs, icon: PhoneCall, color: 'purple' } 
-    ];
+const TotalsFooter = ({ totals, onShare, streaks, goals, onGoalChange }) => {
+    const [editingGoal, setEditingGoal] = useState(null); 
 
+    const metrics = [
+        { key: 'exposures', label: 'Total Exposures', value: totals.exposures, icon: Target, color: 'indigo' },
+        { key: 'followUps', label: 'Follow Ups', value: totals.followUps, icon: Users, color: 'green' },
+        { key: 'sitdowns', label: 'Sitdowns', value: totals.sitdowns, icon: Briefcase, color: 'amber' },
+        { key: 'pbrs', label: 'PBRS', value: totals.pbrs, icon: Users, color: 'purple' },
+        { key: 'threeWays', label: '3-Way Calls', value: totals.threeWays, icon: PhoneCall, color: 'pink' }
+    ];
+    
+    const handleGoalEdit = (e) => {
+        if (e.key === 'Enter' || e.type === 'blur') {
+            onGoalChange(editingGoal, e.target.value);
+            setEditingGoal(null);
+        }
+    };
+    
+    const WEEKS_IN_MONTH = 4.33;
+    
     const streakData = [
         { label: 'Exposures', value: streaks.exposures, color: 'blue' },
         { label: 'Follow Ups', value: streaks.followUps, color: 'green' },
@@ -562,20 +567,50 @@ const TotalsFooter = ({ totals, onShare, streaks }) => {
                     <Share2 className="h-4 w-4 mr-2" /> Share Weekly Report
                 </button>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className={`lg:col-span-2 bg-indigo-100 border border-indigo-200 p-4 sm:p-6 rounded-lg flex items-center justify-between`}>
-                    <div><h3 className={`text-base sm:text-lg font-semibold text-indigo-800`}>{primaryMetric.label}</h3><p className={`text-4xl sm:text-5xl font-bold text-indigo-600 mt-1`}>{primaryMetric.value}</p></div>
-                    <primaryMetric.icon className={`h-12 w-12 sm:h-16 sm:w-16 text-indigo-400`} />
-                </div>
-                {otherMetrics.map(metric => (
-                     <div key={metric.label} className={`bg-${metric.color}-100 border border-${metric.color}-200 p-4 rounded-lg flex items-center justify-between`}>
-                        <div><h4 className={`text-sm sm:text-md font-semibold text-${metric.color}-800`}>{metric.label}</h4><p className={`text-2xl sm:text-3xl font-bold text-${metric.color}-900 mt-1`}>{metric.value}</p></div>
-                        <metric.icon className={`h-8 w-8 sm:h-10 sm:w-10 text-${metric.color}-400`} />
-                    </div>
-                ))}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {metrics.map(metric => {
+                    const goal = goals[metric.key] || 0;
+                    const progress = goal > 0 ? (metric.value / goal) * 100 : 0;
+                    const weeklyPace = Math.ceil(goal / WEEKS_IN_MONTH);
+
+                    return (
+                        <div key={metric.key} className={`bg-white border p-4 rounded-lg shadow-sm flex flex-col`}>
+                            <div className="flex items-start justify-between">
+                                <div>
+                                    <h4 className={`text-sm sm:text-md font-semibold text-gray-600`}>{metric.label}</h4>
+                                    <p className={`text-4xl sm:text-5xl font-bold text-gray-900 mt-1`}>{metric.value}</p>
+                                </div>
+                                <metric.icon className={`h-8 w-8 text-${metric.color}-400`} />
+                            </div>
+                            <div className="mt-auto pt-4">
+                                <div className="flex justify-between items-center text-xs text-gray-500">
+                                    <span 
+                                        onClick={() => setEditingGoal(metric.key)}
+                                        className="cursor-pointer hover:text-indigo-600"
+                                    >
+                                        Goal: {editingGoal === metric.key ? 
+                                            <input 
+                                                type="number"
+                                                defaultValue={goal}
+                                                onKeyDown={handleGoalEdit}
+                                                onBlur={handleGoalEdit}
+                                                autoFocus
+                                                className="w-12 text-center bg-gray-100 rounded"
+                                            /> : <span>{goal} <Edit2 className="h-3 w-3 inline-block ml-1"/></span>
+                                        }
+                                    </span>
+                                    {goal > 0 && <span className="font-semibold">(~{weeklyPace}/wk)</span>}
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-2.5 mt-2">
+                                    <div className={`bg-${metric.color}-500 h-2.5 rounded-full`} style={{ width: `${Math.min(progress, 100)}%` }}></div>
+                                </div>
+                            </div>
+                        </div>
+                    )
+                })}
             </div>
             <div className="mt-6 bg-white p-4 rounded-lg shadow-sm border">
-                <h3 className="text-lg font-semibold text-center mb-3">Activity Streaks</h3>
+               <h3 className="text-lg font-semibold text-center mb-3">Activity Streaks</h3>
                 <div className="flex justify-around items-center">
                     {streakData.map(streak => streak.value > 1 && (
                         <div key={streak.label} className="text-center">
