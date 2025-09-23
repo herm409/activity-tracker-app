@@ -501,7 +501,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
             sitdowns: calculateAndUpdateStreak('sitdowns'),
         };
 
-    }, [data, user, userProfile, setUserProfile]);
+    }, [data.current, data.last, user, userProfile, setUserProfile]);
 
     const weekDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
     const handleDayClick = (day) => { if(!day.isBlank) setSelectedDay(day.day); };
