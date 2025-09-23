@@ -455,7 +455,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
             acc.threeWays += Number(dayData.threeWays) || 0;
             return acc;
         }, { exposures: 0, followUps: 0, sitdowns: 0, pbrs: 0, threeWays: 0 });
-    }, [data]);
+    }, [data.current]);
 
     const streaks = useMemo(() => {
         const calculateAndUpdateStreak = (activityKey) => {
