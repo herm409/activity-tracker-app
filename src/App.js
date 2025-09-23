@@ -92,7 +92,7 @@ const App = () => {
         const profileSnap = await getDoc(profileRef);
         if (profileSnap.exists()) {
             const profileData = profileSnap.data();
-            setUserProfile(profileData);
+            setUserProfile({ ...profileData, uid: user.uid });
             if (!profileData.displayName) {
                 setShowNameModal(true);
             }
@@ -455,11 +455,13 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
             acc.pbrs += Number(dayData.pbrs) || 0;
             acc.threeWays += Number(dayData.threeWays) || 0;
             return acc;
-        }, initTotals);
+        }, [data.current]);
     }, [data.current]);
 
     const streaks = useMemo(() => {
         const calculateAndUpdateStreak = (activityKey) => {
+            if (!user || !userProfile.uid || !data.current) return 0;
+            
             let currentStreak = 0;
             const today = new Date();
             let dayToCheck = new Date(today);
@@ -486,7 +488,8 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
             const longestStreaks = userProfile.longestStreaks || {};
             if (currentStreak > (longestStreaks[activityKey] || 0)) {
                 const newLongestStreaks = {...longestStreaks, [activityKey]: currentStreak };
-                const profileRef = doc(getFirestore(), 'artifacts', appId, 'users', user.uid);
+                const db = getFirestore();
+                const profileRef = doc(db, 'artifacts', appId, 'users', user.uid);
                 setDoc(profileRef, { longestStreaks: newLongestStreaks }, { merge: true });
                 setUserProfile(prev => ({...prev, longestStreaks: newLongestStreaks}));
             }
@@ -499,7 +502,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
             sitdowns: calculateAndUpdateStreak('sitdowns'),
         };
 
-    }, [data, user, userProfile, setUserProfile]);
+    }, [data.current, data.last, user, userProfile, setUserProfile]);
 
     const weekDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
     const handleDayClick = (day) => { if(!day.isBlank) setSelectedDay(day.day); };
@@ -770,5 +773,4 @@ const ConfirmDeleteModal = ({ onClose, onConfirm }) => {
 };
 
 export default App;
-
 
