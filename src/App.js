@@ -26,50 +26,6 @@ const finalFirebaseConfig = typeof window.__firebase_config !== 'undefined' ? JS
 const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : 'default-app-id';
 
 // --- Helper Functions ---
-const calculateStreak = (monthlyData, activityKey) => {
-    let streak = 0;
-    const today = new Date();
-    const currentMonthDataForStreak = monthlyData || {};
-    
-    const startDay = new Date(today);
-    startDay.setDate(today.getDate() - 1);
-
-    for (let i = 0; i < today.getDate(); i++) {
-        const dayToCheck = new Date(startDay);
-        dayToCheck.setDate(startDay.getDate() - i);
-        
-        if (dayToCheck.getMonth() !== today.getMonth()) break;
-
-        const dayData = currentMonthDataForStreak[dayToCheck.getDate()];
-        let hasActivity = false;
-        if (dayData) {
-            if (Array.isArray(dayData[activityKey])) {
-                hasActivity = dayData[activityKey].length > 0;
-            } else {
-                hasActivity = Number(dayData[activityKey]) > 0;
-            }
-        }
-        
-        if (hasActivity) {
-            streak++;
-        } else {
-            break;
-        }
-    }
-    const todayData = currentMonthDataForStreak[today.getDate()];
-    if(todayData){
-        let todayHasActivity = false;
-        if (Array.isArray(todayData[activityKey])) {
-            todayHasActivity = todayData[activityKey].length > 0;
-        } else {
-            todayHasActivity = Number(todayData[activityKey]) > 0;
-        }
-        if(todayHasActivity) streak++;
-    }
-
-    return streak;
-};
-
 const debounce = (func, wait) => {
     let timeout;
     return function executedFunction(...args) {
@@ -86,11 +42,12 @@ const App = () => {
     const [auth, setAuth] = useState(null);
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [displayName, setDisplayName] = useState('');
+    const [userProfile, setUserProfile] = useState({});
     const [showNameModal, setShowNameModal] = useState(false);
 
     const [currentDate, setCurrentDate] = useState(new Date());
     const [monthlyData, setMonthlyData] = useState({});
+    const [lastMonthData, setLastMonthData] = useState({});
     const [monthlyGoals, setMonthlyGoals] = useState({ exposures: 0, followUps: 0, sitdowns: 0, pbrs: 0, threeWays: 0 });
     const [hotlist, setHotlist] = useState([]);
     const [analyticsData, setAnalyticsData] = useState([]);
@@ -122,14 +79,23 @@ const App = () => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
     const monthYearId = `${year}-${String(month + 1).padStart(2, '0')}`;
+    
+    const lastMonthDate = new Date(currentDate);
+    lastMonthDate.setMonth(currentDate.getMonth() - 1);
+    const lastMonthYearId = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, '0')}`;
+
 
     const fetchData = useCallback(async () => {
         if (!user || !db) return;
 
         const profileRef = doc(db, 'artifacts', appId, 'users', user.uid);
         const profileSnap = await getDoc(profileRef);
-        if (profileSnap.exists() && profileSnap.data().displayName) {
-            setDisplayName(profileSnap.data().displayName);
+        if (profileSnap.exists()) {
+            const profileData = profileSnap.data();
+            setUserProfile(profileData);
+            if (!profileData.displayName) {
+                setShowNameModal(true);
+            }
         } else {
             setShowNameModal(true);
         }
@@ -144,13 +110,21 @@ const App = () => {
             setMonthlyData({});
             setMonthlyGoals({ exposures: 0, followUps: 0, sitdowns: 0, pbrs: 0, threeWays: 0 });
         }
+        
+        const lastMonthDocRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', lastMonthYearId);
+        const lastMonthDocSnap = await getDoc(lastMonthDocRef);
+        if (lastMonthDocSnap.exists()) {
+            setLastMonthData(lastMonthDocSnap.data().dailyData || {});
+        } else {
+            setLastMonthData({});
+        }
 
         const hotlistColRef = collection(db, 'artifacts', appId, 'users', user.uid, 'hotlist');
         const hotlistQuery = query(hotlistColRef, limit(10));
         const hotlistSnapshot = await getDocs(hotlistQuery);
         setHotlist(hotlistSnapshot.docs.map(d => ({ id: d.id, ...d.data() })));
 
-    }, [user, db, monthYearId]);
+    }, [user, db, monthYearId, lastMonthYearId]);
 
     const handleSetDisplayName = async (name) => {
         if (!user || !db || !name.trim()) {
@@ -158,9 +132,10 @@ const App = () => {
             return;
         }
         const trimmedName = name.trim();
+        const newProfile = { ...userProfile, displayName: trimmedName };
         const profileRef = doc(db, 'artifacts', appId, 'users', user.uid);
-        await setDoc(profileRef, { displayName: trimmedName }, { merge: true });
-        setDisplayName(trimmedName);
+        await setDoc(profileRef, newProfile, { merge: true });
+        setUserProfile(newProfile);
         setShowNameModal(false);
     };
 
@@ -203,15 +178,15 @@ const App = () => {
     }, [user, db, currentDate, fetchData, fetchAnalytics, activeTab, hotlist.length]);
 
     const updateLeaderboard = useCallback(async (currentMonthData) => {
-        if (!user || !db || !displayName) return;
+        if (!user || !db || !userProfile.displayName) return;
         const totalExposures = Object.values(currentMonthData).reduce((sum, day) => sum + (Number(day.exposures) || 0), 0);
         const leaderboardRef = doc(db, 'artifacts', appId, 'leaderboard', monthYearId, 'entries', user.uid);
         await setDoc(leaderboardRef, {
-            displayName: displayName,
+            displayName: userProfile.displayName,
             exposures: totalExposures,
             userId: user.uid
         });
-    }, [user, db, displayName, monthYearId]);
+    }, [user, db, userProfile.displayName, monthYearId]);
 
     const debouncedSave = useMemo(() => debounce(async (dataToSave, goalsToSave) => {
         if (!user || !db) return;
@@ -300,7 +275,7 @@ const App = () => {
             const thisWeekTotals = getWeekTotals(startOfWeek, endOfWeek);
             const lastWeekTotals = getWeekTotals(startOfLastWeek, endOfLastWeek);
 
-            let shareText = `My Activity Tracker Report\nFrom: ${displayName}\nWeek of: ${startOfWeek.toLocaleDateString()} - ${endOfWeek.toLocaleDateString()}\n\n`;
+            let shareText = `My Activity Tracker Report\nFrom: ${userProfile.displayName}\nWeek of: ${startOfWeek.toLocaleDateString()} - ${endOfWeek.toLocaleDateString()}\n\n`;
             shareText += `**This Week's Numbers:**\n- Exposures: ${thisWeekTotals.Exposures}\n- Follow Ups: ${thisWeekTotals['Follow Ups']}\n- Sitdowns: ${thisWeekTotals.Sitdowns}\n- PBRS: ${thisWeekTotals.PBRS}\n\n`;
             shareText += `**Last Week's Numbers:**\n- Exposures: ${lastWeekTotals.Exposures}\n- Follow Ups: ${lastWeekTotals['Follow Ups']}\n- Sitdowns: ${lastWeekTotals.Sitdowns}\n- PBRS: ${lastWeekTotals.PBRS}\n\n`;
             shareText += "--------------------\n\n";
@@ -334,10 +309,10 @@ const App = () => {
     return (
         <div className="bg-gray-50 min-h-screen font-sans text-gray-800">
             <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
-                <Header displayName={displayName} onSignOut={handleSignOut} />
+                <Header displayName={userProfile.displayName} onSignOut={handleSignOut} />
                 <TabBar activeTab={activeTab} setActiveTab={setActiveTab} />
                 <main className="mt-6">
-                    {activeTab === 'tracker' && <ActivityTracker date={currentDate} setDate={setCurrentDate} goals={monthlyGoals} onGoalChange={handleGoalChange} data={monthlyData} onDataChange={handleDataChange} onShare={handleShareReport} />}
+                    {activeTab === 'tracker' && <ActivityTracker date={currentDate} setDate={setCurrentDate} goals={monthlyGoals} onGoalChange={handleGoalChange} data={{current: monthlyData, last: lastMonthData}} onDataChange={handleDataChange} onShare={handleShareReport} user={user} userProfile={userProfile} setUserProfile={setUserProfile} />}
                     {activeTab === 'hotlist' && <HotList list={hotlist} onAdd={addHotlistItem} onUpdate={updateHotlistItem} onDelete={deleteHotlistItem} />}
                     {activeTab === 'analytics' && <AnalyticsDashboard data={analyticsData} />}
                     {activeTab === 'leaderboard' && <Leaderboard db={db} monthYearId={monthYearId} />}
@@ -449,7 +424,7 @@ const Leaderboard = ({ db, monthYearId }) => {
     );
 };
 
-const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChange, onShare }) => {
+const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChange, onShare, user, userProfile, setUserProfile }) => {
     const [selectedDay, setSelectedDay] = useState(null);
     const year = date.getFullYear();
     const month = date.getMonth();
@@ -463,7 +438,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
         const days = [];
         for (let i = 0; i < firstDayOfMonth; i++) { days.push({ isBlank: true, day: `blank-${i}` }); }
         for (let day = 1; day <= daysInMonth; day++) {
-            const dayData = data[day] || {};
+            const dayData = data.current[day] || {};
             const isPast = isCurrentMonth && day < today.getDate();
             const noActivity = Object.keys(dayData).filter(k => k !== 'exerc' && k !== 'read').length === 0 || (Number(dayData.exposures || 0) === 0 && Number(dayData.followUps || 0) === 0 && (dayData.sitdowns || []).length === 0);
             days.push({ day, isBlank: false, data: dayData, hasNoActivity: isPast && noActivity });
@@ -473,7 +448,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
 
     const monthlyTotals = useMemo(() => {
         const initTotals = { exposures: 0, followUps: 0, sitdowns: 0, pbrs: 0, threeWays: 0 };
-        return Object.values(data).reduce((acc, dayData) => {
+        return Object.values(data.current).reduce((acc, dayData) => {
             acc.exposures += Number(dayData.exposures) || 0;
             acc.followUps += Number(dayData.followUps) || 0;
             acc.sitdowns += Array.isArray(dayData.sitdowns) ? dayData.sitdowns.length : 0;
@@ -481,13 +456,50 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
             acc.threeWays += Number(dayData.threeWays) || 0;
             return acc;
         }, initTotals);
-    }, [data]);
+    }, [data.current]);
 
-    const streaks = useMemo(() => ({
-        exposures: calculateStreak(data, 'exposures'),
-        followUps: calculateStreak(data, 'followUps'),
-        sitdowns: calculateStreak(data, 'sitdowns'),
-    }), [data]);
+    const streaks = useMemo(() => {
+        const calculateAndUpdateStreak = (activityKey) => {
+            let currentStreak = 0;
+            const today = new Date();
+            let dayToCheck = new Date(today);
+    
+            while (true) {
+                const monthData = dayToCheck.getMonth() === today.getMonth() ? data.current : data.last;
+                if (!monthData) break;
+    
+                const dayData = monthData[dayToCheck.getDate()];
+                let hasActivity = false;
+                if (dayData) {
+                    if (Array.isArray(dayData[activityKey])) hasActivity = dayData[activityKey].length > 0;
+                    else hasActivity = Number(dayData[activityKey]) > 0;
+                }
+    
+                if (hasActivity) {
+                    currentStreak++;
+                    dayToCheck.setDate(dayToCheck.getDate() - 1);
+                } else {
+                    break;
+                }
+            }
+            
+            const longestStreaks = userProfile.longestStreaks || {};
+            if (currentStreak > (longestStreaks[activityKey] || 0)) {
+                const newLongestStreaks = {...longestStreaks, [activityKey]: currentStreak };
+                const profileRef = doc(getFirestore(), 'artifacts', appId, 'users', user.uid);
+                setDoc(profileRef, { longestStreaks: newLongestStreaks }, { merge: true });
+                setUserProfile(prev => ({...prev, longestStreaks: newLongestStreaks}));
+            }
+            return currentStreak;
+        };
+        
+        return {
+            exposures: calculateAndUpdateStreak('exposures'),
+            followUps: calculateAndUpdateStreak('followUps'),
+            sitdowns: calculateAndUpdateStreak('sitdowns'),
+        };
+
+    }, [data, user, userProfile, setUserProfile]);
 
     const weekDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
     const handleDayClick = (day) => { if(!day.isBlank) setSelectedDay(day.day); };
@@ -529,14 +541,15 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
                     </div>
                 ))}
             </div>
-            <TotalsFooter totals={monthlyTotals} onShare={onShare} streaks={streaks} goals={goals} onGoalChange={onGoalChange}/>
-            {selectedDay && <DayEntryModal day={selectedDay} data={data[selectedDay] || {}} onClose={closeModal} onChange={handleModalDataChange} />}
+            <TotalsFooter totals={monthlyTotals} onShare={onShare} streaks={streaks} goals={goals} onGoalChange={onGoalChange} userProfile={userProfile}/>
+            {selectedDay && <DayEntryModal day={selectedDay} data={data.current[selectedDay] || {}} onClose={closeModal} onChange={handleModalDataChange} />}
         </div>
     );
 };
 
-const TotalsFooter = ({ totals, onShare, streaks, goals, onGoalChange }) => {
+const TotalsFooter = ({ totals, onShare, streaks, goals, onGoalChange, userProfile }) => {
     const [editingGoal, setEditingGoal] = useState(null); 
+    const longestStreaks = userProfile.longestStreaks || {};
 
     const metrics = [
         { key: 'exposures', label: 'Total Exposures', value: totals.exposures, icon: Target, color: 'indigo' },
@@ -554,12 +567,6 @@ const TotalsFooter = ({ totals, onShare, streaks, goals, onGoalChange }) => {
     };
     
     const WEEKS_IN_MONTH = 4.33;
-    
-    const streakData = [
-        { label: 'Exposures', value: streaks.exposures, color: 'blue' },
-        { label: 'Follow Ups', value: streaks.followUps, color: 'green' },
-        { label: 'Sitdowns', value: streaks.sitdowns, color: 'amber' },
-    ];
 
     return (
         <div className="mt-6 pt-5 border-t border-gray-200">
@@ -573,6 +580,8 @@ const TotalsFooter = ({ totals, onShare, streaks, goals, onGoalChange }) => {
                     const goal = goals[metric.key] || 0;
                     const progress = goal > 0 ? (metric.value / goal) * 100 : 0;
                     const weeklyPace = Math.ceil(goal / WEEKS_IN_MONTH);
+                    const currentStreak = streaks[metric.key] || 0;
+                    const longestStreak = longestStreaks[metric.key] || 0;
 
                     return (
                         <div key={metric.key} className={`bg-white border p-4 rounded-lg shadow-sm flex flex-col`}>
@@ -582,6 +591,16 @@ const TotalsFooter = ({ totals, onShare, streaks, goals, onGoalChange }) => {
                                     <p className={`text-4xl sm:text-5xl font-bold text-gray-900 mt-1`}>{metric.value}</p>
                                 </div>
                                 <metric.icon className={`h-8 w-8 text-${metric.color}-400`} />
+                            </div>
+                            <div className="mt-4 flex space-x-4">
+                                <div className="flex items-center text-xs text-gray-500">
+                                    <Flame className="h-4 w-4 mr-1 text-amber-500"/>
+                                    <span>Current: <strong>{currentStreak}</strong></span>
+                                </div>
+                                <div className="flex items-center text-xs text-gray-500">
+                                     <Trophy className="h-4 w-4 mr-1 text-gray-400"/>
+                                     <span>Longest: <strong>{longestStreak}</strong></span>
+                                </div>
                             </div>
                             <div className="mt-auto pt-4">
                                 <div className="flex justify-between items-center text-xs text-gray-500">
@@ -609,21 +628,6 @@ const TotalsFooter = ({ totals, onShare, streaks, goals, onGoalChange }) => {
                         </div>
                     )
                 })}
-            </div>
-            <div className="mt-6 bg-white p-4 rounded-lg shadow-sm border">
-               <h3 className="text-lg font-semibold text-center mb-3">Activity Streaks</h3>
-                <div className="flex justify-around items-center">
-                    {streakData.map(streak => streak.value > 1 && (
-                        <div key={streak.label} className="text-center">
-                            <div className={`relative w-16 h-16 bg-${streak.color}-100 rounded-full flex items-center justify-center`}>
-                                <Flame className={`h-8 w-8 text-${streak.color}-500`} />
-                                <span className={`absolute -top-1 -right-1 bg-${streak.color}-500 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center`}>{streak.value}</span>
-                            </div>
-                            <p className="text-xs font-medium text-gray-600 mt-2">{streak.label}</p>
-                        </div>
-                    ))}
-                    {streakData.every(s => s.value <= 1) && <p className="text-sm text-gray-500">Log an activity for two days in a row to start a streak!</p>}
-                </div>
             </div>
         </div>
     );
@@ -766,4 +770,5 @@ const ConfirmDeleteModal = ({ onClose, onConfirm }) => {
 };
 
 export default App;
+
 
