@@ -444,7 +444,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
             days.push({ day, isBlank: false, data: dayData, hasNoActivity: isPast && noActivity });
         }
         return days;
-    }, [year, month, data.current]);
+    }, [year, month, data]);
 
     const monthlyTotals = useMemo(() => {
         return Object.values(data.current).reduce((acc, dayData) => {
@@ -455,7 +455,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
             acc.threeWays += Number(dayData.threeWays) || 0;
             return acc;
         }, { exposures: 0, followUps: 0, sitdowns: 0, pbrs: 0, threeWays: 0 });
-    }, [data.current]);
+    }, [data]);
 
     const streaks = useMemo(() => {
         const calculateAndUpdateStreak = (activityKey) => {
@@ -503,7 +503,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
             threeWays: calculateAndUpdateStreak('threeWays'),
         };
 
-    }, [data.current, data.last, user, userProfile, setUserProfile]);
+    }, [data, user, userProfile, setUserProfile]);
 
     const weekDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
     const handleDayClick = (day) => { if(!day.isBlank) setSelectedDay(day.day); };
