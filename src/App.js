@@ -9,7 +9,7 @@ import {
 } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, query, limit, addDoc, deleteDoc, orderBy } from 'firebase/firestore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { ChevronUp, ChevronDown, Plus, X, Calendar, List, BarChart2, Target, Users, PhoneCall, Briefcase, Trash2, Trophy, LogOut, Share2, Flame } from 'lucide-react';
+import { ChevronUp, ChevronDown, Plus, X, List, BarChart2, Target, Users, PhoneCall, Briefcase, Trash2, Trophy, LogOut, Share2, Flame } from 'lucide-react';
 
 // --- Firebase Configuration ---
 const firebaseConfig = {
@@ -411,8 +411,6 @@ const TabBar = ({ activeTab, setActiveTab }) => {
         }
     };
     
-    // The main calendar view is now the default "home", not a tab.
-    // The header "Activity Tracker" serves as its title.
     return (
         <div className="border-b border-gray-200"><nav className="-mb-px flex space-x-4 sm:space-x-6 overflow-x-auto" aria-label="Tabs">
             {tabs.map(tab => (<button key={tab.id} onClick={() => handleTabClick(tab.id)} className={`${ activeTab === tab.id ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' } whitespace-nowrap py-3 px-1 sm:py-4 border-b-2 font-medium text-sm flex items-center`}>
