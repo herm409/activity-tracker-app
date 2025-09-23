@@ -455,7 +455,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
             acc.threeWays += Number(dayData.threeWays) || 0;
             return acc;
         }, { exposures: 0, followUps: 0, sitdowns: 0, pbrs: 0, threeWays: 0 });
-    }, [data.current]);
+    }, [data]);
 
     const streaks = useMemo(() => {
         const calculateAndUpdateStreak = (activityKey) => {
@@ -501,7 +501,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
             sitdowns: calculateAndUpdateStreak('sitdowns'),
         };
 
-    }, [data.current, data.last, user, userProfile, setUserProfile]);
+    }, [data, user, userProfile, setUserProfile]);
 
     const weekDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
     const handleDayClick = (day) => { if(!day.isBlank) setSelectedDay(day.day); };
