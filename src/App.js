@@ -459,7 +459,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
 
     const streaks = useMemo(() => {
         const calculateAndUpdateStreak = (activityKey) => {
-            if (!user || !userProfile.uid || !data.current) return 0;
+            if (!user || !userProfile.uid || !data) return 0;
             
             let currentStreak = 0;
             const today = new Date();
