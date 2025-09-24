@@ -444,7 +444,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
             days.push({ day, isBlank: false, data: dayData, hasNoActivity: isPast && noActivity });
         }
         return days;
-    }, [year, month, data.current]);
+    }, [year, month, data]);
 
     const monthlyTotals = useMemo(() => {
         return Object.values(data.current).reduce((acc, dayData) => {
@@ -455,7 +455,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
             acc.threeWays += Number(dayData.threeWays) || 0;
             return acc;
         }, { exposures: 0, followUps: 0, sitdowns: 0, pbrs: 0, threeWays: 0 });
-    }, [data.current]);
+    }, [data]);
 
     const streaks = useMemo(() => {
         const calculateAndUpdateStreak = (activityKey) => {
@@ -464,18 +464,6 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
             let currentStreak = 0;
             const today = new Date();
             let dayToCheck = new Date(today);
-    
-            // Check if there's activity today. If not, the streak is based on days before today.
-            const todayData = data.current[today.getDate()];
-            let hasActivityToday = false;
-            if (todayData) {
-                if (Array.isArray(todayData[activityKey])) hasActivityToday = todayData[activityKey].length > 0;
-                else hasActivityToday = Number(todayData[activityKey]) > 0;
-            }
-    
-            if (!hasActivityToday) {
-                dayToCheck.setDate(dayToCheck.getDate() - 1);
-            }
     
             while (true) {
                 const monthData = dayToCheck.getMonth() === today.getMonth() ? data.current : data.last;
@@ -538,9 +526,6 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
                     <h2 className="text-xl sm:text-2xl font-semibold w-36 sm:w-48 text-center">{date.toLocaleString('default', { month: 'long', year: 'numeric' })}</h2>
                     <button onClick={() => changeMonth(1)} className="p-2 rounded-md hover:bg-gray-100"><ChevronUp className="h-5 w-5 rotate-90" /></button>
                 </div>
-                 {Object.keys(data.current).length === 0 && (
-                    <p className="text-sm text-gray-500 mt-2 sm:mt-0 sm:ml-4">Click a day on the calendar to log your activity.</p>
-                )}
             </div>
             <div className="grid grid-cols-7 gap-1">
                 {weekDays.map((day, index) => <div key={`${day}-${index}`} className="text-center font-semibold text-xs text-gray-500 py-2">{day}</div>)}
