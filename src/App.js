@@ -465,18 +465,18 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
             const today = new Date();
             let dayToCheck = new Date(today);
     
-            // If no activity today, start checking from yesterday.
+            // Check if there's activity today. If not, the streak is based on days before today.
             const todayData = data.current[today.getDate()];
             let hasActivityToday = false;
             if (todayData) {
-                 if (Array.isArray(todayData[activityKey])) hasActivityToday = todayData[activityKey].length > 0;
-                 else hasActivityToday = Number(todayData[activityKey]) > 0;
+                if (Array.isArray(todayData[activityKey])) hasActivityToday = todayData[activityKey].length > 0;
+                else hasActivityToday = Number(todayData[activityKey]) > 0;
             }
-
+    
             if (!hasActivityToday) {
                 dayToCheck.setDate(dayToCheck.getDate() - 1);
             }
-
+    
             while (true) {
                 const monthData = dayToCheck.getMonth() === today.getMonth() ? data.current : data.last;
                 if (!monthData) break;
@@ -515,7 +515,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
             threeWays: calculateAndUpdateStreak('threeWays'),
         };
 
-    }, [data.current, data.last, user, userProfile, setUserProfile]);
+    }, [data, user, userProfile, setUserProfile]);
 
     const weekDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
     const handleDayClick = (day) => { if(!day.isBlank) setSelectedDay(day.day); };
