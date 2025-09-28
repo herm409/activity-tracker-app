@@ -206,7 +206,7 @@ const App = () => {
     const handleGoalChange = (goalKey, value) => {
         const newGoals = { ...monthlyGoals, [goalKey]: Number(value) || 0 };
         setMonthlyGoals(newGoals);
-        debouncedSave(monthlyData, newGoals);
+        debouncedSave(null, newGoals);
     };
     
     const addHotlistItem = () => setShowAddHotlistModal(true);
