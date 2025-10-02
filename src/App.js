@@ -257,15 +257,13 @@ const App = () => {
                 const totals = { Exposures: 0, 'Follow Ups': 0, Sitdowns: 0, PBRS: 0 };
                 let current = new Date(startDate);
                 while(current <= endDate) {
-                    const monthDataDocId = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}`;
-                    if (monthDataDocId === monthYearId) {
-                        const dayData = monthlyData[current.getDate()];
-                        if(dayData) {
-                            totals.Exposures += Number(dayData.exposures) || 0;
-                            totals['Follow Ups'] += Number(dayData.followUps) || 0;
-                            totals.Sitdowns += Array.isArray(dayData.sitdowns) ? dayData.sitdowns.length : 0;
-                            totals.PBRS += Number(dayData.pbrs) || 0;
-                        }
+                    const dataSet = current.getMonth() === today.getMonth() ? monthlyData : lastMonthData;
+                    const dayData = dataSet[current.getDate()];
+                    if(dayData) {
+                        totals.Exposures += Number(dayData.exposures) || 0;
+                        totals['Follow Ups'] += Number(dayData.followUps) || 0;
+                        totals.Sitdowns += Array.isArray(dayData.sitdowns) ? dayData.sitdowns.length : 0;
+                        totals.PBRS += Number(dayData.pbrs) || 0;
                     }
                     current.setDate(current.getDate() + 1);
                 }
@@ -444,7 +442,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
             days.push({ day, isBlank: false, data: dayData, hasNoActivity: isPast && noActivity });
         }
         return days;
-    }, [year, month, data]);
+    }, [year, month, data.current]);
 
     const monthlyTotals = useMemo(() => {
         return Object.values(data.current).reduce((acc, dayData) => {
@@ -455,7 +453,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
             acc.threeWays += Number(dayData.threeWays) || 0;
             return acc;
         }, { exposures: 0, followUps: 0, sitdowns: 0, pbrs: 0, threeWays: 0 });
-    }, [data]);
+    }, [data.current]);
 
     const streaks = useMemo(() => {
         const calculateAndUpdateStreak = (activityKey) => {
@@ -465,8 +463,20 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
             const today = new Date();
             let dayToCheck = new Date(today);
     
+            // If no activity today, start checking from yesterday.
+            const todayData = data.current[today.getDate()];
+            let hasActivityToday = false;
+            if (todayData) {
+                 if (Array.isArray(todayData[activityKey])) hasActivityToday = todayData[activityKey].length > 0;
+                 else hasActivityToday = Number(todayData[activityKey]) > 0;
+            }
+
+            if (!hasActivityToday) {
+                dayToCheck.setDate(dayToCheck.getDate() - 1);
+            }
+    
             while (true) {
-                const monthData = dayToCheck.getMonth() === today.getMonth() ? data.current : data.last;
+                const monthData = dayToCheck.getMonth() === new Date().getMonth() ? data.current : data.last;
                 if (!monthData) break;
     
                 const dayData = monthData[dayToCheck.getDate()];
@@ -503,7 +513,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
             threeWays: calculateAndUpdateStreak('threeWays'),
         };
 
-    }, [data, user, userProfile, setUserProfile]);
+    }, [data.current, data.last, user, userProfile, setUserProfile]);
 
     const weekDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
     const handleDayClick = (day) => { if(!day.isBlank) setSelectedDay(day.day); };
@@ -526,6 +536,9 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
                     <h2 className="text-xl sm:text-2xl font-semibold w-36 sm:w-48 text-center">{date.toLocaleString('default', { month: 'long', year: 'numeric' })}</h2>
                     <button onClick={() => changeMonth(1)} className="p-2 rounded-md hover:bg-gray-100"><ChevronUp className="h-5 w-5 rotate-90" /></button>
                 </div>
+                 {Object.keys(data.current).length === 0 && (
+                    <p className="text-sm text-gray-500 mt-2 sm:mt-0 sm:ml-4">Click a day on the calendar to log your activity.</p>
+                )}
             </div>
             <div className="grid grid-cols-7 gap-1">
                 {weekDays.map((day, index) => <div key={`${day}-${index}`} className="text-center font-semibold text-xs text-gray-500 py-2">{day}</div>)}
