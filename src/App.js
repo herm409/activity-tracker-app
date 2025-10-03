@@ -822,17 +822,19 @@ const TotalsFooter = ({ totals, onShare, isSharing, streaks, goals, onGoalChange
                             <div className="flex items-start justify-between">
                                 <div>
                                     <h4 className={`text-sm sm:text-md font-semibold text-gray-600`}>{metric.label}</h4>
-                                    <div className="flex items-center mt-1 space-x-2">
-                                        <p className={`text-4xl sm:text-5xl font-bold text-gray-900`}>{metric.value}</p>
-                                        {metric.key !== 'sitdowns' && (
-                                            <div className="flex flex-col space-y-1 self-center">
-                                                <button onClick={() => onQuickAdd(metric.key, 1)} className="p-1.5 rounded-full bg-gray-200 text-gray-600 hover:bg-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                                                    <Plus className="h-3 w-3" />
+                                    <div className="flex items-center mt-1">
+                                        {metric.key !== 'sitdowns' ? (
+                                            <div className="flex items-center space-x-3">
+                                                <button onClick={() => onQuickAdd(metric.key, -1)} className="p-2 rounded-full bg-gray-200 text-gray-600 hover:bg-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                                    <Minus className="h-4 w-4" />
                                                 </button>
-                                                <button onClick={() => onQuickAdd(metric.key, -1)} className="p-1.5 rounded-full bg-gray-200 text-gray-600 hover:bg-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                                                    <Minus className="h-3 w-3" />
+                                                <p className={`text-4xl sm:text-5xl font-bold text-gray-900 text-center w-14`}>{metric.value}</p>
+                                                <button onClick={() => onQuickAdd(metric.key, 1)} className="p-2 rounded-full bg-gray-200 text-gray-600 hover:bg-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                                    <Plus className="h-4 w-4" />
                                                 </button>
                                             </div>
+                                        ) : (
+                                            <p className={`text-4xl sm:text-5xl font-bold text-gray-900`}>{metric.value}</p>
                                         )}
                                     </div>
                                 </div>
@@ -1388,4 +1390,5 @@ const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
 });
 
 export default App;
+
 
