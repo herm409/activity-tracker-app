@@ -312,9 +312,9 @@ const App = () => {
         const dateRange = `${startOfWeek.toLocaleDateString('default', {month: 'short', day: 'numeric'})} - ${endOfWeek.toLocaleDateString('default', {month: 'short', day: 'numeric'})}`;
         
         const hotlistColRef = collection(db, 'artifacts', appId, 'users', user.uid, 'hotlist');
-        const hotlistQuery = query(hotlistColRef, where('isArchived', '!=', true));
-        const hotlistSnapshot = await getDocs(hotlistQuery);
-        const hotlistForReport = hotlistSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        const allDocsSnap = await getDocs(hotlistColRef);
+        const allItems = allDocsSnap.docs.map(d => ({id: d.id, ...d.data()}));
+        const hotlistForReport = allItems.filter(item => item.isArchived !== true).slice(0, 10);
 
         return { totals: thisWeekTotals, lastWeekTotals, dateRange, hotlist: hotlistForReport };
     }, [monthlyData, lastMonthData, user, db]);
@@ -1390,5 +1390,4 @@ const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
 });
 
 export default App;
-
 
