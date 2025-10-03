@@ -9,7 +9,7 @@ import {
 } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, query, limit, addDoc, deleteDoc, orderBy, where, getCountFromServer, updateDoc } from 'firebase/firestore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { ChevronUp, ChevronDown, Plus, X, List, BarChart2, Target, Users, PhoneCall, Briefcase, Trash2, Trophy, LogOut, Share2, Flame, Edit2, Calendar, Minus, Info, Archive, ArchiveRestore, ArrowDownUp } from 'lucide-react';
+import { ChevronUp, ChevronDown, Plus, X, List, BarChart2, Target, Users, PhoneCall, Briefcase, Trash2, Trophy, LogOut, Share2, Flame, Edit2, Calendar, Minus, Info, Archive, ArchiveRestore } from 'lucide-react';
 // Note: This implementation assumes html2canvas is loaded via a script tag in the main HTML file.
 // <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
@@ -923,18 +923,11 @@ const HotList = ({ user, db }) => {
     const [activeProspectsCount, setActiveProspectsCount] = useState(0);
     const [showAddModal, setShowAddModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState(null);
+    const [sortBy, setSortBy] = useState('name'); // New state for sorting
 
-    const hotlistColRef = useMemo(() => collection(db, 'artifacts', appId, 'users', user.uid, 'hotlist'), [db, user.uid, appId]);
+    const hotlistColRef = useMemo(() => collection(db, 'artifacts', appId, 'users', user.uid, 'hotlist'), [db, user.uid]);
 
     const fetchHotlist = useCallback(async () => {
-        const q = isArchiveView 
-            ? query(hotlistColRef, where('isArchived', '==', true))
-            : query(hotlistColRef, where('isArchived', '!=', true));
-        
-        const snapshot = await getDocs(q);
-        const fetchedList = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-
-        // For backwards compatibility, get all docs and filter client-side if the query might miss old data.
         const allDocsSnap = await getDocs(hotlistColRef);
         const allItems = allDocsSnap.docs.map(d => ({id: d.id, ...d.data()}));
         
@@ -962,10 +955,9 @@ const HotList = ({ user, db }) => {
         fetchHotlist();
     };
 
-    const debouncedUpdate = useCallback(debounce(async (id, field, value) => {
+    const debouncedUpdate = useMemo(() => debounce(async (id, field, value) => {
         const docRef = doc(hotlistColRef, id);
         await updateDoc(docRef, { [field]: value });
-        // No need to fetch here, local state is already updated
     }, 1000), [hotlistColRef]);
 
     const handleUpdate = (id, field, value) => {
@@ -995,6 +987,25 @@ const HotList = ({ user, db }) => {
 
     const progress = Math.min((activeProspectsCount / 10) * 100, 100);
 
+    const sortedList = useMemo(() => {
+        const statusOrder = { Hot: 1, Warm: 2, Cold: 3 };
+        return [...hotlist].sort((a, b) => {
+            if (sortBy === 'name') {
+                return a.name.localeCompare(b.name);
+            }
+            if (sortBy === 'lastContacted') {
+                // Newest first, nulls last
+                if (!a.lastContacted) return 1;
+                if (!b.lastContacted) return -1;
+                return new Date(b.lastContacted) - new Date(a.lastContacted);
+            }
+            if (sortBy === 'status') {
+                return (statusOrder[a.status] || 3) - (statusOrder[b.status] || 3);
+            }
+            return 0;
+        });
+    }, [hotlist, sortBy]);
+
     return (
         <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
              {showAddModal && <AddHotlistItemModal onClose={() => setShowAddModal(false)} onAdd={handleAdd} />}
@@ -1017,9 +1028,23 @@ const HotList = ({ user, db }) => {
                     </div>
                 </div>
             )}
+            
+            <div className="my-4 flex items-center justify-end space-x-2">
+                <label htmlFor="sort-prospects" className="text-sm font-medium text-gray-600">Sort by:</label>
+                <select 
+                    id="sort-prospects"
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="rounded-md border-gray-300 shadow-sm text-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                >
+                    <option value="name">Name (A-Z)</option>
+                    <option value="lastContacted">Last Contact (Newest)</option>
+                    <option value="status">Status (Hot-Cold)</option>
+                </select>
+            </div>
 
             <div className="space-y-4">
-                {hotlist.length > 0 ? hotlist.map(item => {
+                {sortedList.length > 0 ? sortedList.map(item => {
                     const currentStatus = item.status || 'Warm';
                     const { text, color, bg } = statusConfig[currentStatus];
 
@@ -1363,5 +1388,4 @@ const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
 });
 
 export default App;
-
 
