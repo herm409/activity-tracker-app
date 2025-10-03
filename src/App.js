@@ -424,10 +424,47 @@ const Leaderboard = ({ db, monthYearId }) => {
 
 const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChange, onShare, user, userProfile, setUserProfile }) => {
     const [selectedDay, setSelectedDay] = useState(null);
+    const [viewMode, setViewMode] = useState('week'); // Default to 'week'
+    
     const year = date.getFullYear();
     const month = date.getMonth();
-    const changeMonth = (offset) => { const newDate = new Date(date); newDate.setMonth(date.getMonth() + offset); setDate(newDate); };
     
+    // Navigation functions
+    const changeMonth = (offset) => { const newDate = new Date(date); newDate.setMonth(date.getMonth() + offset); setDate(newDate); };
+    const changeWeek = (offset) => { const newDate = new Date(date); newDate.setDate(date.getDate() + (7 * offset)); setDate(newDate); };
+
+    // Data for Weekly View
+    const weekDisplayDays = useMemo(() => {
+        const startOfWeek = new Date(date);
+        startOfWeek.setDate(date.getDate() - date.getDay()); // Assuming Sunday is the first day
+        startOfWeek.setHours(0,0,0,0);
+
+        const days = [];
+        for (let i = 0; i < 7; i++) {
+            const currentDay = new Date(startOfWeek);
+            currentDay.setDate(startOfWeek.getDate() + i);
+            
+            const dataSet = currentDay.getMonth() === date.getMonth() ? data.current : data.last;
+            const dayData = dataSet ? (dataSet[currentDay.getDate()] || {}) : {};
+
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            const isPast = currentDay < today;
+            
+            const noActivity = !dayData || ((Number(dayData.exposures || 0) === 0) && (Number(dayData.followUps || 0) === 0) && (Array.isArray(dayData.sitdowns) ? dayData.sitdowns.length === 0 : true));
+
+            days.push({
+                date: currentDay,
+                day: currentDay.getDate(),
+                data: dayData,
+                hasNoActivity: isPast && noActivity,
+                isBlank: false, // For compatibility
+            });
+        }
+        return days;
+    }, [date, data]);
+
+    // Data for Monthly View
     const calendarDays = useMemo(() => {
         const today = new Date();
         const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
@@ -502,8 +539,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
         };
 
     }, [data, user, userProfile, setUserProfile]);
-
-    const weekDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+    
     const handleDayClick = (day) => { if(!day.isBlank) setSelectedDay(day.day); };
     const closeModal = () => setSelectedDay(null);
     const handleModalDataChange = (field, value) => onDataChange(selectedDay, field, value);
@@ -515,34 +551,60 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
         pbrs: 'bg-purple-500',
         threeWays: 'bg-pink-500',
     };
-
+    
     return (
         <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
                 <div className="flex items-center mb-4 sm:mb-0">
-                    <button onClick={() => changeMonth(-1)} className="p-2 rounded-md hover:bg-gray-100"><ChevronDown className="h-5 w-5 rotate-90" /></button>
-                    <h2 className="text-xl sm:text-2xl font-semibold w-36 sm:w-48 text-center">{date.toLocaleString('default', { month: 'long', year: 'numeric' })}</h2>
-                    <button onClick={() => changeMonth(1)} className="p-2 rounded-md hover:bg-gray-100"><ChevronUp className="h-5 w-5 rotate-90" /></button>
+                    <button onClick={() => viewMode === 'week' ? changeWeek(-1) : changeMonth(-1)} className="p-2 rounded-md hover:bg-gray-100"><ChevronDown className="h-5 w-5 rotate-90" /></button>
+                    <h2 className="text-xl sm:text-2xl font-semibold w-40 sm:w-56 text-center">
+                        {viewMode === 'week' 
+                            ? `${weekDisplayDays[0].date.toLocaleDateString('default', { month: 'short', day: 'numeric' })} - ${weekDisplayDays[6].date.toLocaleDateString('default', { month: 'short', day: 'numeric' })}`
+                            : date.toLocaleString('default', { month: 'long', year: 'numeric' })}
+                    </h2>
+                    <button onClick={() => viewMode === 'week' ? changeWeek(1) : changeMonth(1)} className="p-2 rounded-md hover:bg-gray-100"><ChevronUp className="h-5 w-5 rotate-90" /></button>
                 </div>
+                <button onClick={() => setViewMode(viewMode === 'week' ? 'month' : 'week')} className="text-sm bg-gray-200 text-gray-700 px-3 py-2 rounded-md hover:bg-gray-300 transition">
+                    {viewMode === 'week' ? 'View Month' : 'View Week'}
+                </button>
             </div>
-            <div className="grid grid-cols-7 gap-1">
-                {weekDays.map((day, index) => <div key={`${day}-${index}`} className="text-center font-semibold text-xs text-gray-500 py-2">{day}</div>)}
-                {calendarDays.map((d) => (
-                    <div key={d.day} onClick={() => handleDayClick(d)} className={`border rounded-md aspect-square p-1 sm:p-2 flex flex-col ${d.isBlank ? 'bg-gray-50' : 'cursor-pointer hover:bg-indigo-50'}`}>
-                        {!d.isBlank && (
-                            <>
-                                <span className={`font-medium text-xs sm:text-sm ${d.hasNoActivity ? 'text-red-500' : ''}`}>{d.day}</span>
-                                <div className="flex justify-center items-end space-x-1 mt-auto h-2">
-                                    {d.data.exposures > 0 && <div className={`h-2 w-2 ${activityColors.exposures} rounded-full`}></div>}
-                                    {d.data.followUps > 0 && <div className={`h-2 w-2 ${activityColors.followUps} rounded-full`}></div>}
-                                    {d.data.sitdowns?.length > 0 && <div className={`h-2 w-2 ${activityColors.sitdowns} rounded-full`}></div>}
-                                    {d.data.pbrs > 0 && <div className={`h-2 w-2 ${activityColors.pbrs} rounded-full`}></div>}
-                                </div>
-                            </>
-                        )}
-                    </div>
-                ))}
-            </div>
+            
+            {viewMode === 'week' ? (
+                <div className="grid grid-cols-7 gap-2 text-center">
+                    {weekDisplayDays.map(d => (
+                        <div key={d.date.toISOString()} onClick={() => handleDayClick(d)} className="cursor-pointer hover:bg-indigo-50 p-2 rounded-lg border flex flex-col items-center justify-between aspect-square">
+                            <div className="text-xs text-gray-500">{d.date.toLocaleDateString('default', { weekday: 'short' })}</div>
+                            <div className={`font-semibold text-lg ${d.hasNoActivity ? 'text-red-500' : ''}`}>{d.day}</div>
+                            <div className="flex justify-center items-center space-x-1 h-2">
+                                {d.data.exposures > 0 && <div className={`h-2 w-2 ${activityColors.exposures} rounded-full`}></div>}
+                                {d.data.followUps > 0 && <div className={`h-2 w-2 ${activityColors.followUps} rounded-full`}></div>}
+                                {d.data.sitdowns?.length > 0 && <div className={`h-2 w-2 ${activityColors.sitdowns} rounded-full`}></div>}
+                                {d.data.pbrs > 0 && <div className={`h-2 w-2 ${activityColors.pbrs} rounded-full`}></div>}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <div className="grid grid-cols-7 gap-1">
+                    {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => <div key={`${day}-${index}`} className="text-center font-semibold text-xs text-gray-500 py-2">{day}</div>)}
+                    {calendarDays.map((d) => (
+                        <div key={d.day} onClick={() => handleDayClick(d)} className={`border rounded-md aspect-square p-1 sm:p-2 flex flex-col ${d.isBlank ? 'bg-gray-50' : 'cursor-pointer hover:bg-indigo-50'}`}>
+                            {!d.isBlank && (
+                                <>
+                                    <span className={`font-medium text-xs sm:text-sm ${d.hasNoActivity ? 'text-red-500' : ''}`}>{d.day}</span>
+                                    <div className="flex justify-center items-end space-x-1 mt-auto h-2">
+                                        {d.data.exposures > 0 && <div className={`h-2 w-2 ${activityColors.exposures} rounded-full`}></div>}
+                                        {d.data.followUps > 0 && <div className={`h-2 w-2 ${activityColors.followUps} rounded-full`}></div>}
+                                        {d.data.sitdowns?.length > 0 && <div className={`h-2 w-2 ${activityColors.sitdowns} rounded-full`}></div>}
+                                        {d.data.pbrs > 0 && <div className={`h-2 w-2 ${activityColors.pbrs} rounded-full`}></div>}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
+
             <TotalsFooter totals={monthlyTotals} onShare={onShare} streaks={streaks} goals={goals} onGoalChange={onGoalChange} userProfile={userProfile}/>
             {selectedDay && <DayEntryModal day={selectedDay} data={data.current[selectedDay] || {}} onClose={closeModal} onChange={handleModalDataChange} />}
         </div>
@@ -772,4 +834,3 @@ const ConfirmDeleteModal = ({ onClose, onConfirm }) => {
 };
 
 export default App;
-
