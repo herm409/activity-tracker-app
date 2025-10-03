@@ -245,7 +245,7 @@ const App = () => {
     
     const handleSignOut = async () => auth && await signOut(auth);
 
-    const getWeekDataForReport = () => {
+    const getWeekDataForReport = useCallback(() => {
         const today = new Date();
         const dayOfWeek = today.getDay();
         const startOfWeek = new Date(today);
@@ -282,9 +282,9 @@ const App = () => {
         const dateRange = `${startOfWeek.toLocaleDateString('default', {month: 'short', day: 'numeric'})} - ${endOfWeek.toLocaleDateString('default', {month: 'short', day: 'numeric'})}`;
         
         return { totals: thisWeekTotals, lastWeekTotals, dateRange, hotlist };
-    }
+    }, [monthlyData, lastMonthData, hotlist]);
 
-    const handleShareReportAsText = async () => {
+    const handleShareReportAsText = useCallback(async () => {
         const { totals, lastWeekTotals, dateRange } = getWeekDataForReport();
 
         let shareText = `My Activity Tracker Report\nFrom: ${userProfile.displayName}\nWeek of: ${dateRange}\n\n`;
@@ -298,7 +298,7 @@ const App = () => {
         try {
             await navigator.share({ title: 'My Weekly Activity Report', text: shareText });
         } catch (error) { console.error('Error sharing text:', error); }
-    };
+    }, [getWeekDataForReport, userProfile.displayName, hotlist]);
     
     const handleShare = async () => {
         if (typeof window.html2canvas === 'undefined') {
@@ -572,7 +572,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
             pbrs: calculateAndUpdateStreak('pbrs'),
             threeWays: calculateAndUpdateStreak('threeWays'),
         };
-    }, [data, user, userProfile, setUserProfile, appId]);
+    }, [data, user, userProfile, setUserProfile]);
     
     const handleDayClick = (day) => { if(!day.isBlank) setSelectedDay(day.day); };
     const closeModal = () => setSelectedDay(null);
