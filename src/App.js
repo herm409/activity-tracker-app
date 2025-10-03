@@ -46,6 +46,7 @@ const App = () => {
     const [loading, setLoading] = useState(true);
     const [userProfile, setUserProfile] = useState({});
     const [showNameModal, setShowNameModal] = useState(false);
+    const [showEditNameModal, setShowEditNameModal] = useState(false);
     const [showOnboarding, setShowOnboarding] = useState(false);
     const [showGoalInstruction, setShowGoalInstruction] = useState(false);
 
@@ -142,6 +143,7 @@ const App = () => {
     const handleSetDisplayName = async (name) => {
         if (!user || !db || !name.trim()) {
             setShowNameModal(false);
+            setShowEditNameModal(false);
             return;
         }
         const trimmedName = name.trim();
@@ -150,6 +152,7 @@ const App = () => {
         await setDoc(profileRef, newProfile, { merge: true });
         setUserProfile(newProfile);
         setShowNameModal(false);
+        setShowEditNameModal(false);
     };
 
     const handleDismissOnboarding = async () => {
@@ -392,7 +395,7 @@ const App = () => {
     return (
         <div className="bg-gray-50 min-h-screen font-sans text-gray-800">
             <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
-                <Header displayName={userProfile.displayName} onSignOut={handleSignOut} />
+                <Header displayName={userProfile.displayName} onSignOut={handleSignOut} onEditName={() => setShowEditNameModal(true)} />
                 <TabBar activeTab={activeTab} setActiveTab={setActiveTab} />
                 <main className="mt-6">
                     {activeTab === 'tracker' && <ActivityTracker date={currentDate} setDate={setCurrentDate} goals={monthlyGoals} onGoalChange={handleGoalChange} data={{current: monthlyData, last: lastMonthData}} onDataChange={handleDataChange} onShare={handleShare} isSharing={isSharing} user={user} userProfile={userProfile} setUserProfile={setUserProfile} onQuickAdd={handleQuickAdd} showGoalInstruction={showGoalInstruction} onDismissGoalInstruction={handleDismissGoalInstruction} />}
@@ -401,6 +404,7 @@ const App = () => {
                     {activeTab === 'leaderboard' && <Leaderboard db={db} monthYearId={monthYearId} user={user} />}
                 </main>
                 {showNameModal && <DisplayNameModal onSave={handleSetDisplayName} />}
+                {showEditNameModal && <DisplayNameModal onSave={handleSetDisplayName} onClose={() => setShowEditNameModal(false)} currentName={userProfile.displayName} />}
                 {showOnboarding && <OnboardingModal onDismiss={handleDismissOnboarding} />}
                 {reportCardData && (
                     <div style={{ position: 'fixed', left: '-9999px', top: 0, zIndex: -1 }}>
@@ -452,11 +456,18 @@ const AuthPage = ({ auth }) => {
     );
 };
 
-const Header = ({ displayName, onSignOut }) => (
+const Header = ({ displayName, onSignOut, onEditName }) => (
     <header className="mb-6 flex justify-between items-start">
         <div>
             <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight">Activity Tracker</h1>
-            <p className="text-md sm:text-lg text-gray-500 mt-1">{displayName ? `Welcome, ${displayName}` : 'Your dashboard for business growth.'}</p>
+            <div className="flex items-center space-x-2 mt-1">
+                <p className="text-md sm:text-lg text-gray-500">{displayName ? `Welcome, ${displayName}` : 'Your dashboard for business growth.'}</p>
+                {displayName && (
+                    <button onClick={onEditName} className="text-gray-400 hover:text-gray-600" title="Edit your name">
+                        <Edit2 className="h-4 w-4" />
+                    </button>
+                )}
+            </div>
         </div>
         <button onClick={onSignOut} className="flex items-center bg-gray-200 text-gray-700 px-3 py-2 rounded-md hover:bg-gray-300 transition text-sm">
             <LogOut className="h-4 w-4 mr-2"/>Sign Out
@@ -924,12 +935,12 @@ const SitdownTracker = ({ value = [], onChange }) => {
 };
 
 const HotList = ({ user, db }) => {
-    const [hotlist, setHotlist] = useState([]);
+    const [list, setList] = useState([]);
     const [isArchiveView, setIsArchiveView] = useState(false);
     const [activeProspectsCount, setActiveProspectsCount] = useState(0);
     const [showAddModal, setShowAddModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState(null);
-    const [sortBy, setSortBy] = useState('name'); // New state for sorting
+    const [sortBy, setSortBy] = useState('name');
 
     const hotlistColRef = useMemo(() => collection(db, 'artifacts', appId, 'users', user.uid, 'hotlist'), [db, user.uid]);
 
@@ -937,7 +948,7 @@ const HotList = ({ user, db }) => {
         const allDocsSnap = await getDocs(hotlistColRef);
         const allItems = allDocsSnap.docs.map(d => ({id: d.id, ...d.data()}));
         
-        setHotlist(allItems.filter(item => (isArchiveView ? item.isArchived === true : item.isArchived !== true)));
+        setList(allItems.filter(item => (isArchiveView ? item.isArchived === true : item.isArchived !== true)));
         setActiveProspectsCount(allItems.filter(item => item.isArchived !== true).length);
 
     }, [hotlistColRef, isArchiveView]);
@@ -967,7 +978,7 @@ const HotList = ({ user, db }) => {
     }, 1000), [hotlistColRef]);
 
     const handleUpdate = (id, field, value) => {
-        setHotlist(prevList => prevList.map(item => item.id === id ? { ...item, [field]: value } : item));
+        setList(prevList => prevList.map(item => item.id === id ? { ...item, [field]: value } : item));
         debouncedUpdate(id, field, value);
     };
 
@@ -995,12 +1006,11 @@ const HotList = ({ user, db }) => {
 
     const sortedList = useMemo(() => {
         const statusOrder = { Hot: 1, Warm: 2, Cold: 3 };
-        return [...hotlist].sort((a, b) => {
+        return [...list].sort((a, b) => {
             if (sortBy === 'name') {
                 return a.name.localeCompare(b.name);
             }
             if (sortBy === 'lastContacted') {
-                // Newest first, nulls last
                 if (!a.lastContacted) return 1;
                 if (!b.lastContacted) return -1;
                 return new Date(b.lastContacted) - new Date(a.lastContacted);
@@ -1010,7 +1020,7 @@ const HotList = ({ user, db }) => {
             }
             return 0;
         });
-    }, [hotlist, sortBy]);
+    }, [list, sortBy]);
 
     return (
         <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
@@ -1182,18 +1192,21 @@ const HotList = ({ user, db }) => {
     );
 };
 
-const DisplayNameModal = ({ onSave }) => {
-    const [name, setName] = useState('');
+const DisplayNameModal = ({ onSave, onClose, currentName }) => {
+    const [name, setName] = useState(currentName || '');
     const handleSave = () => { if (name.trim()) { onSave(name.trim()); } };
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
-                <div className="p-6 border-b"><h3 className="text-xl font-semibold">Welcome!</h3><p className="text-sm text-gray-600 mt-1">Please set your display name for the leaderboard.</p></div>
+                <div className="p-6 border-b"><h3 className="text-xl font-semibold">{currentName ? 'Edit Your Name' : 'Welcome!'}</h3><p className="text-sm text-gray-600 mt-1">Please set your display name for the leaderboard.</p></div>
                 <div className="p-6">
                     <label htmlFor="display-name" className="block text-sm font-medium text-gray-700">Display Name</label>
                     <input type="text" id="display-name" value={name} onChange={(e) => setName(e.target.value)} className="mt-1 block w-full p-2 border rounded-md" autoFocus />
                 </div>
-                <div className="p-4 bg-gray-50 flex justify-end"><button onClick={handleSave} className="bg-indigo-600 text-white px-4 py-2 rounded-md">Save Name</button></div>
+                <div className="p-4 bg-gray-50 flex justify-end space-x-2">
+                    {onClose && <button onClick={onClose} className="bg-gray-200 px-4 py-2 rounded-md">Cancel</button>}
+                    <button onClick={handleSave} className="bg-indigo-600 text-white px-4 py-2 rounded-md">Save Name</button>
+                </div>
             </div>
         </div>
     );
@@ -1395,5 +1408,4 @@ const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
 });
 
 export default App;
-
 
