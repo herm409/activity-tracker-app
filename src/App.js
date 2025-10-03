@@ -187,13 +187,12 @@ const App = () => {
         }
         const docSnaps = await Promise.all(analyticsPromises);
         const processedData = docSnaps.map((snap, index) => {
-            const totals = { name: monthLabels[index], Exposures: 0, 'Follow Ups': 0, Sitdowns: 0 };
+            const totals = { name: monthLabels[index], Exposures: 0, 'Follow Ups': 0 };
             if (snap.exists()) {
                 const data = snap.data().dailyData || {};
                 Object.values(data).forEach(day => {
                     totals.Exposures += Number(day.exposures) || 0;
                     totals['Follow Ups'] += Number(day.followUps) || 0;
-                    totals.Sitdowns += Array.isArray(day.sitdowns) ? day.sitdowns.length : 0;
                 });
             }
             return totals;
@@ -293,7 +292,7 @@ const App = () => {
         endOfLastWeek.setDate(startOfWeek.getDate() - 1);
         
         const getWeekTotals = (startDate, endDate) => {
-            const totals = { exposures: 0, followUps: 0, sitdowns: 0, pbrs: 0, threeWays: 0 };
+            const totals = { exposures: 0, followUps: 0, pbrs: 0, threeWays: 0 };
             let current = new Date(startDate);
             while(current <= endDate) {
                 const dataSet = current.getMonth() === today.getMonth() ? monthlyData : lastMonthData;
@@ -301,7 +300,6 @@ const App = () => {
                 if(dayData) {
                     totals.exposures += Number(dayData.exposures) || 0;
                     totals.followUps += Number(dayData.followUps) || 0;
-                    totals.sitdowns += Array.isArray(dayData.sitdowns) ? dayData.sitdowns.length : 0;
                     totals.pbrs += Number(dayData.pbrs) || 0;
                     totals.threeWays += Number(dayData.threeWays) || 0;
                 }
@@ -326,8 +324,8 @@ const App = () => {
         const { totals, lastWeekTotals, dateRange, hotlist: reportHotlist } = await getWeekDataForReport();
 
         let shareText = `My Activity Tracker Report\nFrom: ${userProfile.displayName}\nWeek of: ${dateRange}\n\n`;
-        shareText += `**This Week's Numbers:**\n- Exposures: ${totals.exposures}\n- Follow Ups: ${totals.followUps}\n- Sitdowns: ${totals.sitdowns}\n- PBRS: ${totals.pbrs}\n\n`;
-        shareText += `**Last Week's Numbers:**\n- Exposures: ${lastWeekTotals.exposures}\n- Follow Ups: ${lastWeekTotals.followUps}\n- Sitdowns: ${lastWeekTotals.sitdowns}\n- PBRS: ${lastWeekTotals.pbrs}\n\n`;
+        shareText += `**This Week's Numbers:**\n- Exposures: ${totals.exposures}\n- Follow Ups: ${totals.followUps}\n- PBRS: ${totals.pbrs}\n\n`;
+        shareText += `**Last Week's Numbers:**\n- Exposures: ${lastWeekTotals.exposures}\n- Follow Ups: ${lastWeekTotals.followUps}\n- PBRS: ${lastWeekTotals.pbrs}\n\n`;
         shareText += "--------------------\n\n";
         shareText += `My "10 in Play" Hotlist\n\n`;
         reportHotlist.forEach((item, index) => { shareText += `${index + 1}. ${item.name}\n${item.notes ? `- Notes: ${item.notes}\n\n` : '\n'}`;});
@@ -781,7 +779,6 @@ const TotalsFooter = ({ totals, onShare, isSharing, streaks, goals, onGoalChange
     const metrics = [
         { key: 'exposures', label: 'Total Exposures', value: totals.exposures, icon: Target, color: 'indigo' },
         { key: 'followUps', label: 'Follow Ups', value: totals.followUps, icon: Users, color: 'green' },
-        { key: 'sitdowns', label: 'Sitdowns', value: totals.sitdowns, icon: Briefcase, color: 'amber' },
         { key: 'pbrs', label: 'PBRS', value: totals.pbrs, icon: Users, color: 'purple' },
         { key: 'threeWays', label: '3-Way Calls', value: totals.threeWays, icon: PhoneCall, color: 'pink' }
     ];
@@ -935,7 +932,7 @@ const SitdownTracker = ({ value = [], onChange }) => {
 };
 
 const HotList = ({ user, db }) => {
-    const [list, setList] = useState([]);
+    const [hotlist, setHotlist] = useState([]);
     const [isArchiveView, setIsArchiveView] = useState(false);
     const [activeProspectsCount, setActiveProspectsCount] = useState(0);
     const [showAddModal, setShowAddModal] = useState(false);
@@ -948,7 +945,7 @@ const HotList = ({ user, db }) => {
         const allDocsSnap = await getDocs(hotlistColRef);
         const allItems = allDocsSnap.docs.map(d => ({id: d.id, ...d.data()}));
         
-        setList(allItems.filter(item => (isArchiveView ? item.isArchived === true : item.isArchived !== true)));
+        setHotlist(allItems.filter(item => (isArchiveView ? item.isArchived === true : item.isArchived !== true)));
         setActiveProspectsCount(allItems.filter(item => item.isArchived !== true).length);
 
     }, [hotlistColRef, isArchiveView]);
@@ -978,7 +975,7 @@ const HotList = ({ user, db }) => {
     }, 1000), [hotlistColRef]);
 
     const handleUpdate = (id, field, value) => {
-        setList(prevList => prevList.map(item => item.id === id ? { ...item, [field]: value } : item));
+        setHotlist(prevList => prevList.map(item => item.id === id ? { ...item, [field]: value } : item));
         debouncedUpdate(id, field, value);
     };
 
@@ -1006,7 +1003,7 @@ const HotList = ({ user, db }) => {
 
     const sortedList = useMemo(() => {
         const statusOrder = { Hot: 1, Warm: 2, Cold: 3 };
-        return [...list].sort((a, b) => {
+        return [...hotlist].sort((a, b) => {
             if (sortBy === 'name') {
                 return a.name.localeCompare(b.name);
             }
@@ -1020,7 +1017,7 @@ const HotList = ({ user, db }) => {
             }
             return 0;
         });
-    }, [list, sortBy]);
+    }, [hotlist, sortBy]);
 
     return (
         <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
@@ -1252,7 +1249,7 @@ const AnalyticsDashboard = ({ data }) => {
                 <ResponsiveContainer>
                     <BarChart data={data} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" tick={{fontSize: 12}} /><YAxis tick={{fontSize: 12}} /><Tooltip /><Legend wrapperStyle={{fontSize: "14px"}} />
-                        <Bar dataKey="Exposures" fill="#8884d8" /><Bar dataKey="Follow Ups" fill="#82ca9d" /><Bar dataKey="Sitdowns" fill="#ffc658" />
+                        <Bar dataKey="Exposures" fill="#8884d8" /><Bar dataKey="Follow Ups" fill="#82ca9d" />
                     </BarChart>
                 </ResponsiveContainer>
             </div>
@@ -1337,7 +1334,6 @@ const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
     const metrics = [
         { key: 'exposures', label: 'Exposures', value: weekData.totals.exposures, lastWeek: weekData.lastWeekTotals.exposures, color: 'indigo' },
         { key: 'followUps', label: 'Follow Ups', value: weekData.totals.followUps, lastWeek: weekData.lastWeekTotals.followUps, color: 'green' },
-        { key: 'sitdowns', label: 'Sitdowns', value: weekData.totals.sitdowns, lastWeek: weekData.lastWeekTotals.sitdowns, color: 'amber' },
         { key: 'pbrs', label: 'PBRS', value: weekData.totals.pbrs, lastWeek: weekData.lastWeekTotals.pbrs, color: 'purple' },
         { key: 'threeWays', label: '3-Way Calls', value: weekData.totals.threeWays, lastWeek: weekData.lastWeekTotals.threeWays, color: 'pink' }
     ];
