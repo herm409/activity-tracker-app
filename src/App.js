@@ -184,30 +184,56 @@ const App = () => {
         }
     }, [user, db, currentDate, fetchData, fetchAnalytics, activeTab, hotlist.length]);
 
-    const updateLeaderboard = useCallback(async (currentMonthData) => {
+    const updateLeaderboard = useCallback(async (currentMonthData, targetMonthId) => {
         if (!user || !db || !userProfile.displayName) return;
         const totalExposures = Object.values(currentMonthData).reduce((sum, day) => sum + (Number(day.exposures) || 0), 0);
-        const leaderboardRef = doc(db, 'artifacts', appId, 'leaderboard', monthYearId, 'entries', user.uid);
+        const leaderboardRef = doc(db, 'artifacts', appId, 'leaderboard', targetMonthId, 'entries', user.uid);
         await setDoc(leaderboardRef, {
             displayName: userProfile.displayName,
             exposures: totalExposures,
             userId: user.uid
         });
-    }, [user, db, userProfile.displayName, monthYearId]);
+    }, [user, db, userProfile.displayName]);
 
     const debouncedSave = useMemo(() => debounce(async (dataToSave, goalsToSave) => {
         if (!user || !db) return;
         const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', monthYearId);
         await setDoc(docRef, { dailyData: dataToSave, monthlyGoals: goalsToSave }, { merge: true });
         if (dataToSave) {
-            updateLeaderboard(dataToSave);
+            updateLeaderboard(dataToSave, monthYearId);
         }
     }, 1500), [user, db, monthYearId, updateLeaderboard]);
 
-    const handleDataChange = (day, field, value) => {
-        const updatedData = { ...monthlyData, [day]: { ...monthlyData[day], [field]: value } };
-        setMonthlyData(updatedData);
-        debouncedSave(updatedData, monthlyGoals);
+    const handleDataChange = (date, field, value) => {
+        const day = date.getDate();
+        const targetMonthId = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+        if (targetMonthId === monthYearId) {
+            // It's the current month, use existing state and debouncer
+            const updatedData = { ...monthlyData, [day]: { ...monthlyData[day], [field]: value } };
+            setMonthlyData(updatedData);
+            debouncedSave(updatedData, monthlyGoals);
+        } else {
+            // It's a past month, update directly and save.
+            const handleSave = async () => {
+                if (!user || !db) return;
+                
+                // Update local state for immediate UI feedback if it's last month
+                if(targetMonthId === lastMonthYearId) {
+                    const updatedLastMonthData = { ...lastMonthData, [day]: { ...lastMonthData[day], [field]: value } };
+                    setLastMonthData(updatedLastMonthData);
+                }
+
+                const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', targetMonthId);
+                const docSnap = await getDoc(docRef);
+                const existingData = docSnap.exists() ? docSnap.data() : { dailyData: {}, monthlyGoals: {} };
+                const updatedDailyData = { ...existingData.dailyData, [day]: { ...existingData.dailyData[day], [field]: value } };
+                
+                await setDoc(docRef, { ...existingData, dailyData: updatedDailyData }, { merge: true });
+                updateLeaderboard(updatedDailyData, targetMonthId);
+            };
+            handleSave();
+        }
     };
 
     const handleGoalChange = (goalKey, value) => {
@@ -574,12 +600,25 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
         };
     }, [data, user, userProfile, setUserProfile]);
     
-    const handleDayClick = (day) => { if(!day.isBlank) setSelectedDay(day.day); };
+    const handleDayClick = (dayObj) => {
+        if (dayObj.isBlank) return;
+        const dateToSet = dayObj.date ? dayObj.date : new Date(year, month, dayObj.day);
+        setSelectedDay(dateToSet);
+    };
     const closeModal = () => setSelectedDay(null);
     const handleModalDataChange = (field, value) => onDataChange(selectedDay, field, value);
 
     const activityColors = { exposures: 'bg-blue-500', followUps: 'bg-green-500', sitdowns: 'bg-amber-500', pbrs: 'bg-purple-500', threeWays: 'bg-pink-500' };
     
+    let modalData = {};
+    if (selectedDay) {
+        if (selectedDay.getMonth() === date.getMonth() && selectedDay.getFullYear() === date.getFullYear()) {
+            modalData = data.current[selectedDay.getDate()] || {};
+        } else {
+            modalData = data.last[selectedDay.getDate()] || {};
+        }
+    }
+
     return (
         <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
@@ -632,7 +671,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
                 </div>
             )}
             <TotalsFooter totals={monthlyTotals} onShare={onShare} isSharing={isSharing} streaks={streaks} goals={goals} onGoalChange={onGoalChange} userProfile={userProfile}/>
-            {selectedDay && <DayEntryModal day={selectedDay} data={data.current[selectedDay] || {}} onClose={closeModal} onChange={handleModalDataChange} />}
+            {selectedDay && <DayEntryModal day={selectedDay.getDate()} data={modalData} onClose={closeModal} onChange={handleModalDataChange} />}
         </div>
     );
 };
