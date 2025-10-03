@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, forwardRef } from 'react';
 import { initializeApp } from 'firebase/app';
 import { 
     getAuth, 
@@ -10,6 +10,8 @@ import {
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, query, limit, addDoc, deleteDoc, orderBy } from 'firebase/firestore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { ChevronUp, ChevronDown, Plus, X, List, BarChart2, Target, Users, PhoneCall, Briefcase, Trash2, Trophy, LogOut, Share2, Flame, Edit2, Calendar } from 'lucide-react';
+// Note: This implementation assumes html2canvas is loaded via a script tag in the main HTML file.
+// <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
 // --- Firebase Configuration ---
 const firebaseConfig = {
@@ -54,6 +56,11 @@ const App = () => {
     const [activeTab, setActiveTab] = useState('tracker');
     const [showAddHotlistModal, setShowAddHotlistModal] = useState(false);
     const [deletingItemId, setDeletingItemId] = useState(null);
+    
+    // State for image report card generation
+    const [isSharing, setIsSharing] = useState(false);
+    const [reportCardData, setReportCardData] = useState(null);
+    const reportCardRef = useRef(null);
 
     // --- Firebase Initialization ---
     useEffect(() => {
@@ -237,71 +244,114 @@ const App = () => {
     };
     
     const handleSignOut = async () => auth && await signOut(auth);
-    
-    const handleShareReport = async () => {
-        if (navigator.share) {
-            const today = new Date();
-            const dayOfWeek = today.getDay();
-            const startOfWeek = new Date(today);
-            startOfWeek.setDate(today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1));
-            startOfWeek.setHours(0,0,0,0);
-            const endOfWeek = new Date(startOfWeek);
-            endOfWeek.setDate(startOfWeek.getDate() + 6);
-            endOfWeek.setHours(23,59,59,999);
-            const startOfLastWeek = new Date(startOfWeek);
-            startOfLastWeek.setDate(startOfWeek.getDate() - 7);
-            const endOfLastWeek = new Date(startOfWeek);
-            endOfLastWeek.setDate(startOfWeek.getDate() - 1);
-            
-            const getWeekTotals = (startDate, endDate) => {
-                const totals = { Exposures: 0, 'Follow Ups': 0, Sitdowns: 0, PBRS: 0 };
-                let current = new Date(startDate);
-                while(current <= endDate) {
-                    const dataSet = current.getMonth() === today.getMonth() ? monthlyData : lastMonthData;
-                    const dayData = dataSet[current.getDate()];
-                    if(dayData) {
-                        totals.Exposures += Number(dayData.exposures) || 0;
-                        totals['Follow Ups'] += Number(dayData.followUps) || 0;
-                        totals.Sitdowns += Array.isArray(dayData.sitdowns) ? dayData.sitdowns.length : 0;
-                        totals.PBRS += Number(dayData.pbrs) || 0;
-                    }
-                    current.setDate(current.getDate() + 1);
+
+    const getWeekDataForReport = () => {
+        const today = new Date();
+        const dayOfWeek = today.getDay();
+        const startOfWeek = new Date(today);
+        startOfWeek.setDate(today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1)); 
+        startOfWeek.setHours(0,0,0,0);
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(startOfWeek.getDate() + 6);
+        endOfWeek.setHours(23,59,59,999);
+        const startOfLastWeek = new Date(startOfWeek);
+        startOfLastWeek.setDate(startOfWeek.getDate() - 7);
+        const endOfLastWeek = new Date(startOfWeek);
+        endOfLastWeek.setDate(startOfWeek.getDate() - 1);
+        
+        const getWeekTotals = (startDate, endDate) => {
+            const totals = { exposures: 0, followUps: 0, sitdowns: 0, pbrs: 0, threeWays: 0 };
+            let current = new Date(startDate);
+            while(current <= endDate) {
+                const dataSet = current.getMonth() === today.getMonth() ? monthlyData : lastMonthData;
+                const dayData = dataSet[current.getDate()];
+                if(dayData) {
+                    totals.exposures += Number(dayData.exposures) || 0;
+                    totals.followUps += Number(dayData.followUps) || 0;
+                    totals.sitdowns += Array.isArray(dayData.sitdowns) ? dayData.sitdowns.length : 0;
+                    totals.pbrs += Number(dayData.pbrs) || 0;
+                    totals.threeWays += Number(dayData.threeWays) || 0;
                 }
-                return totals;
-            };
-
-            const thisWeekTotals = getWeekTotals(startOfWeek, endOfWeek);
-            const lastWeekTotals = getWeekTotals(startOfLastWeek, endOfLastWeek);
-
-            let shareText = `My Activity Tracker Report\nFrom: ${userProfile.displayName}\nWeek of: ${startOfWeek.toLocaleDateString()} - ${endOfWeek.toLocaleDateString()}\n\n`;
-            shareText += `**This Week's Numbers:**\n- Exposures: ${thisWeekTotals.Exposures}\n- Follow Ups: ${thisWeekTotals['Follow Ups']}\n- Sitdowns: ${thisWeekTotals.Sitdowns}\n- PBRS: ${thisWeekTotals.PBRS}\n\n`;
-            shareText += `**Last Week's Numbers:**\n- Exposures: ${lastWeekTotals.Exposures}\n- Follow Ups: ${lastWeekTotals['Follow Ups']}\n- Sitdowns: ${lastWeekTotals.Sitdowns}\n- PBRS: ${lastWeekTotals.PBRS}\n\n`;
-            shareText += "--------------------\n\n";
-            shareText += `My "10 in Play" Hotlist\n\n`;
-            if (hotlist.length === 0) {
-                shareText += "My list is currently empty.";
-            } else {
-                hotlist.forEach((item, index) => {
-                    shareText += `${index + 1}. ${item.name}\n`;
-                    if (item.notes) {
-                        shareText += `- Notes: ${item.notes}\n\n`;
-                    } else {
-                        shareText += `\n`;
-                    }
-                });
+                current.setDate(current.getDate() + 1);
             }
-            shareText += "\nSent from my Activity Tracker App";
+            return totals;
+        };
 
-            try {
-                await navigator.share({ title: 'My Weekly Activity Report', text: shareText });
-            } catch (error) { console.error('Error sharing:', error); }
-        } else {
-            alert('Your browser does not support the share feature.');
+        const thisWeekTotals = getWeekTotals(startOfWeek, endOfWeek);
+        const lastWeekTotals = getWeekTotals(startOfLastWeek, endOfLastWeek);
+        const dateRange = `${startOfWeek.toLocaleDateString('default', {month: 'short', day: 'numeric'})} - ${endOfWeek.toLocaleDateString('default', {month: 'short', day: 'numeric'})}`;
+        
+        return { totals: thisWeekTotals, lastWeekTotals, dateRange, hotlist };
+    }
+
+    const handleShareReportAsText = async () => {
+        const { totals, lastWeekTotals, dateRange } = getWeekDataForReport();
+
+        let shareText = `My Activity Tracker Report\nFrom: ${userProfile.displayName}\nWeek of: ${dateRange}\n\n`;
+        shareText += `**This Week's Numbers:**\n- Exposures: ${totals.exposures}\n- Follow Ups: ${totals.followUps}\n- Sitdowns: ${totals.sitdowns}\n- PBRS: ${totals.pbrs}\n\n`;
+        shareText += `**Last Week's Numbers:**\n- Exposures: ${lastWeekTotals.exposures}\n- Follow Ups: ${lastWeekTotals.followUps}\n- Sitdowns: ${lastWeekTotals.sitdowns}\n- PBRS: ${lastWeekTotals.pbrs}\n\n`;
+        shareText += "--------------------\n\n";
+        shareText += `My "10 in Play" Hotlist\n\n`;
+        hotlist.forEach((item, index) => { shareText += `${index + 1}. ${item.name}\n${item.notes ? `- Notes: ${item.notes}\n\n` : '\n'}`;});
+        shareText += "\nSent from my Activity Tracker App";
+
+        try {
+            await navigator.share({ title: 'My Weekly Activity Report', text: shareText });
+        } catch (error) { console.error('Error sharing text:', error); }
+    };
+    
+    const handleShare = async () => {
+        if (typeof window.html2canvas === 'undefined') {
+            console.error("html2canvas library is not available. Falling back to text share.");
+            await handleShareReportAsText();
+            return;
         }
+        setIsSharing(true);
+        const weekData = getWeekDataForReport();
+        setReportCardData(weekData);
     };
 
-    if (loading) return <div className="flex items-center justify-center h-screen bg-gray-100"><div className="text-xl font-semibold">Loading...</div></div>;
+    useEffect(() => {
+        if (!reportCardData || !reportCardRef.current) return;
     
+        const generateAndShareImage = async () => {
+            try {
+                const element = reportCardRef.current;
+                const canvas = await window.html2canvas(element, { scale: 2, useCORS: true, backgroundColor: '#f9fafb' });
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+                
+                if (!blob) throw new Error("Canvas to Blob conversion failed.");
+    
+                const file = new File([blob], 'activity-report.png', { type: 'image/png' });
+                const shareData = {
+                    files: [file],
+                    title: 'My Weekly Activity Report',
+                    text: `Here's my activity report for the week of ${reportCardData.dateRange}.`,
+                };
+    
+                if (navigator.canShare && navigator.canShare(shareData)) {
+                    await navigator.share(shareData);
+                } else {
+                    console.log("File sharing not supported, falling back to text.");
+                    await handleShareReportAsText();
+                }
+    
+            } catch (error) {
+                console.error('Error generating or sharing report image:', error);
+                alert('Could not generate report card. Sharing as text instead.');
+                await handleShareReportAsText();
+            } finally {
+                setIsSharing(false);
+                setReportCardData(null);
+            }
+        };
+    
+        const timer = setTimeout(generateAndShareImage, 100);
+        return () => clearTimeout(timer);
+    
+    }, [reportCardData, handleShareReportAsText]);
+    
+    if (loading) return <div className="flex items-center justify-center h-screen bg-gray-100"><div className="text-xl font-semibold">Loading...</div></div>;
     if (!user) return <AuthPage auth={auth} />;
 
     return (
@@ -310,7 +360,7 @@ const App = () => {
                 <Header displayName={userProfile.displayName} onSignOut={handleSignOut} />
                 <TabBar activeTab={activeTab} setActiveTab={setActiveTab} />
                 <main className="mt-6">
-                    {activeTab === 'tracker' && <ActivityTracker date={currentDate} setDate={setCurrentDate} goals={monthlyGoals} onGoalChange={handleGoalChange} data={{current: monthlyData, last: lastMonthData}} onDataChange={handleDataChange} onShare={handleShareReport} user={user} userProfile={userProfile} setUserProfile={setUserProfile} />}
+                    {activeTab === 'tracker' && <ActivityTracker date={currentDate} setDate={setCurrentDate} goals={monthlyGoals} onGoalChange={handleGoalChange} data={{current: monthlyData, last: lastMonthData}} onDataChange={handleDataChange} onShare={handleShare} isSharing={isSharing} user={user} userProfile={userProfile} setUserProfile={setUserProfile} />}
                     {activeTab === 'hotlist' && <HotList list={hotlist} onAdd={addHotlistItem} onUpdate={updateHotlistItem} onDelete={deleteHotlistItem} />}
                     {activeTab === 'analytics' && <AnalyticsDashboard data={analyticsData} />}
                     {activeTab === 'leaderboard' && <Leaderboard db={db} monthYearId={monthYearId} />}
@@ -318,11 +368,18 @@ const App = () => {
                 {showNameModal && <DisplayNameModal onSave={handleSetDisplayName} />}
                 {showAddHotlistModal && <AddHotlistItemModal onClose={() => setShowAddHotlistModal(false)} onAdd={handleConfirmAddHotlistItem} />}
                 {deletingItemId && <ConfirmDeleteModal onClose={() => setDeletingItemId(null)} onConfirm={handleConfirmDelete} />}
+                {reportCardData && (
+                    <div style={{ position: 'fixed', left: '-9999px', top: 0, zIndex: -1 }}>
+                        <ReportCard ref={reportCardRef} profile={userProfile} weekData={reportCardData} goals={monthlyGoals} />
+                    </div>
+                )}
             </div>
         </div>
     );
 };
 
+
+// ... (AuthPage, Header, TabBar, Leaderboard components remain unchanged)
 const AuthPage = ({ auth }) => {
     const [isSignUp, setIsSignUp] = useState(true);
     const [email, setEmail] = useState('');
@@ -422,49 +479,33 @@ const Leaderboard = ({ db, monthYearId }) => {
     );
 };
 
-const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChange, onShare, user, userProfile, setUserProfile }) => {
+const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChange, onShare, isSharing, user, userProfile, setUserProfile }) => {
     const [selectedDay, setSelectedDay] = useState(null);
-    const [viewMode, setViewMode] = useState('week'); // Default to 'week'
-    
+    const [viewMode, setViewMode] = useState('week');
     const year = date.getFullYear();
     const month = date.getMonth();
-    
-    // Navigation functions
     const changeMonth = (offset) => { const newDate = new Date(date); newDate.setMonth(date.getMonth() + offset); setDate(newDate); };
     const changeWeek = (offset) => { const newDate = new Date(date); newDate.setDate(date.getDate() + (7 * offset)); setDate(newDate); };
 
-    // Data for Weekly View
     const weekDisplayDays = useMemo(() => {
         const startOfWeek = new Date(date);
-        startOfWeek.setDate(date.getDate() - date.getDay()); // Assuming Sunday is the first day
+        startOfWeek.setDate(date.getDate() - date.getDay());
         startOfWeek.setHours(0,0,0,0);
-
         const days = [];
         for (let i = 0; i < 7; i++) {
             const currentDay = new Date(startOfWeek);
             currentDay.setDate(startOfWeek.getDate() + i);
-            
             const dataSet = currentDay.getMonth() === date.getMonth() ? data.current : data.last;
             const dayData = dataSet ? (dataSet[currentDay.getDate()] || {}) : {};
-
             const today = new Date();
             today.setHours(0,0,0,0);
             const isPast = currentDay < today;
-            
             const noActivity = !dayData || ((Number(dayData.exposures || 0) === 0) && (Number(dayData.followUps || 0) === 0) && (Array.isArray(dayData.sitdowns) ? dayData.sitdowns.length === 0 : true));
-
-            days.push({
-                date: currentDay,
-                day: currentDay.getDate(),
-                data: dayData,
-                hasNoActivity: isPast && noActivity,
-                isBlank: false, // For compatibility
-            });
+            days.push({ date: currentDay, day: currentDay.getDate(), data: dayData, hasNoActivity: isPast && noActivity, isBlank: false });
         }
         return days;
     }, [date, data]);
 
-    // Data for Monthly View
     const calendarDays = useMemo(() => {
         const today = new Date();
         const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
@@ -495,22 +536,18 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
     const streaks = useMemo(() => {
         const calculateAndUpdateStreak = (activityKey) => {
             if (!user || !userProfile.uid || !data) return 0;
-            
             let currentStreak = 0;
             const today = new Date();
             let dayToCheck = new Date(today);
-    
             while (true) {
                 const monthData = dayToCheck.getMonth() === today.getMonth() ? data.current : data.last;
                 if (!monthData) break;
-    
                 const dayData = monthData[dayToCheck.getDate()];
                 let hasActivity = false;
                 if (dayData) {
                     if (Array.isArray(dayData[activityKey])) hasActivity = dayData[activityKey].length > 0;
                     else hasActivity = Number(dayData[activityKey]) > 0;
                 }
-    
                 if (hasActivity) {
                     currentStreak++;
                     dayToCheck.setDate(dayToCheck.getDate() - 1);
@@ -518,7 +555,6 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
                     break;
                 }
             }
-            
             const longestStreaks = userProfile.longestStreaks || {};
             if (currentStreak > (longestStreaks[activityKey] || 0)) {
                 const newLongestStreaks = {...longestStreaks, [activityKey]: currentStreak };
@@ -529,7 +565,6 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
             }
             return currentStreak;
         };
-        
         return {
             exposures: calculateAndUpdateStreak('exposures'),
             followUps: calculateAndUpdateStreak('followUps'),
@@ -537,24 +572,17 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
             pbrs: calculateAndUpdateStreak('pbrs'),
             threeWays: calculateAndUpdateStreak('threeWays'),
         };
-
-    }, [data, user, userProfile, setUserProfile]);
+    }, [data, user, userProfile, setUserProfile, appId]);
     
     const handleDayClick = (day) => { if(!day.isBlank) setSelectedDay(day.day); };
     const closeModal = () => setSelectedDay(null);
     const handleModalDataChange = (field, value) => onDataChange(selectedDay, field, value);
 
-    const activityColors = {
-        exposures: 'bg-blue-500',
-        followUps: 'bg-green-500',
-        sitdowns: 'bg-amber-500',
-        pbrs: 'bg-purple-500',
-        threeWays: 'bg-pink-500',
-    };
+    const activityColors = { exposures: 'bg-blue-500', followUps: 'bg-green-500', sitdowns: 'bg-amber-500', pbrs: 'bg-purple-500', threeWays: 'bg-pink-500' };
     
     return (
         <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
-             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
                 <div className="flex items-center mb-4 sm:mb-0">
                     <button onClick={() => viewMode === 'week' ? changeWeek(-1) : changeMonth(-1)} className="p-2 rounded-md hover:bg-gray-100"><ChevronDown className="h-5 w-5 rotate-90" /></button>
                     <h2 className="text-xl sm:text-2xl font-semibold w-40 sm:w-56 text-center">
@@ -568,7 +596,6 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
                     {viewMode === 'week' ? 'View Month' : 'View Week'}
                 </button>
             </div>
-            
             {viewMode === 'week' ? (
                 <div className="grid grid-cols-7 gap-2 text-center">
                     {weekDisplayDays.map(d => (
@@ -604,17 +631,15 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
                     ))}
                 </div>
             )}
-
-            <TotalsFooter totals={monthlyTotals} onShare={onShare} streaks={streaks} goals={goals} onGoalChange={onGoalChange} userProfile={userProfile}/>
+            <TotalsFooter totals={monthlyTotals} onShare={onShare} isSharing={isSharing} streaks={streaks} goals={goals} onGoalChange={onGoalChange} userProfile={userProfile}/>
             {selectedDay && <DayEntryModal day={selectedDay} data={data.current[selectedDay] || {}} onClose={closeModal} onChange={handleModalDataChange} />}
         </div>
     );
 };
 
-const TotalsFooter = ({ totals, onShare, streaks, goals, onGoalChange, userProfile }) => {
+const TotalsFooter = ({ totals, onShare, isSharing, streaks, goals, onGoalChange, userProfile }) => {
     const [editingGoal, setEditingGoal] = useState(null); 
     const longestStreaks = userProfile.longestStreaks || {};
-
     const metrics = [
         { key: 'exposures', label: 'Total Exposures', value: totals.exposures, icon: Target, color: 'indigo' },
         { key: 'followUps', label: 'Follow Ups', value: totals.followUps, icon: Users, color: 'green' },
@@ -622,21 +647,19 @@ const TotalsFooter = ({ totals, onShare, streaks, goals, onGoalChange, userProfi
         { key: 'pbrs', label: 'PBRS', value: totals.pbrs, icon: Users, color: 'purple' },
         { key: 'threeWays', label: '3-Way Calls', value: totals.threeWays, icon: PhoneCall, color: 'pink' }
     ];
-    
     const handleGoalEdit = (e) => {
         if (e.key === 'Enter' || e.type === 'blur') {
             onGoalChange(editingGoal, e.target.value);
             setEditingGoal(null);
         }
     };
-    
     const WEEKS_IN_MONTH = 4.33;
 
     return (
         <div className="mt-6 pt-5 border-t border-gray-200">
             <div className="flex justify-end mb-4">
-                 <button onClick={onShare} className="flex items-center bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition text-sm">
-                    <Share2 className="h-4 w-4 mr-2" /> Share Weekly Report
+                <button onClick={onShare} disabled={isSharing} className="flex items-center bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition text-sm disabled:bg-indigo-400 disabled:cursor-wait">
+                    <Share2 className="h-4 w-4 mr-2" /> {isSharing ? 'Generating...' : 'Share Weekly Report'}
                 </button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -646,7 +669,6 @@ const TotalsFooter = ({ totals, onShare, streaks, goals, onGoalChange, userProfi
                     const weeklyPace = Math.ceil(goal / WEEKS_IN_MONTH);
                     const currentStreak = streaks[metric.key] || 0;
                     const longestStreak = longestStreaks[metric.key] || 0;
-
                     return (
                         <div key={metric.key} className={`bg-white border p-4 rounded-lg shadow-sm flex flex-col`}>
                             <div className="flex items-start justify-between">
@@ -657,37 +679,19 @@ const TotalsFooter = ({ totals, onShare, streaks, goals, onGoalChange, userProfi
                                 <metric.icon className={`h-8 w-8 text-${metric.color}-400`} />
                             </div>
                             <div className="mt-4 flex space-x-4">
-                                <div className="flex items-center text-xs text-gray-500">
-                                    <Flame className="h-4 w-4 mr-1 text-amber-500"/>
-                                    <span>Current: <strong>{currentStreak}</strong></span>
-                                </div>
-                                <div className="flex items-center text-xs text-gray-500">
-                                     <Trophy className="h-4 w-4 mr-1 text-gray-400"/>
-                                     <span>Longest: <strong>{longestStreak}</strong></span>
-                                </div>
+                                <div className="flex items-center text-xs text-gray-500"><Flame className="h-4 w-4 mr-1 text-amber-500"/><span>Current: <strong>{currentStreak}</strong></span></div>
+                                <div className="flex items-center text-xs text-gray-500"><Trophy className="h-4 w-4 mr-1 text-gray-400"/><span>Longest: <strong>{longestStreak}</strong></span></div>
                             </div>
                             <div className="mt-auto pt-4">
                                 <div className="flex justify-between items-center text-xs text-gray-500">
-                                    <span 
-                                        onClick={() => setEditingGoal(metric.key)}
-                                        className="cursor-pointer hover:text-indigo-600"
-                                    >
+                                    <span onClick={() => setEditingGoal(metric.key)} className="cursor-pointer hover:text-indigo-600">
                                         Goal: {editingGoal === metric.key ? 
-                                            <input 
-                                                type="number"
-                                                defaultValue={goal}
-                                                onKeyDown={handleGoalEdit}
-                                                onBlur={handleGoalEdit}
-                                                autoFocus
-                                                className="w-12 text-center bg-gray-100 rounded"
-                                            /> : <span>{goal} <Edit2 className="h-3 w-3 inline-block ml-1"/></span>
+                                            <input type="number" defaultValue={goal} onKeyDown={handleGoalEdit} onBlur={handleGoalEdit} autoFocus className="w-12 text-center bg-gray-100 rounded"/> : <span>{goal} <Edit2 className="h-3 w-3 inline-block ml-1"/></span>
                                         }
                                     </span>
                                     {goal > 0 && <span className="font-semibold">(~{weeklyPace}/wk)</span>}
                                 </div>
-                                <div className="w-full bg-gray-200 rounded-full h-2.5 mt-2">
-                                    <div className={`bg-${metric.color}-500 h-2.5 rounded-full`} style={{ width: `${Math.min(progress, 100)}%` }}></div>
-                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-2.5 mt-2"><div className={`bg-${metric.color}-500 h-2.5 rounded-full`} style={{ width: `${Math.min(progress, 100)}%` }}></div></div>
                             </div>
                         </div>
                     )
@@ -697,6 +701,7 @@ const TotalsFooter = ({ totals, onShare, streaks, goals, onGoalChange, userProfi
     );
 };
 
+// ... (DayEntryModal, SitdownTracker, HotList, DisplayNameModal, AnalyticsDashboard, and input components remain unchanged)
 const DayEntryModal = ({ day, data, onClose, onChange }) => {
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -800,12 +805,9 @@ const AnalyticsDashboard = ({ data }) => {
     );
 };
 
-const NumberInput = (props) => (
-    <input type="number" min="0" className="w-20 p-1 border border-gray-300 rounded-md text-sm focus:ring-indigo-500 focus:border-indigo-500 transition" {...props} />
-);
-const CheckboxInput = (props) => (
-    <input type="checkbox" className="h-5 w-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 transition" {...props} />
-);
+const NumberInput = (props) => ( <input type="number" min="0" className="w-20 p-1 border border-gray-300 rounded-md text-sm focus:ring-indigo-500 focus:border-indigo-500 transition" {...props} /> );
+const CheckboxInput = (props) => ( <input type="checkbox" className="h-5 w-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 transition" {...props} /> );
+
 const AddHotlistItemModal = ({ onClose, onAdd }) => {
     const [name, setName] = useState('');
     const handleAdd = () => { if (name.trim()) { onAdd(name.trim()); } };
@@ -833,4 +835,71 @@ const ConfirmDeleteModal = ({ onClose, onConfirm }) => {
     );
 };
 
+// --- New Report Card Component ---
+const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
+    const WEEKS_IN_MONTH = 4.33;
+    const metrics = [
+        { key: 'exposures', label: 'Exposures', value: weekData.totals.exposures, lastWeek: weekData.lastWeekTotals.exposures, color: 'indigo' },
+        { key: 'followUps', label: 'Follow Ups', value: weekData.totals.followUps, lastWeek: weekData.lastWeekTotals.followUps, color: 'green' },
+        { key: 'sitdowns', label: 'Sitdowns', value: weekData.totals.sitdowns, lastWeek: weekData.lastWeekTotals.sitdowns, color: 'amber' },
+        { key: 'pbrs', label: 'PBRS', value: weekData.totals.pbrs, lastWeek: weekData.lastWeekTotals.pbrs, color: 'purple' },
+        { key: 'threeWays', label: '3-Way Calls', value: weekData.totals.threeWays, lastWeek: weekData.lastWeekTotals.threeWays, color: 'pink' }
+    ];
+
+    return (
+        <div ref={ref} className="bg-white p-6 font-sans border border-gray-200 rounded-lg shadow-md" style={{ width: '450px' }}>
+            <div className="text-center mb-6">
+                <h1 className="text-2xl font-bold text-gray-800">Weekly Activity Report</h1>
+                <p className="text-md text-gray-600">{profile.displayName || 'User'}</p>
+                <p className="text-sm text-gray-500 font-medium">{weekData.dateRange}</p>
+            </div>
+            
+            <div className="space-y-4 mb-6">
+                <h3 className="font-semibold text-gray-700 border-b pb-2">This Week's Activity</h3>
+                {metrics.map(metric => {
+                    const monthlyGoal = goals[metric.key] || 0;
+                    const weeklyGoal = Math.ceil(monthlyGoal / WEEKS_IN_MONTH);
+                    const progress = weeklyGoal > 0 ? (metric.value / weeklyGoal) * 100 : 0;
+                    
+                    return (
+                        <div key={metric.key}>
+                            <div className="flex justify-between items-center mb-1">
+                                <h4 className="font-semibold text-gray-600">{metric.label}</h4>
+                                <div className="text-right">
+                                    <p className="font-bold text-xl text-gray-800">{metric.value}</p>
+                                    <p className="text-xs text-gray-400">Last Week: {metric.lastWeek}</p>
+                                </div>
+                            </div>
+                            {weeklyGoal > 0 && (
+                                <>
+                                    <div className="w-full bg-gray-200 rounded-full h-1.5">
+                                        <div className={`bg-${metric.color}-500 h-1.5 rounded-full`} style={{ width: `${Math.min(progress, 100)}%` }}></div>
+                                    </div>
+                                    <p className="text-right text-xs text-gray-500 mt-1">Weekly Goal: {weeklyGoal}</p>
+                                </>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+
+            <div>
+                <h3 className="font-semibold text-gray-700 border-b pb-2 mb-3">10 in Play</h3>
+                {weekData.hotlist && weekData.hotlist.length > 0 ? (
+                    <ol className="list-decimal list-inside text-sm text-gray-600 space-y-1">
+                        {weekData.hotlist.map(item => <li key={item.id}>{item.name}</li>)}
+                    </ol>
+                ) : (
+                    <p className="text-sm text-gray-500">No items in the hotlist.</p>
+                )}
+            </div>
+            
+            <div className="mt-6 text-center text-xs text-gray-400">
+                <p>Generated by Activity Tracker App</p>
+            </div>
+        </div>
+    );
+});
+
 export default App;
+
