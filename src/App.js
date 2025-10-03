@@ -7,9 +7,9 @@ import {
     signInWithEmailAndPassword,
     signOut
 } from 'firebase/auth';
-import { getFirestore, doc, setDoc, getDoc, collection, getDocs, query, limit, addDoc, deleteDoc, orderBy, where, getCountFromServer } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, getDoc, collection, getDocs, query, limit, addDoc, deleteDoc, orderBy, where, getCountFromServer, updateDoc } from 'firebase/firestore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { ChevronUp, ChevronDown, Plus, X, List, BarChart2, Target, Users, PhoneCall, Briefcase, Trash2, Trophy, LogOut, Share2, Flame, Edit2, Calendar, Minus } from 'lucide-react';
+import { ChevronUp, ChevronDown, Plus, X, List, BarChart2, Target, Users, PhoneCall, Briefcase, Trash2, Trophy, LogOut, Share2, Flame, Edit2, Calendar, Minus, Info, Archive, ArchiveRestore, ArrowDownUp } from 'lucide-react';
 // Note: This implementation assumes html2canvas is loaded via a script tag in the main HTML file.
 // <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
@@ -46,16 +46,15 @@ const App = () => {
     const [loading, setLoading] = useState(true);
     const [userProfile, setUserProfile] = useState({});
     const [showNameModal, setShowNameModal] = useState(false);
+    const [showOnboarding, setShowOnboarding] = useState(false);
+    const [showGoalInstruction, setShowGoalInstruction] = useState(false);
 
     const [currentDate, setCurrentDate] = useState(new Date());
     const [monthlyData, setMonthlyData] = useState({});
     const [lastMonthData, setLastMonthData] = useState({});
     const [monthlyGoals, setMonthlyGoals] = useState({ exposures: 0, followUps: 0, sitdowns: 0, pbrs: 0, threeWays: 0 });
-    const [hotlist, setHotlist] = useState([]);
     const [analyticsData, setAnalyticsData] = useState([]);
     const [activeTab, setActiveTab] = useState('tracker');
-    const [showAddHotlistModal, setShowAddHotlistModal] = useState(false);
-    const [deletingItemId, setDeletingItemId] = useState(null);
     
     // State for image report card generation
     const [isSharing, setIsSharing] = useState(false);
@@ -97,25 +96,38 @@ const App = () => {
 
         const profileRef = doc(db, 'artifacts', appId, 'users', user.uid);
         const profileSnap = await getDoc(profileRef);
+        
+        let profileData = {};
         if (profileSnap.exists()) {
-            const profileData = profileSnap.data();
+            profileData = profileSnap.data();
             setUserProfile({ ...profileData, uid: user.uid });
             if (!profileData.displayName) {
                 setShowNameModal(true);
             }
+            if (!profileData.hasCompletedOnboarding) {
+                setShowOnboarding(true);
+            }
         } else {
             setShowNameModal(true);
+            setShowOnboarding(true);
         }
 
         const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', monthYearId);
         const docSnap = await getDoc(docRef);
+        let currentGoals = { exposures: 0, followUps: 0, sitdowns: 0, pbrs: 0, threeWays: 0 };
         if (docSnap.exists()) {
             const data = docSnap.data();
             setMonthlyData(data.dailyData || {});
-            setMonthlyGoals(data.monthlyGoals || { exposures: 0, followUps: 0, sitdowns: 0, pbrs: 0, threeWays: 0 });
+            currentGoals = data.monthlyGoals || currentGoals;
+            setMonthlyGoals(currentGoals);
         } else {
             setMonthlyData({});
-            setMonthlyGoals({ exposures: 0, followUps: 0, sitdowns: 0, pbrs: 0, threeWays: 0 });
+            setMonthlyGoals(currentGoals);
+        }
+
+        const allGoalsZero = Object.values(currentGoals).every(goal => goal === 0);
+        if (!profileData.hasSeenGoalInstruction && allGoalsZero) {
+            setShowGoalInstruction(true);
         }
         
         const lastMonthDocRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', lastMonthYearId);
@@ -125,12 +137,6 @@ const App = () => {
         } else {
             setLastMonthData({});
         }
-
-        const hotlistColRef = collection(db, 'artifacts', appId, 'users', user.uid, 'hotlist');
-        const hotlistQuery = query(hotlistColRef, limit(10));
-        const hotlistSnapshot = await getDocs(hotlistQuery);
-        setHotlist(hotlistSnapshot.docs.map(d => ({ id: d.id, ...d.data() })));
-
     }, [user, db, monthYearId, lastMonthYearId]);
 
     const handleSetDisplayName = async (name) => {
@@ -144,6 +150,22 @@ const App = () => {
         await setDoc(profileRef, newProfile, { merge: true });
         setUserProfile(newProfile);
         setShowNameModal(false);
+    };
+
+    const handleDismissOnboarding = async () => {
+        if (!user || !db) return;
+        setShowOnboarding(false);
+        const profileRef = doc(db, 'artifacts', appId, 'users', user.uid);
+        await setDoc(profileRef, { hasCompletedOnboarding: true }, { merge: true });
+        setUserProfile(prev => ({ ...prev, hasCompletedOnboarding: true }));
+    };
+
+    const handleDismissGoalInstruction = async () => {
+        if (!user || !db) return;
+        setShowGoalInstruction(false);
+        const profileRef = doc(db, 'artifacts', appId, 'users', user.uid);
+        await setDoc(profileRef, { hasSeenGoalInstruction: true }, { merge: true });
+        setUserProfile(prev => ({ ...prev, hasSeenGoalInstruction: true }));
     };
 
     const fetchAnalytics = useCallback(async () => {
@@ -178,11 +200,10 @@ const App = () => {
 
     useEffect(() => {
         if (user && db) {
-           if(activeTab === 'hotlist' && !hotlist.length) fetchData();
            if(activeTab === 'analytics') fetchAnalytics();
            if (activeTab === 'tracker') fetchData();
         }
-    }, [user, db, currentDate, fetchData, fetchAnalytics, activeTab, hotlist.length]);
+    }, [user, db, currentDate, fetchData, fetchAnalytics, activeTab]);
 
     const updateLeaderboard = useCallback(async (currentMonthData, targetMonthId) => {
         if (!user || !db || !userProfile.displayName) return;
@@ -209,16 +230,13 @@ const App = () => {
         const targetMonthId = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 
         if (targetMonthId === monthYearId) {
-            // It's the current month, use existing state and debouncer
             const updatedData = { ...monthlyData, [day]: { ...monthlyData[day], [field]: value } };
             setMonthlyData(updatedData);
             debouncedSave(updatedData, monthlyGoals);
         } else {
-            // It's a past month, update directly and save.
             const handleSave = async () => {
                 if (!user || !db) return;
                 
-                // Update local state for immediate UI feedback if it's last month
                 if(targetMonthId === lastMonthYearId) {
                     const updatedLastMonthData = { ...lastMonthData, [day]: { ...lastMonthData[day], [field]: value } };
                     setLastMonthData(updatedLastMonthData);
@@ -238,7 +256,6 @@ const App = () => {
 
     const handleQuickAdd = (metricKey, amount) => {
         const today = new Date();
-        // Prevent quick add if the main calendar view is not on the current month.
         if (today.getFullYear() !== year || today.getMonth() !== month) {
             alert("Quick add is only available for the current day on the current month's view.");
             return;
@@ -255,42 +272,10 @@ const App = () => {
         setMonthlyGoals(newGoals);
         debouncedSave(null, newGoals);
     };
-    
-    const addHotlistItem = () => setShowAddHotlistModal(true);
-    
-    const handleConfirmAddHotlistItem = async (name) => {
-        if (!user || !db || !name) { setShowAddHotlistModal(false); return; }
-        const newItem = { 
-            name, 
-            notes: "",
-            status: 'Warm', // Default status
-            lastContacted: null
-        };
-        const docRef = await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'hotlist'), newItem);
-        setHotlist([...hotlist, { id: docRef.id, ...newItem }]);
-        setShowAddHotlistModal(false);
-    };
-    
-    const updateHotlistItem = async (id, field, value) => {
-        if (!user || !db) return;
-        const updatedList = hotlist.map(item => item.id === id ? { ...item, [field]: value } : item);
-        setHotlist(updatedList);
-        const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'hotlist', id);
-        await setDoc(docRef, { [field]: value }, { merge: true });
-    };
-
-    const deleteHotlistItem = (id) => setDeletingItemId(id);
-    
-    const handleConfirmDelete = async () => {
-        if (!user || !db || !deletingItemId) { setDeletingItemId(null); return; }
-        setHotlist(hotlist.filter(item => item.id !== deletingItemId));
-        await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'hotlist', deletingItemId));
-        setDeletingItemId(null);
-    };
-    
+        
     const handleSignOut = async () => auth && await signOut(auth);
 
-    const getWeekDataForReport = useCallback(() => {
+    const getWeekDataForReport = useCallback(async () => {
         const today = new Date();
         const dayOfWeek = today.getDay();
         const startOfWeek = new Date(today);
@@ -326,24 +311,29 @@ const App = () => {
         const lastWeekTotals = getWeekTotals(startOfLastWeek, endOfLastWeek);
         const dateRange = `${startOfWeek.toLocaleDateString('default', {month: 'short', day: 'numeric'})} - ${endOfWeek.toLocaleDateString('default', {month: 'short', day: 'numeric'})}`;
         
-        return { totals: thisWeekTotals, lastWeekTotals, dateRange, hotlist };
-    }, [monthlyData, lastMonthData, hotlist]);
+        const hotlistColRef = collection(db, 'artifacts', appId, 'users', user.uid, 'hotlist');
+        const hotlistQuery = query(hotlistColRef, where('isArchived', '!=', true));
+        const hotlistSnapshot = await getDocs(hotlistQuery);
+        const hotlistForReport = hotlistSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        return { totals: thisWeekTotals, lastWeekTotals, dateRange, hotlist: hotlistForReport };
+    }, [monthlyData, lastMonthData, user, db]);
 
     const handleShareReportAsText = useCallback(async () => {
-        const { totals, lastWeekTotals, dateRange } = getWeekDataForReport();
+        const { totals, lastWeekTotals, dateRange, hotlist: reportHotlist } = await getWeekDataForReport();
 
         let shareText = `My Activity Tracker Report\nFrom: ${userProfile.displayName}\nWeek of: ${dateRange}\n\n`;
         shareText += `**This Week's Numbers:**\n- Exposures: ${totals.exposures}\n- Follow Ups: ${totals.followUps}\n- Sitdowns: ${totals.sitdowns}\n- PBRS: ${totals.pbrs}\n\n`;
         shareText += `**Last Week's Numbers:**\n- Exposures: ${lastWeekTotals.exposures}\n- Follow Ups: ${lastWeekTotals.followUps}\n- Sitdowns: ${lastWeekTotals.sitdowns}\n- PBRS: ${lastWeekTotals.pbrs}\n\n`;
         shareText += "--------------------\n\n";
         shareText += `My "10 in Play" Hotlist\n\n`;
-        hotlist.forEach((item, index) => { shareText += `${index + 1}. ${item.name}\n${item.notes ? `- Notes: ${item.notes}\n\n` : '\n'}`;});
+        reportHotlist.forEach((item, index) => { shareText += `${index + 1}. ${item.name}\n${item.notes ? `- Notes: ${item.notes}\n\n` : '\n'}`;});
         shareText += "\nSent from my Activity Tracker App";
 
         try {
             await navigator.share({ title: 'My Weekly Activity Report', text: shareText });
         } catch (error) { console.error('Error sharing text:', error); }
-    }, [getWeekDataForReport, userProfile.displayName, hotlist]);
+    }, [getWeekDataForReport, userProfile.displayName]);
     
     const handleShare = async () => {
         if (typeof window.html2canvas === 'undefined') {
@@ -352,7 +342,7 @@ const App = () => {
             return;
         }
         setIsSharing(true);
-        const weekData = getWeekDataForReport();
+        const weekData = await getWeekDataForReport();
         setReportCardData(weekData);
     };
 
@@ -405,14 +395,13 @@ const App = () => {
                 <Header displayName={userProfile.displayName} onSignOut={handleSignOut} />
                 <TabBar activeTab={activeTab} setActiveTab={setActiveTab} />
                 <main className="mt-6">
-                    {activeTab === 'tracker' && <ActivityTracker date={currentDate} setDate={setCurrentDate} goals={monthlyGoals} onGoalChange={handleGoalChange} data={{current: monthlyData, last: lastMonthData}} onDataChange={handleDataChange} onShare={handleShare} isSharing={isSharing} user={user} userProfile={userProfile} setUserProfile={setUserProfile} onQuickAdd={handleQuickAdd} />}
-                    {activeTab === 'hotlist' && <HotList list={hotlist} onAdd={addHotlistItem} onUpdate={updateHotlistItem} onDelete={deleteHotlistItem} />}
+                    {activeTab === 'tracker' && <ActivityTracker date={currentDate} setDate={setCurrentDate} goals={monthlyGoals} onGoalChange={handleGoalChange} data={{current: monthlyData, last: lastMonthData}} onDataChange={handleDataChange} onShare={handleShare} isSharing={isSharing} user={user} userProfile={userProfile} setUserProfile={setUserProfile} onQuickAdd={handleQuickAdd} showGoalInstruction={showGoalInstruction} onDismissGoalInstruction={handleDismissGoalInstruction} />}
+                    {activeTab === 'hotlist' && <HotList user={user} db={db} />}
                     {activeTab === 'analytics' && <AnalyticsDashboard data={analyticsData} />}
                     {activeTab === 'leaderboard' && <Leaderboard db={db} monthYearId={monthYearId} user={user} />}
                 </main>
                 {showNameModal && <DisplayNameModal onSave={handleSetDisplayName} />}
-                {showAddHotlistModal && <AddHotlistItemModal onClose={() => setShowAddHotlistModal(false)} onAdd={handleConfirmAddHotlistItem} />}
-                {deletingItemId && <ConfirmDeleteModal onClose={() => setDeletingItemId(null)} onConfirm={handleConfirmDelete} />}
+                {showOnboarding && <OnboardingModal onDismiss={handleDismissOnboarding} />}
                 {reportCardData && (
                     <div style={{ position: 'fixed', left: '-9999px', top: 0, zIndex: -1 }}>
                         <ReportCard ref={reportCardRef} profile={userProfile} weekData={reportCardData} goals={monthlyGoals} />
@@ -579,7 +568,7 @@ const Leaderboard = ({ db, monthYearId, user }) => {
     );
 };
 
-const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChange, onShare, isSharing, user, userProfile, setUserProfile, onQuickAdd }) => {
+const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChange, onShare, isSharing, user, userProfile, setUserProfile, onQuickAdd, showGoalInstruction, onDismissGoalInstruction }) => {
     const [selectedDay, setSelectedDay] = useState(null);
     const [viewMode, setViewMode] = useState('week');
     const year = date.getFullYear();
@@ -765,13 +754,13 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
                     })}
                 </div>
             )}
-            <TotalsFooter totals={monthlyTotals} onShare={onShare} isSharing={isSharing} streaks={streaks} goals={goals} onGoalChange={onGoalChange} userProfile={userProfile} onQuickAdd={onQuickAdd} />
+            <TotalsFooter totals={monthlyTotals} onShare={onShare} isSharing={isSharing} streaks={streaks} goals={goals} onGoalChange={onGoalChange} userProfile={userProfile} onQuickAdd={onQuickAdd} showGoalInstruction={showGoalInstruction} onDismissGoalInstruction={onDismissGoalInstruction} />
             {selectedDay && <DayEntryModal day={selectedDay.getDate()} data={modalData} onClose={closeModal} onChange={handleModalDataChange} />}
         </div>
     );
 };
 
-const TotalsFooter = ({ totals, onShare, isSharing, streaks, goals, onGoalChange, userProfile, onQuickAdd }) => {
+const TotalsFooter = ({ totals, onShare, isSharing, streaks, goals, onGoalChange, userProfile, onQuickAdd, showGoalInstruction, onDismissGoalInstruction }) => {
     const [editingGoal, setEditingGoal] = useState(null); 
     const longestStreaks = userProfile.longestStreaks || {};
     const metrics = [
@@ -789,8 +778,31 @@ const TotalsFooter = ({ totals, onShare, isSharing, streaks, goals, onGoalChange
     };
     const WEEKS_IN_MONTH = 4.33;
 
+    const streakStyles = {
+        active: {
+            text: 'text-gray-700',
+            flame: 'text-amber-500'
+        },
+        inactive: {
+            text: 'text-gray-500',
+            flame: 'text-gray-400'
+        }
+    };
+
     return (
         <div className="mt-6 pt-5 border-t border-gray-200">
+             {showGoalInstruction && (
+                <div className="mb-4 p-4 bg-indigo-50 border border-indigo-200 rounded-lg flex items-start space-x-3">
+                    <Info className="h-5 w-5 text-indigo-500 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                        <p className="text-sm font-medium text-indigo-800">Set your monthly goals!</p>
+                        <p className="text-sm text-indigo-700 mt-1">Click the <Edit2 className="h-3 w-3 inline-block mx-1" /> icon next to "Goal" on any card below to set your targets for the month.</p>
+                    </div>
+                    <button onClick={onDismissGoalInstruction} className="text-indigo-500 hover:text-indigo-700">
+                        <X className="h-5 w-5" />
+                    </button>
+                </div>
+            )}
             <div className="flex justify-end mb-4">
                 <button onClick={onShare} disabled={isSharing} className="flex items-center bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition text-sm disabled:bg-indigo-400 disabled:cursor-wait">
                     <Share2 className="h-4 w-4 mr-2" /> {isSharing ? 'Generating...' : 'Share Weekly Report'}
@@ -803,6 +815,8 @@ const TotalsFooter = ({ totals, onShare, isSharing, streaks, goals, onGoalChange
                     const weeklyPace = Math.ceil(goal / WEEKS_IN_MONTH);
                     const currentStreak = streaks[metric.key] || 0;
                     const longestStreak = longestStreaks[metric.key] || 0;
+                    const streakStyle = currentStreak > 0 ? streakStyles.active : streakStyles.inactive;
+
                     return (
                         <div key={metric.key} className={`bg-white border p-4 rounded-lg shadow-sm flex flex-col`}>
                             <div className="flex items-start justify-between">
@@ -825,8 +839,14 @@ const TotalsFooter = ({ totals, onShare, isSharing, streaks, goals, onGoalChange
                                 <metric.icon className={`h-8 w-8 text-${metric.color}-400`} />
                             </div>
                             <div className="mt-4 flex space-x-4">
-                                <div className="flex items-center text-xs text-gray-500"><Flame className="h-4 w-4 mr-1 text-amber-500"/><span>Current: <strong>{currentStreak}</strong></span></div>
-                                <div className="flex items-center text-xs text-gray-500"><Trophy className="h-4 w-4 mr-1 text-gray-400"/><span>Longest: <strong>{longestStreak}</strong></span></div>
+                                <div className={`flex items-center text-xs ${streakStyle.text}`}>
+                                    <Flame className={`h-4 w-4 mr-1 ${streakStyle.flame}`}/>
+                                    <span>Current: <strong>{currentStreak}</strong></span>
+                                </div>
+                                <div className="flex items-center text-xs text-gray-500">
+                                    <Trophy className="h-4 w-4 mr-1 text-gray-400"/>
+                                    <span>Longest: <strong>{longestStreak}</strong></span>
+                                </div>
                             </div>
                             <div className="mt-auto pt-4">
                                 <div className="flex justify-between items-center text-xs text-gray-500">
@@ -897,26 +917,110 @@ const SitdownTracker = ({ value = [], onChange }) => {
     );
 };
 
-const HotList = ({ list, onAdd, onUpdate, onDelete }) => {
+const HotList = ({ user, db }) => {
+    const [hotlist, setHotlist] = useState([]);
+    const [isArchiveView, setIsArchiveView] = useState(false);
+    const [activeProspectsCount, setActiveProspectsCount] = useState(0);
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [itemToDelete, setItemToDelete] = useState(null);
+
+    const hotlistColRef = useMemo(() => collection(db, 'artifacts', appId, 'users', user.uid, 'hotlist'), [db, user.uid, appId]);
+
+    const fetchHotlist = useCallback(async () => {
+        const q = isArchiveView 
+            ? query(hotlistColRef, where('isArchived', '==', true))
+            : query(hotlistColRef, where('isArchived', '!=', true));
+        
+        const snapshot = await getDocs(q);
+        const fetchedList = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        // For backwards compatibility, get all docs and filter client-side if the query might miss old data.
+        const allDocsSnap = await getDocs(hotlistColRef);
+        const allItems = allDocsSnap.docs.map(d => ({id: d.id, ...d.data()}));
+        
+        setHotlist(allItems.filter(item => (isArchiveView ? item.isArchived === true : item.isArchived !== true)));
+        setActiveProspectsCount(allItems.filter(item => item.isArchived !== true).length);
+
+    }, [hotlistColRef, isArchiveView]);
+
+    useEffect(() => {
+        fetchHotlist();
+    }, [isArchiveView, fetchHotlist]);
+
+
+    const handleAdd = async (name) => {
+        setShowAddModal(false);
+        if (!name) return;
+        const newItem = { 
+            name, 
+            notes: "",
+            status: 'Warm',
+            lastContacted: null,
+            isArchived: false
+        };
+        await addDoc(hotlistColRef, newItem);
+        fetchHotlist();
+    };
+
+    const debouncedUpdate = useCallback(debounce(async (id, field, value) => {
+        const docRef = doc(hotlistColRef, id);
+        await updateDoc(docRef, { [field]: value });
+        // No need to fetch here, local state is already updated
+    }, 1000), [hotlistColRef]);
+
+    const handleUpdate = (id, field, value) => {
+        setHotlist(prevList => prevList.map(item => item.id === id ? { ...item, [field]: value } : item));
+        debouncedUpdate(id, field, value);
+    };
+
+    const handleInstantUpdate = async (id, field, value) => {
+        const docRef = doc(hotlistColRef, id);
+        await updateDoc(docRef, { [field]: value });
+        fetchHotlist();
+    };
+
+    const handleDelete = async () => {
+        if (!itemToDelete) return;
+        const docRef = doc(hotlistColRef, itemToDelete);
+        await deleteDoc(docRef);
+        fetchHotlist();
+        setItemToDelete(null);
+    };
+
     const statusConfig = {
         Hot: { text: 'Hot', color: 'text-red-800', bg: 'bg-red-100', ring: 'ring-red-500' },
         Warm: { text: 'Warm', color: 'text-amber-800', bg: 'bg-amber-100', ring: 'ring-amber-500' },
         Cold: { text: 'Cold', color: 'text-blue-800', bg: 'bg-blue-100', ring: 'ring-blue-500' },
     };
 
+    const progress = Math.min((activeProspectsCount / 10) * 100, 100);
+
     return (
         <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
-            <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl sm:text-2xl font-semibold">10 in Play / Hot List</h2>
-                {list.length < 10 && (
-                    <button onClick={onAdd} className="flex items-center bg-indigo-600 text-white px-3 py-2 rounded-md">
-                        <Plus className="h-5 w-5 mr-1" /> Add Item
-                    </button>
-                )}
+             {showAddModal && <AddHotlistItemModal onClose={() => setShowAddModal(false)} onAdd={handleAdd} />}
+             {itemToDelete && <ConfirmDeleteModal onConfirm={handleDelete} onClose={() => setItemToDelete(null)} />}
+            <div className="flex justify-between items-center mb-2">
+                <h2 className="text-xl sm:text-2xl font-semibold">{isArchiveView ? 'Archived Prospects' : '10 in Play / Hot List'}</h2>
+                <button onClick={() => setIsArchiveView(!isArchiveView)} className="flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-800">
+                    {isArchiveView ? <><List className="h-4 w-4 mr-1"/> View Active List</> : <><Archive className="h-4 w-4 mr-1"/> View Archive</>}
+                </button>
             </div>
+
+            {!isArchiveView && (
+                 <div className="mb-4">
+                    <div className="flex justify-between items-center text-sm font-medium text-gray-600 mb-1">
+                        <span>Progress to 10 Prospects</span>
+                        <span>{activeProspectsCount}/10</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2.5">
+                        <div className="bg-indigo-600 h-2.5 rounded-full" style={{ width: `${progress}%` }}></div>
+                    </div>
+                </div>
+            )}
+
             <div className="space-y-4">
-                {list.map(item => {
-                    const currentStatus = item.status || 'Warm'; // Default to Warm if no status is set
+                {hotlist.length > 0 ? hotlist.map(item => {
+                    const currentStatus = item.status || 'Warm';
                     const { text, color, bg } = statusConfig[currentStatus];
 
                     return (
@@ -924,14 +1028,16 @@ const HotList = ({ list, onAdd, onUpdate, onDelete }) => {
                             <div className="flex justify-between items-start">
                                 <input
                                     type="text"
-                                    value={item.name}
-                                    onChange={(e) => onUpdate(item.id, 'name', e.target.value)}
+                                    defaultValue={item.name}
+                                    onChange={(e) => handleUpdate(item.id, 'name', e.target.value)}
                                     className="text-md sm:text-lg font-semibold border-none p-0 w-full focus:ring-0"
                                     placeholder="Enter name..."
                                 />
-                                <button onClick={() => onDelete(item.id)} className="text-gray-400 hover:text-red-500 ml-2">
-                                    <X className="h-5 w-5" />
-                                </button>
+                                {!isArchiveView && (
+                                    <button onClick={() => handleInstantUpdate(item.id, 'isArchived', true)} className="text-gray-400 hover:text-indigo-600 ml-2" title="Archive Prospect">
+                                        <Archive className="h-5 w-5" />
+                                    </button>
+                                )}
                             </div>
 
                             <div className="flex items-center space-x-4 mt-2">
@@ -949,47 +1055,98 @@ const HotList = ({ list, onAdd, onUpdate, onDelete }) => {
                             </div>
 
                             <textarea
-                                value={item.notes}
-                                onChange={(e) => onUpdate(item.id, 'notes', e.target.value)}
+                                defaultValue={item.notes}
+                                onChange={(e) => handleUpdate(item.id, 'notes', e.target.value)}
                                 placeholder="Add notes..."
                                 className="mt-3 w-full text-sm text-gray-600 border-gray-200 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
                                 rows="2"
                             ></textarea>
 
                             <div className="mt-3 pt-3 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between space-y-3 sm:space-y-0">
-                                <div className="flex items-center space-x-2">
-                                     <span className="text-xs font-medium text-gray-500 hidden sm:inline">Status:</span>
-                                    {Object.keys(statusConfig).map(statusKey => {
-                                        const { text, ring } = statusConfig[statusKey];
-                                        const isSelected = currentStatus === statusKey;
-                                        return (
-                                            <button
-                                                key={statusKey}
-                                                onClick={() => onUpdate(item.id, 'status', statusKey)}
-                                                className={`px-3 py-1 text-xs font-medium rounded-full transition-all ${
-                                                    isSelected
-                                                        ? `${statusConfig[statusKey].bg} ${statusConfig[statusKey].color} ring-2 ${ring}`
-                                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                                }`}
-                                            >
-                                                {text}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                                 <button 
-                                    onClick={() => onUpdate(item.id, 'lastContacted', new Date().toISOString())}
-                                    className="flex w-full sm:w-auto items-center justify-center space-x-1 px-3 py-1.5 text-xs font-medium rounded-full bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition"
-                                >
-                                    <Calendar className="h-3 w-3" />
-                                    <span>Log Today's Contact</span>
-                                </button>
+                                {isArchiveView ? (
+                                    <div className="flex items-center space-x-2">
+                                        <button onClick={() => handleInstantUpdate(item.id, 'isArchived', false)} className="flex items-center space-x-1 px-3 py-1.5 text-xs font-medium rounded-full bg-green-100 text-green-700 hover:bg-green-200 transition">
+                                            <ArchiveRestore className="h-3 w-3" />
+                                            <span>Unarchive</span>
+                                        </button>
+                                        <button onClick={() => setItemToDelete(item.id)} className="flex items-center space-x-1 px-3 py-1.5 text-xs font-medium rounded-full bg-red-100 text-red-700 hover:bg-red-200 transition">
+                                            <Trash2 className="h-3 w-3" />
+                                            <span>Delete</span>
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="flex items-center space-x-2">
+                                            <span className="text-xs font-medium text-gray-500 hidden sm:inline">Status:</span>
+                                            {Object.keys(statusConfig).map(statusKey => {
+                                                const { text, ring } = statusConfig[statusKey];
+                                                const isSelected = currentStatus === statusKey;
+                                                return (
+                                                    <button
+                                                        key={statusKey}
+                                                        onClick={() => handleInstantUpdate(item.id, 'status', statusKey)}
+                                                        className={`px-3 py-1 text-xs font-medium rounded-full transition-all ${
+                                                            isSelected
+                                                                ? `${statusConfig[statusKey].bg} ${statusConfig[statusKey].color} ring-2 ${ring}`
+                                                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                                        }`}
+                                                    >
+                                                        {text}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                        <button 
+                                            onClick={() => handleInstantUpdate(item.id, 'lastContacted', new Date().toISOString())}
+                                            className="flex w-full sm:w-auto items-center justify-center space-x-1 px-3 py-1.5 text-xs font-medium rounded-full bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition"
+                                        >
+                                            <Calendar className="h-3 w-3" />
+                                            <span>Log Today's Contact</span>
+                                        </button>
+                                    </>
+                                )}
                             </div>
                         </div>
                     );
-                })}
-                {list.length === 0 && <p className="text-gray-500 text-center py-8">Your hot list is empty. Click "Add Item" to get started!</p>}
+                }) : (
+                     <div className="text-center py-10 px-6 bg-gray-50 rounded-lg">
+                        {isArchiveView ? (
+                            <>
+                                <Archive className="mx-auto h-12 w-12 text-gray-400" />
+                                <h3 className="mt-2 text-lg font-semibold text-gray-900">Archive is Empty</h3>
+                                <p className="mt-1 text-sm text-gray-500">
+                                    When you archive prospects, they will appear here.
+                                </p>
+                            </>
+                        ) : (
+                            <>
+                                <List className="mx-auto h-12 w-12 text-gray-400" />
+                                <h3 className="mt-2 text-lg font-semibold text-gray-900">Build Your Hot List</h3>
+                                <p className="mt-1 text-sm text-gray-500">
+                                    This is your list of key prospects. Click the button below to add your first one.
+                                </p>
+                                <div className="mt-6">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowAddModal(true)}
+                                        className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                    >
+                                        <Plus className="-ml-1 mr-2 h-5 w-5" />
+                                        Add First Prospect
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                )}
             </div>
+            {!isArchiveView && (
+                <div className="mt-4 flex justify-end">
+                    <button onClick={() => setShowAddModal(true)} className="flex items-center bg-indigo-600 text-white px-3 py-2 rounded-md">
+                        <Plus className="h-5 w-5 mr-1" /> Add Prospect
+                    </button>
+                </div>
+            )}
         </div>
     );
 };
@@ -1010,6 +1167,38 @@ const DisplayNameModal = ({ onSave }) => {
         </div>
     );
 };
+
+const OnboardingModal = ({ onDismiss }) => (
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div className="p-6 text-center">
+                <Trophy className="h-12 w-12 mx-auto text-amber-500" />
+                <h3 className="mt-4 text-xl font-semibold">Welcome to Your Activity Tracker!</h3>
+                <p className="mt-2 text-gray-600">Here's how to get started:</p>
+            </div>
+            <div className="px-6 pb-6 space-y-4 text-left">
+                <div className="flex items-start space-x-3">
+                    <div className="flex-shrink-0 h-6 w-6 rounded-full bg-indigo-500 text-white flex items-center justify-center font-bold text-sm">1</div>
+                    <div>
+                        <h4 className="font-semibold">For Quick Entries</h4>
+                        <p className="text-sm text-gray-600">Use the <Plus className="h-3 w-3 inline-block mx-1"/>/<Minus className="h-3 w-3 inline-block mx-1"/> buttons on the summary cards to quickly add or remove today's activity.</p>
+                    </div>
+                </div>
+                 <div className="flex items-start space-x-3">
+                    <div className="flex-shrink-0 h-6 w-6 rounded-full bg-indigo-500 text-white flex items-center justify-center font-bold text-sm">2</div>
+                    <div>
+                        <h4 className="font-semibold">For More Detail</h4>
+                        <p className="text-sm text-gray-600">Tap any day on the calendar to open the full activity log for that date.</p>
+                    </div>
+                </div>
+            </div>
+            <div className="p-4 bg-gray-50 flex justify-center">
+                <button onClick={onDismiss} className="bg-indigo-600 text-white px-6 py-2 rounded-md hover:bg-indigo-700">Got it!</button>
+            </div>
+        </div>
+    </div>
+);
+
 
 const AnalyticsDashboard = ({ data }) => {
     return (
@@ -1077,7 +1266,7 @@ const AddHotlistItemModal = ({ onClose, onAdd }) => {
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
-                <div className="p-6 border-b"><h3 className="text-xl font-semibold">Add New Hotlist Item</h3></div>
+                <div className="p-6 border-b"><h3 className="text-xl font-semibold">Add New Prospect</h3></div>
                 <div className="p-6">
                     <label htmlFor="hotlist-name" className="block text-sm font-medium text-gray-700">Name</label>
                     <input type="text" id="hotlist-name" value={name} onChange={(e) => setName(e.target.value)} className="mt-1 block w-full p-2 border border-gray-300 rounded-md" autoFocus />
@@ -1091,7 +1280,7 @@ const ConfirmDeleteModal = ({ onClose, onConfirm }) => {
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
-                <div className="p-6"><h3 className="text-xl font-semibold">Confirm Deletion</h3><p className="mt-2 text-gray-600">Are you sure? This cannot be undone.</p></div>
+                <div className="p-6"><h3 className="text-xl font-semibold">Confirm Deletion</h3><p className="mt-2 text-gray-600">Are you sure? This action is permanent and cannot be undone.</p></div>
                 <div className="p-4 bg-gray-50 flex justify-end space-x-2"><button onClick={onClose} className="bg-gray-200 px-4 py-2 rounded-md">Cancel</button><button onClick={onConfirm} className="bg-red-600 text-white px-4 py-2 rounded-md">Delete</button></div>
             </div>
         </div>
@@ -1174,4 +1363,5 @@ const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
 });
 
 export default App;
+
 
