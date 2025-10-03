@@ -419,7 +419,7 @@ const App = () => {
 
 // ... (AuthPage, Header, TabBar components remain unchanged)
 const AuthPage = ({ auth }) => {
-    const [isSignUp, setIsSignUp] = useState(true);
+    const [isSignUp, setIsSignUp] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
@@ -1395,4 +1395,5 @@ const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
 });
 
 export default App;
+
 
