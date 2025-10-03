@@ -7,9 +7,9 @@ import {
     signInWithEmailAndPassword,
     signOut
 } from 'firebase/auth';
-import { getFirestore, doc, setDoc, getDoc, collection, getDocs, query, limit, addDoc, deleteDoc, orderBy } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, getDoc, collection, getDocs, query, limit, addDoc, deleteDoc, orderBy, where, getCountFromServer } from 'firebase/firestore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { ChevronUp, ChevronDown, Plus, X, List, BarChart2, Target, Users, PhoneCall, Briefcase, Trash2, Trophy, LogOut, Share2, Flame, Edit2, Calendar } from 'lucide-react';
+import { ChevronUp, ChevronDown, Plus, X, List, BarChart2, Target, Users, PhoneCall, Briefcase, Trash2, Trophy, LogOut, Share2, Flame, Edit2, Calendar, Minus } from 'lucide-react';
 // Note: This implementation assumes html2canvas is loaded via a script tag in the main HTML file.
 // <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
@@ -236,6 +236,20 @@ const App = () => {
         }
     };
 
+    const handleQuickAdd = (metricKey, amount) => {
+        const today = new Date();
+        // Prevent quick add if the main calendar view is not on the current month.
+        if (today.getFullYear() !== year || today.getMonth() !== month) {
+            alert("Quick add is only available for the current day on the current month's view.");
+            return;
+        }
+        const todayData = monthlyData[today.getDate()] || {};
+        const currentValue = Number(todayData[metricKey]) || 0;
+        const newValue = Math.max(0, currentValue + amount);
+
+        handleDataChange(today, metricKey, newValue);
+    };
+
     const handleGoalChange = (goalKey, value) => {
         const newGoals = { ...monthlyGoals, [goalKey]: Number(value) || 0 };
         setMonthlyGoals(newGoals);
@@ -246,7 +260,12 @@ const App = () => {
     
     const handleConfirmAddHotlistItem = async (name) => {
         if (!user || !db || !name) { setShowAddHotlistModal(false); return; }
-        const newItem = { name, notes: "" };
+        const newItem = { 
+            name, 
+            notes: "",
+            status: 'Warm', // Default status
+            lastContacted: null
+        };
         const docRef = await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'hotlist'), newItem);
         setHotlist([...hotlist, { id: docRef.id, ...newItem }]);
         setShowAddHotlistModal(false);
@@ -386,10 +405,10 @@ const App = () => {
                 <Header displayName={userProfile.displayName} onSignOut={handleSignOut} />
                 <TabBar activeTab={activeTab} setActiveTab={setActiveTab} />
                 <main className="mt-6">
-                    {activeTab === 'tracker' && <ActivityTracker date={currentDate} setDate={setCurrentDate} goals={monthlyGoals} onGoalChange={handleGoalChange} data={{current: monthlyData, last: lastMonthData}} onDataChange={handleDataChange} onShare={handleShare} isSharing={isSharing} user={user} userProfile={userProfile} setUserProfile={setUserProfile} />}
+                    {activeTab === 'tracker' && <ActivityTracker date={currentDate} setDate={setCurrentDate} goals={monthlyGoals} onGoalChange={handleGoalChange} data={{current: monthlyData, last: lastMonthData}} onDataChange={handleDataChange} onShare={handleShare} isSharing={isSharing} user={user} userProfile={userProfile} setUserProfile={setUserProfile} onQuickAdd={handleQuickAdd} />}
                     {activeTab === 'hotlist' && <HotList list={hotlist} onAdd={addHotlistItem} onUpdate={updateHotlistItem} onDelete={deleteHotlistItem} />}
                     {activeTab === 'analytics' && <AnalyticsDashboard data={analyticsData} />}
-                    {activeTab === 'leaderboard' && <Leaderboard db={db} monthYearId={monthYearId} />}
+                    {activeTab === 'leaderboard' && <Leaderboard db={db} monthYearId={monthYearId} user={user} />}
                 </main>
                 {showNameModal && <DisplayNameModal onSave={handleSetDisplayName} />}
                 {showAddHotlistModal && <AddHotlistItemModal onClose={() => setShowAddHotlistModal(false)} onAdd={handleConfirmAddHotlistItem} />}
@@ -405,7 +424,7 @@ const App = () => {
 };
 
 
-// ... (AuthPage, Header, TabBar, Leaderboard components remain unchanged)
+// ... (AuthPage, Header, TabBar components remain unchanged)
 const AuthPage = ({ auth }) => {
     const [isSignUp, setIsSignUp] = useState(true);
     const [email, setEmail] = useState('');
@@ -469,51 +488,113 @@ const TabBar = ({ activeTab, setActiveTab }) => {
     );
 };
 
-const Leaderboard = ({ db, monthYearId }) => {
+const Leaderboard = ({ db, monthYearId, user }) => {
     const [scores, setScores] = useState([]);
+    const [userRank, setUserRank] = useState(null);
+    const [userScore, setUserScore] = useState(null);
     const [loading, setLoading] = useState(true);
+
     useEffect(() => {
         const fetchScores = async () => {
-            if (!db) return;
+            if (!db || !user) return;
             setLoading(true);
-            const scoresColRef = collection(db, 'artifacts', appId, 'leaderboard', monthYearId, 'entries');
-            const q = query(scoresColRef, orderBy('exposures', 'desc'), limit(25));
+
             try {
-                const querySnapshot = await getDocs(q);
-                setScores(querySnapshot.docs.map(doc => doc.data()));
-            } catch (error) { console.error("Error fetching leaderboard:", error); }
-            setLoading(false);
+                const scoresColRef = collection(db, 'artifacts', appId, 'leaderboard', monthYearId, 'entries');
+                
+                // 1. Fetch top 25
+                const top25Query = query(scoresColRef, orderBy('exposures', 'desc'), limit(25));
+                const top25Snapshot = await getDocs(top25Query);
+                const top25Scores = top25Snapshot.docs.map(doc => doc.data());
+                setScores(top25Scores);
+
+                // 2. Fetch current user's score
+                const userDocRef = doc(scoresColRef, user.uid);
+                const userDocSnap = await getDoc(userDocRef);
+
+                if (userDocSnap.exists()) {
+                    const currentUserData = userDocSnap.data();
+                    setUserScore(currentUserData);
+                    
+                    // 3. Calculate user's rank
+                    const higherRankQuery = query(scoresColRef, where('exposures', '>', currentUserData.exposures));
+                    const higherRankSnapshot = await getCountFromServer(higherRankQuery);
+                    setUserRank(higherRankSnapshot.data().count + 1);
+                } else {
+                    setUserRank(null);
+                    setUserScore(null);
+                }
+            } catch (error) {
+                console.error("Error fetching leaderboard:", error);
+            } finally {
+                setLoading(false);
+            }
         };
         fetchScores();
-    }, [db, monthYearId]);
+    }, [db, monthYearId, user]);
+
+    const isUserInTop25 = scores.some(score => score.userId === user.uid);
 
     if (loading) return <div className="text-center p-10">Loading Leaderboard...</div>;
+    
     return (
         <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
             <h2 className="text-xl sm:text-2xl font-semibold mb-4">Top 25 Performers</h2>
-            {scores.length === 0 ? (<p className="text-gray-500">The leaderboard is empty.</p>) : (
+            {scores.length === 0 ? (
+                <p className="text-gray-500">The leaderboard is empty for this month.</p>
+            ) : (
                 <ol className="space-y-3">
-                    {scores.map((score, index) => (
-                        <li key={score.userId} className="flex items-center justify-between p-3 rounded-md bg-gray-50">
-                            <div className="flex items-center"><span className="text-lg font-bold text-gray-400 w-8">{index + 1}</span><span className="font-medium">{score.displayName}</span></div>
-                            <span className="font-bold text-lg text-indigo-600">{score.exposures}</span>
-                        </li>
-                    ))}
+                    {scores.map((score, index) => {
+                        const isCurrentUser = score.userId === user.uid;
+                        return (
+                            <li 
+                                key={score.userId} 
+                                className={`flex items-center justify-between p-3 rounded-md ${isCurrentUser ? 'bg-indigo-100 border-l-4 border-indigo-500' : 'bg-gray-50'}`}
+                            >
+                                <div className="flex items-center">
+                                    <span className="text-lg font-bold text-gray-400 w-8">{index + 1}</span>
+                                    <span className="font-medium">{score.displayName}</span>
+                                    {isCurrentUser && <span className="ml-2 text-xs font-semibold text-indigo-700 bg-indigo-200 px-2 py-0.5 rounded-full">You</span>}
+                                </div>
+                                <span className="font-bold text-lg text-indigo-600">{score.exposures}</span>
+                            </li>
+                        );
+                    })}
                 </ol>
+            )}
+
+            {userRank && userScore && !isUserInTop25 && (
+                <div className="mt-6 border-t pt-4">
+                     <h3 className="text-md font-semibold text-gray-600 mb-2">Your Position</h3>
+                     <div className="flex items-center justify-between p-3 rounded-md bg-indigo-50 border border-indigo-200">
+                        <div className="flex items-center">
+                            <span className="text-lg font-bold text-gray-500 w-8">#{userRank}</span>
+                            <span className="font-medium">{userScore.displayName}</span>
+                        </div>
+                        <span className="font-bold text-lg text-indigo-600">{userScore.exposures}</span>
+                    </div>
+                </div>
             )}
         </div>
     );
 };
 
-const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChange, onShare, isSharing, user, userProfile, setUserProfile }) => {
+const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChange, onShare, isSharing, user, userProfile, setUserProfile, onQuickAdd }) => {
     const [selectedDay, setSelectedDay] = useState(null);
     const [viewMode, setViewMode] = useState('week');
     const year = date.getFullYear();
     const month = date.getMonth();
+
+    const monthYearId = `${year}-${String(month + 1).padStart(2, '0')}`;
+    const lastMonthDate = new Date(date);
+    lastMonthDate.setMonth(date.getMonth() - 1);
+    const lastMonthYearId = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, '0')}`;
+
     const changeMonth = (offset) => { const newDate = new Date(date); newDate.setMonth(date.getMonth() + offset); setDate(newDate); };
     const changeWeek = (offset) => { const newDate = new Date(date); newDate.setDate(date.getDate() + (7 * offset)); setDate(newDate); };
 
     const weekDisplayDays = useMemo(() => {
+        const today = new Date();
         const startOfWeek = new Date(date);
         startOfWeek.setDate(date.getDate() - date.getDay());
         startOfWeek.setHours(0,0,0,0);
@@ -523,27 +604,35 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
             currentDay.setDate(startOfWeek.getDate() + i);
             const dataSet = currentDay.getMonth() === date.getMonth() ? data.current : data.last;
             const dayData = dataSet ? (dataSet[currentDay.getDate()] || {}) : {};
-            const today = new Date();
-            today.setHours(0,0,0,0);
-            const isPast = currentDay < today;
+            
+            const isPast = currentDay < today && today.toDateString() !== currentDay.toDateString();
             const noActivity = !dayData || ((Number(dayData.exposures || 0) === 0) && (Number(dayData.followUps || 0) === 0) && (Array.isArray(dayData.sitdowns) ? dayData.sitdowns.length === 0 : true));
-            days.push({ date: currentDay, day: currentDay.getDate(), data: dayData, hasNoActivity: isPast && noActivity, isBlank: false });
+            const isToday = today.toDateString() === currentDay.toDateString();
+            const isWeekend = currentDay.getDay() === 0 || currentDay.getDay() === 6;
+
+            days.push({ date: currentDay, day: currentDay.getDate(), data: dayData, hasNoActivity: isPast && noActivity, isBlank: false, isToday, isWeekend });
         }
         return days;
     }, [date, data]);
 
     const calendarDays = useMemo(() => {
         const today = new Date();
-        const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
         const daysInMonth = new Date(year, month + 1, 0).getDate();
         const firstDayOfMonth = new Date(year, month, 1).getDay();
+    
         const days = [];
         for (let i = 0; i < firstDayOfMonth; i++) { days.push({ isBlank: true, day: `blank-${i}` }); }
+        
         for (let day = 1; day <= daysInMonth; day++) {
+            const currentDateObj = new Date(year, month, day);
             const dayData = data.current[day] || {};
-            const isPast = isCurrentMonth && day < today.getDate();
+            const isTodayFlag = today.toDateString() === currentDateObj.toDateString();
+            const isPast = currentDateObj < today && !isTodayFlag;
             const noActivity = Object.keys(dayData).filter(k => k !== 'exerc' && k !== 'read').length === 0 || (Number(dayData.exposures || 0) === 0 && Number(dayData.followUps || 0) === 0 && (dayData.sitdowns || []).length === 0);
-            days.push({ day, isBlank: false, data: dayData, hasNoActivity: isPast && noActivity });
+            const dayOfWeek = currentDateObj.getDay();
+            const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+    
+            days.push({ day, date: currentDateObj, isBlank: false, data: dayData, hasNoActivity: isPast && noActivity, isToday: isTodayFlag, isWeekend });
         }
         return days;
     }, [year, month, data]);
@@ -602,8 +691,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
     
     const handleDayClick = (dayObj) => {
         if (dayObj.isBlank) return;
-        const dateToSet = dayObj.date ? dayObj.date : new Date(year, month, dayObj.day);
-        setSelectedDay(dateToSet);
+        setSelectedDay(dayObj.date);
     };
     const closeModal = () => setSelectedDay(null);
     const handleModalDataChange = (field, value) => onDataChange(selectedDay, field, value);
@@ -612,11 +700,9 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
     
     let modalData = {};
     if (selectedDay) {
-        if (selectedDay.getMonth() === date.getMonth() && selectedDay.getFullYear() === date.getFullYear()) {
-            modalData = data.current[selectedDay.getDate()] || {};
-        } else {
-            modalData = data.last[selectedDay.getDate()] || {};
-        }
+        const targetMonthId = `${selectedDay.getFullYear()}-${String(selectedDay.getMonth() + 1).padStart(2, '0')}`;
+        const dataSet = targetMonthId === monthYearId ? data.current : (targetMonthId === lastMonthYearId ? data.last : {});
+        modalData = dataSet[selectedDay.getDate()] || {};
     }
 
     return (
@@ -637,46 +723,55 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
             </div>
             {viewMode === 'week' ? (
                 <div className="grid grid-cols-7 gap-2 text-center">
-                    {weekDisplayDays.map(d => (
-                        <div key={d.date.toISOString()} onClick={() => handleDayClick(d)} className="cursor-pointer hover:bg-indigo-50 p-2 rounded-lg border flex flex-col items-center justify-between aspect-square">
-                            <div className="text-xs text-gray-500">{d.date.toLocaleDateString('default', { weekday: 'short' })}</div>
-                            <div className={`font-semibold text-lg ${d.hasNoActivity ? 'text-red-500' : ''}`}>{d.day}</div>
-                            <div className="flex justify-center items-center space-x-1 h-2">
-                                {d.data.exposures > 0 && <div className={`h-2 w-2 ${activityColors.exposures} rounded-full`}></div>}
-                                {d.data.followUps > 0 && <div className={`h-2 w-2 ${activityColors.followUps} rounded-full`}></div>}
-                                {d.data.sitdowns?.length > 0 && <div className={`h-2 w-2 ${activityColors.sitdowns} rounded-full`}></div>}
-                                {d.data.pbrs > 0 && <div className={`h-2 w-2 ${activityColors.pbrs} rounded-full`}></div>}
+                    {weekDisplayDays.map(d => {
+                        const dayClasses = `cursor-pointer hover:bg-indigo-50 p-2 rounded-lg border flex flex-col items-center justify-between aspect-square ${d.isToday ? 'border-2 border-indigo-500' : ''} ${d.isWeekend ? 'bg-gray-50' : ''}`;
+                        return (
+                            <div key={d.date.toISOString()} onClick={() => handleDayClick(d)} className={dayClasses}>
+                                <div className="text-xs text-gray-500">{d.date.toLocaleDateString('default', { weekday: 'short' })}</div>
+                                <div className={`font-semibold text-lg ${d.hasNoActivity ? 'text-red-500' : ''}`}>{d.day}</div>
+                                <div className="flex justify-center items-center space-x-1 h-2">
+                                    {d.data.exposures > 0 && <div className={`h-2 w-2 ${activityColors.exposures} rounded-full`}></div>}
+                                    {d.data.followUps > 0 && <div className={`h-2 w-2 ${activityColors.followUps} rounded-full`}></div>}
+                                    {d.data.sitdowns?.length > 0 && <div className={`h-2 w-2 ${activityColors.sitdowns} rounded-full`}></div>}
+                                    {d.data.pbrs > 0 && <div className={`h-2 w-2 ${activityColors.pbrs} rounded-full`}></div>}
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        )
+                    })}
                 </div>
             ) : (
                 <div className="grid grid-cols-7 gap-1">
                     {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => <div key={`${day}-${index}`} className="text-center font-semibold text-xs text-gray-500 py-2">{day}</div>)}
-                    {calendarDays.map((d) => (
-                        <div key={d.day} onClick={() => handleDayClick(d)} className={`border rounded-md aspect-square p-1 sm:p-2 flex flex-col ${d.isBlank ? 'bg-gray-50' : 'cursor-pointer hover:bg-indigo-50'}`}>
-                            {!d.isBlank && (
-                                <>
-                                    <span className={`font-medium text-xs sm:text-sm ${d.hasNoActivity ? 'text-red-500' : ''}`}>{d.day}</span>
-                                    <div className="flex justify-center items-end space-x-1 mt-auto h-2">
-                                        {d.data.exposures > 0 && <div className={`h-2 w-2 ${activityColors.exposures} rounded-full`}></div>}
-                                        {d.data.followUps > 0 && <div className={`h-2 w-2 ${activityColors.followUps} rounded-full`}></div>}
-                                        {d.data.sitdowns?.length > 0 && <div className={`h-2 w-2 ${activityColors.sitdowns} rounded-full`}></div>}
-                                        {d.data.pbrs > 0 && <div className={`h-2 w-2 ${activityColors.pbrs} rounded-full`}></div>}
-                                    </div>
-                                </>
-                            )}
-                        </div>
-                    ))}
+                    {calendarDays.map((d, index) => {
+                        const dayClasses = `border rounded-md aspect-square p-1 sm:p-2 flex flex-col ${
+                            d.isBlank ? 'bg-transparent border-transparent' : 'cursor-pointer hover:bg-indigo-50'
+                        } ${d.isToday ? 'border-2 border-indigo-500' : ''} ${d.isWeekend && !d.isBlank ? 'bg-gray-50' : ''}`;
+                        
+                        return (
+                            <div key={d.day || `blank-${index}`} onClick={() => handleDayClick(d)} className={dayClasses}>
+                                {!d.isBlank && (
+                                    <>
+                                        <span className={`font-medium text-xs sm:text-sm ${d.hasNoActivity ? 'text-red-500' : ''}`}>{d.day}</span>
+                                        <div className="flex justify-center items-end space-x-1 mt-auto h-2">
+                                            {d.data.exposures > 0 && <div className={`h-2 w-2 ${activityColors.exposures} rounded-full`}></div>}
+                                            {d.data.followUps > 0 && <div className={`h-2 w-2 ${activityColors.followUps} rounded-full`}></div>}
+                                            {d.data.sitdowns?.length > 0 && <div className={`h-2 w-2 ${activityColors.sitdowns} rounded-full`}></div>}
+                                            {d.data.pbrs > 0 && <div className={`h-2 w-2 ${activityColors.pbrs} rounded-full`}></div>}
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        )
+                    })}
                 </div>
             )}
-            <TotalsFooter totals={monthlyTotals} onShare={onShare} isSharing={isSharing} streaks={streaks} goals={goals} onGoalChange={onGoalChange} userProfile={userProfile}/>
+            <TotalsFooter totals={monthlyTotals} onShare={onShare} isSharing={isSharing} streaks={streaks} goals={goals} onGoalChange={onGoalChange} userProfile={userProfile} onQuickAdd={onQuickAdd} />
             {selectedDay && <DayEntryModal day={selectedDay.getDate()} data={modalData} onClose={closeModal} onChange={handleModalDataChange} />}
         </div>
     );
 };
 
-const TotalsFooter = ({ totals, onShare, isSharing, streaks, goals, onGoalChange, userProfile }) => {
+const TotalsFooter = ({ totals, onShare, isSharing, streaks, goals, onGoalChange, userProfile, onQuickAdd }) => {
     const [editingGoal, setEditingGoal] = useState(null); 
     const longestStreaks = userProfile.longestStreaks || {};
     const metrics = [
@@ -713,7 +808,19 @@ const TotalsFooter = ({ totals, onShare, isSharing, streaks, goals, onGoalChange
                             <div className="flex items-start justify-between">
                                 <div>
                                     <h4 className={`text-sm sm:text-md font-semibold text-gray-600`}>{metric.label}</h4>
-                                    <p className={`text-4xl sm:text-5xl font-bold text-gray-900 mt-1`}>{metric.value}</p>
+                                    <div className="flex items-center mt-1 space-x-2">
+                                        <p className={`text-4xl sm:text-5xl font-bold text-gray-900`}>{metric.value}</p>
+                                        {metric.key !== 'sitdowns' && (
+                                            <div className="flex flex-col space-y-1 self-center">
+                                                <button onClick={() => onQuickAdd(metric.key, 1)} className="p-1.5 rounded-full bg-gray-200 text-gray-600 hover:bg-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                                    <Plus className="h-3 w-3" />
+                                                </button>
+                                                <button onClick={() => onQuickAdd(metric.key, -1)} className="p-1.5 rounded-full bg-gray-200 text-gray-600 hover:bg-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                                    <Minus className="h-3 w-3" />
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                                 <metric.icon className={`h-8 w-8 text-${metric.color}-400`} />
                             </div>
@@ -740,7 +847,6 @@ const TotalsFooter = ({ totals, onShare, isSharing, streaks, goals, onGoalChange
     );
 };
 
-// ... (DayEntryModal, SitdownTracker, HotList, DisplayNameModal, AnalyticsDashboard, and input components remain unchanged)
 const DayEntryModal = ({ day, data, onClose, onChange }) => {
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -792,20 +898,97 @@ const SitdownTracker = ({ value = [], onChange }) => {
 };
 
 const HotList = ({ list, onAdd, onUpdate, onDelete }) => {
+    const statusConfig = {
+        Hot: { text: 'Hot', color: 'text-red-800', bg: 'bg-red-100', ring: 'ring-red-500' },
+        Warm: { text: 'Warm', color: 'text-amber-800', bg: 'bg-amber-100', ring: 'ring-amber-500' },
+        Cold: { text: 'Cold', color: 'text-blue-800', bg: 'bg-blue-100', ring: 'ring-blue-500' },
+    };
+
     return (
         <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
-            <div className="flex justify-between items-center mb-4"><h2 className="text-xl sm:text-2xl font-semibold">10 in Play / Hot List</h2>{list.length < 10 && <button onClick={onAdd} className="flex items-center bg-indigo-600 text-white px-3 py-2 rounded-md"><Plus className="h-5 w-5 mr-1" /> Add Item</button>}</div>
+            <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl sm:text-2xl font-semibold">10 in Play / Hot List</h2>
+                {list.length < 10 && (
+                    <button onClick={onAdd} className="flex items-center bg-indigo-600 text-white px-3 py-2 rounded-md">
+                        <Plus className="h-5 w-5 mr-1" /> Add Item
+                    </button>
+                )}
+            </div>
             <div className="space-y-4">
-                {list.map(item => (
-                    <div key={item.id} className="p-4 border rounded-lg">
-                         <div className="flex justify-between items-start">
-                             <input type="text" value={item.name} onChange={(e) => onUpdate(item.id, 'name', e.target.value)} className="text-md sm:text-lg font-semibold border-none p-0 w-full" placeholder="Enter name..." />
-                             <button onClick={() => onDelete(item.id)} className="text-gray-400 hover:text-red-500"><X className="h-5 w-5"/></button>
-                         </div>
-                         <textarea value={item.notes} onChange={(e) => onUpdate(item.id, 'notes', e.target.value)} placeholder="Add notes..." className="mt-2 w-full text-sm text-gray-600 border-gray-200 rounded-md" rows="2"></textarea>
-                     </div>
-                ))}
-                {list.length === 0 && <p className="text-gray-500">Your hot list is empty.</p>}
+                {list.map(item => {
+                    const currentStatus = item.status || 'Warm'; // Default to Warm if no status is set
+                    const { text, color, bg } = statusConfig[currentStatus];
+
+                    return (
+                        <div key={item.id} className="p-4 border rounded-lg bg-white shadow-sm transition-shadow hover:shadow-md">
+                            <div className="flex justify-between items-start">
+                                <input
+                                    type="text"
+                                    value={item.name}
+                                    onChange={(e) => onUpdate(item.id, 'name', e.target.value)}
+                                    className="text-md sm:text-lg font-semibold border-none p-0 w-full focus:ring-0"
+                                    placeholder="Enter name..."
+                                />
+                                <button onClick={() => onDelete(item.id)} className="text-gray-400 hover:text-red-500 ml-2">
+                                    <X className="h-5 w-5" />
+                                </button>
+                            </div>
+
+                            <div className="flex items-center space-x-4 mt-2">
+                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${bg} ${color}`}>
+                                    {text}
+                                </span>
+                                <div className="text-xs text-gray-500">
+                                    Last Contact: {' '}
+                                    <span className="font-semibold">
+                                        {item.lastContacted 
+                                            ? new Date(item.lastContacted).toLocaleDateString()
+                                            : 'Never'}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <textarea
+                                value={item.notes}
+                                onChange={(e) => onUpdate(item.id, 'notes', e.target.value)}
+                                placeholder="Add notes..."
+                                className="mt-3 w-full text-sm text-gray-600 border-gray-200 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                                rows="2"
+                            ></textarea>
+
+                            <div className="mt-3 pt-3 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between space-y-3 sm:space-y-0">
+                                <div className="flex items-center space-x-2">
+                                     <span className="text-xs font-medium text-gray-500 hidden sm:inline">Status:</span>
+                                    {Object.keys(statusConfig).map(statusKey => {
+                                        const { text, ring } = statusConfig[statusKey];
+                                        const isSelected = currentStatus === statusKey;
+                                        return (
+                                            <button
+                                                key={statusKey}
+                                                onClick={() => onUpdate(item.id, 'status', statusKey)}
+                                                className={`px-3 py-1 text-xs font-medium rounded-full transition-all ${
+                                                    isSelected
+                                                        ? `${statusConfig[statusKey].bg} ${statusConfig[statusKey].color} ring-2 ${ring}`
+                                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                                }`}
+                                            >
+                                                {text}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                 <button 
+                                    onClick={() => onUpdate(item.id, 'lastContacted', new Date().toISOString())}
+                                    className="flex w-full sm:w-auto items-center justify-center space-x-1 px-3 py-1.5 text-xs font-medium rounded-full bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition"
+                                >
+                                    <Calendar className="h-3 w-3" />
+                                    <span>Log Today's Contact</span>
+                                </button>
+                            </div>
+                        </div>
+                    );
+                })}
+                {list.length === 0 && <p className="text-gray-500 text-center py-8">Your hot list is empty. Click "Add Item" to get started!</p>}
             </div>
         </div>
     );
@@ -844,9 +1027,50 @@ const AnalyticsDashboard = ({ data }) => {
     );
 };
 
-const NumberInput = (props) => ( <input type="number" min="0" className="w-20 p-1 border border-gray-300 rounded-md text-sm focus:ring-indigo-500 focus:border-indigo-500 transition" {...props} /> );
-const CheckboxInput = (props) => ( <input type="checkbox" className="h-5 w-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 transition" {...props} /> );
+const NumberInput = ({ value, onChange, ...props }) => {
+    const currentValue = Number(value) || 0;
 
+    const handleIncrement = () => {
+        const newValue = currentValue + 1;
+        onChange({ target: { value: String(newValue) } });
+    };
+
+    const handleDecrement = () => {
+        const newValue = Math.max(0, currentValue - 1);
+        onChange({ target: { value: String(newValue) } });
+    };
+
+    const handleChange = (e) => {
+        const typedValue = e.target.value;
+        // Allow empty string to clear the input, otherwise parse as a number
+        if (typedValue === '' || (!isNaN(typedValue) && Number(typedValue) >= 0)) {
+            onChange(e);
+        }
+    };
+
+    return (
+        <div className="flex items-center space-x-2">
+            <button type="button" onClick={handleDecrement} className="p-2 rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300 transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50" disabled={currentValue <= 0}>
+                <Minus className="h-4 w-4" />
+            </button>
+            <input 
+                type="text" // Use text to better control value and avoid default browser number input UI
+                inputMode="numeric" // Brings up number pad on mobile
+                pattern="[0-9]*"
+                value={value} 
+                onChange={handleChange}
+                className="w-16 p-1 border border-gray-300 rounded-md text-center text-sm focus:ring-indigo-500 focus:border-indigo-500 transition" 
+                {...props} 
+            />
+            <button type="button" onClick={handleIncrement} className="p-2 rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300 transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                <Plus className="h-4 w-4" />
+            </button>
+        </div>
+    );
+};
+const CheckboxInput = (props) => (
+    <input type="checkbox" className="h-5 w-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 transition" {...props} />
+);
 const AddHotlistItemModal = ({ onClose, onAdd }) => {
     const [name, setName] = useState('');
     const handleAdd = () => { if (name.trim()) { onAdd(name.trim()); } };
@@ -925,9 +1149,18 @@ const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
             <div>
                 <h3 className="font-semibold text-gray-700 border-b pb-2 mb-3">10 in Play</h3>
                 {weekData.hotlist && weekData.hotlist.length > 0 ? (
-                    <ol className="list-decimal list-inside text-sm text-gray-600 space-y-1">
-                        {weekData.hotlist.map(item => <li key={item.id}>{item.name}</li>)}
-                    </ol>
+                    <ul className="text-sm text-gray-600 space-y-2">
+                        {weekData.hotlist.map((item, index) => (
+                             <li key={item.id} className="flex justify-between items-center border-b border-gray-100 py-1">
+                                <span>{index + 1}. {item.name}</span>
+                                <span className="text-xs text-gray-500">
+                                    {item.lastContacted 
+                                        ? `${new Date(item.lastContacted).toLocaleDateString()}`
+                                        : 'Never'}
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
                 ) : (
                     <p className="text-sm text-gray-500">No items in the hotlist.</p>
                 )}
