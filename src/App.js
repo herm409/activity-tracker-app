@@ -606,8 +606,8 @@ const App = () => {
         const { totals, lastWeekTotals, dateRange, hotlist: reportHotlist } = await getWeekDataForReport();
 
         let shareText = `My Activity Tracker Report\nFrom: ${userProfile.displayName}\nWeek of: ${dateRange}\n\n`;
-        shareText += `**This Week's Numbers:**\n- Exposures: ${totals.exposures}\n- Follow Ups: ${totals.followUps}\n- Presentations: ${totals.presentations}\n- Memberships Sold: ${totals.enrolls}\n\n`;
-        shareText += `**Last Week's Numbers:**\n- Exposures: ${lastWeekTotals.exposures}\n- Follow Ups: ${lastWeekTotals.followUps}\n- Presentations: ${lastWeekTotals.presentations}\n- Memberships Sold: ${lastWeekTotals.enrolls}\n\n`;
+        shareText += `**This Week's Numbers:**\n- Exposures: ${totals.exposures}\n- Follow Ups: ${totals.followUps}\n- Presentations: ${totals.presentations}\n- 3-Way Calls: ${totals.threeWays}\n- Memberships Sold: ${totals.enrolls}\n\n`;
+        shareText += `**Last Week's Numbers:**\n- Exposures: ${lastWeekTotals.exposures}\n- Follow Ups: ${lastWeekTotals.followUps}\n- Presentations: ${lastWeekTotals.presentations}\n- 3-Way Calls: ${lastWeekTotals.threeWays}\n- Memberships Sold: ${lastWeekTotals.enrolls}\n\n`;
         shareText += "--------------------\n\n";
         shareText += `My "10 in Play" Hotlist\n\n`;
         reportHotlist.forEach((item, index) => { shareText += `${index + 1}. ${item.name}\n${item.notes ? `- Notes: ${item.notes}\n\n` : '\n'}`;});
@@ -1678,6 +1678,7 @@ const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
         { key: 'exposures', label: 'Exposures', value: weekData.totals.exposures, lastWeek: weekData.lastWeekTotals.exposures, color: 'indigo' },
         { key: 'followUps', label: 'Follow Ups', value: weekData.totals.followUps, lastWeek: weekData.lastWeekTotals.followUps, color: 'green' },
         { key: 'presentations', label: 'Presentations', value: weekData.totals.presentations, lastWeek: weekData.lastWeekTotals.presentations, color: 'purple' },
+        { key: 'threeWays', label: '3-Way Calls', value: weekData.totals.threeWays, lastWeek: weekData.lastWeekTotals.threeWays, color: 'pink' },
         { key: 'enrolls', label: 'Memberships Sold', value: weekData.totals.enrolls, lastWeek: weekData.lastWeekTotals.enrolls, color: 'teal' },
     ];
 
@@ -1747,6 +1748,7 @@ const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
 });
 
 export default App;
+
 
 
 
