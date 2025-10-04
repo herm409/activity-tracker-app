@@ -103,14 +103,10 @@ const AuthPage = ({ auth }) => {
 };
 
 const Header = ({ displayName, onSignOut, onEditName }) => (
-    <header className="flex justify-between items-center mb-6 pb-4 border-b border-gray-200">
+    <header className="flex justify-between items-center pb-4">
         <div className="flex items-center">
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-                Welcome, {displayName || 'User'}!
-            </h1>
-            <button onClick={onEditName} className="ml-3 text-gray-500 hover:text-indigo-600">
-                <Edit2 className="h-5 w-5" />
-            </button>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Activity Tracker</h1>
+            <button onClick={onEditName} className="ml-3 text-gray-400 hover:text-gray-600"><Edit2 className="h-4 w-4" /></button>
         </div>
         <button onClick={onSignOut} className="flex items-center text-sm font-medium text-gray-600 hover:text-red-600 transition-colors">
             <LogOut className="h-5 w-5 mr-1" /> Sign Out
@@ -1503,8 +1499,8 @@ const TeamDashboard = ({ teamData, teamMembers, onLeaveTeam, onShareInvite, user
 
     const teamTotals = useMemo(() => {
         return teamMembers.reduce((acc, member) => {
-            acc.exposures += member.weeklyExposures;
-            acc.presentations += member.weeklyPresentations;
+            acc.exposures += member.weeklyExposures || 0;
+            acc.presentations += member.weeklyPresentations || 0;
             return acc;
         }, { exposures: 0, presentations: 0 });
     }, [teamMembers]);
@@ -1578,41 +1574,70 @@ const TeamPage = ({ user, db, userProfile, setUserProfile }) => {
     const [isLoading, setIsLoading] = useState(true);
 
     const handleCreateTeam = async (teamName) => {
-        if (!user || !db) return;
+        if (!user || !db || !userProfile.displayName) return;
         setIsLoading(true);
-        let newCode = '';
-        let codeExists = true;
-        
-        while(codeExists) {
-            newCode = generateInviteCode();
-            const codeRef = doc(db, 'artifacts', appId, 'public', 'inviteCodes', newCode);
-            const codeSnap = await getDoc(codeRef);
-            codeExists = codeSnap.exists();
+        try {
+            let newCode = '';
+            let codeExists = true;
+            
+            while(codeExists) {
+                newCode = generateInviteCode();
+                const codeRef = doc(db, 'artifacts', appId, 'public', 'data', 'inviteCodes', newCode);
+                const codeSnap = await getDoc(codeRef);
+                codeExists = codeSnap.exists();
+            }
+
+            const teamColRef = collection(db, 'artifacts', appId, 'public', 'data', 'teams');
+            const newTeamRef = doc(teamColRef);
+
+            const batch = writeBatch(db);
+            batch.set(newTeamRef, { name: teamName, inviteCode: newCode, creatorId: user.uid, createdAt: new Date() });
+            const codeRef = doc(db, 'artifacts', appId, 'public', 'data', 'inviteCodes', newCode);
+            batch.set(codeRef, { teamId: newTeamRef.id });
+            const userProfileRef = doc(db, 'artifacts', appId, 'users', user.uid);
+            batch.update(userProfileRef, { teamId: newTeamRef.id });
+
+            const statsRef = doc(db, 'artifacts', appId, 'public', 'data', 'teamMemberStats', user.uid);
+            batch.set(statsRef, {
+                displayName: userProfile.displayName,
+                teamId: newTeamRef.id,
+                weeklyExposures: 0,
+                weeklyPresentations: 0,
+                lastUpdated: new Date(),
+                uid: user.uid
+            }, { merge: true });
+
+            await batch.commit();
+            setUserProfile(prev => ({ ...prev, teamId: newTeamRef.id }));
+        } catch (error) {
+            console.error("Error creating team:", error);
+        } finally {
+            setIsLoading(false);
         }
-
-        const teamColRef = collection(db, 'artifacts', appId, 'public', 'teams');
-        const newTeamRef = doc(teamColRef);
-
-        const batch = writeBatch(db);
-        batch.set(newTeamRef, { name: teamName, inviteCode: newCode, creatorId: user.uid, createdAt: new Date() });
-        const codeRef = doc(db, 'artifacts', appId, 'public', 'inviteCodes', newCode);
-        batch.set(codeRef, { teamId: newTeamRef.id });
-        const userProfileRef = doc(db, 'artifacts', appId, 'users', user.uid);
-        batch.update(userProfileRef, { teamId: newTeamRef.id });
-
-        await batch.commit();
-        setUserProfile(prev => ({ ...prev, teamId: newTeamRef.id }));
-        setIsLoading(false);
     };
 
     const handleJoinTeam = async (inviteCode) => {
-        if (!user || !db) return false;
-        const codeRef = doc(db, 'artifacts', appId, 'public', 'inviteCodes', inviteCode);
+        if (!user || !db || !userProfile.displayName) return false;
+        const codeRef = doc(db, 'artifacts', appId, 'public', 'data', 'inviteCodes', inviteCode);
         const codeSnap = await getDoc(codeRef);
         if (codeSnap.exists()) {
             const { teamId } = codeSnap.data();
+            
+            const batch = writeBatch(db);
             const userProfileRef = doc(db, 'artifacts', appId, 'users', user.uid);
-            await updateDoc(userProfileRef, { teamId });
+            batch.update(userProfileRef, { teamId });
+
+            const statsRef = doc(db, 'artifacts', appId, 'public', 'data', 'teamMemberStats', user.uid);
+            batch.set(statsRef, {
+                displayName: userProfile.displayName,
+                teamId: teamId,
+                weeklyExposures: 0,
+                weeklyPresentations: 0,
+                lastUpdated: new Date(),
+                uid: user.uid
+            }, { merge: true });
+
+            await batch.commit();
             setUserProfile(prev => ({ ...prev, teamId }));
             return true;
         }
@@ -1623,6 +1648,10 @@ const TeamPage = ({ user, db, userProfile, setUserProfile }) => {
         if (!user || !db) return;
         const userProfileRef = doc(db, 'artifacts', appId, 'users', user.uid);
         await updateDoc(userProfileRef, { teamId: null });
+        
+        const statsRef = doc(db, 'artifacts', appId, 'public', 'data', 'teamMemberStats', user.uid);
+        await updateDoc(statsRef, { teamId: null });
+
         setUserProfile(prev => ({ ...prev, teamId: null }));
         setTeamData(null);
         setTeamMembers([]);
@@ -1636,6 +1665,8 @@ const TeamPage = ({ user, db, userProfile, setUserProfile }) => {
     };
 
     useEffect(() => {
+        let unsubscribe = () => {};
+
         const fetchTeamData = async () => {
             if (!userProfile.teamId) {
                 setIsLoading(false);
@@ -1645,70 +1676,36 @@ const TeamPage = ({ user, db, userProfile, setUserProfile }) => {
             }
             setIsLoading(true);
 
-            // Fetch team details
-            const teamRef = doc(db, 'artifacts', appId, 'public', 'teams', userProfile.teamId);
+            const teamRef = doc(db, 'artifacts', appId, 'public', 'data', 'teams', userProfile.teamId);
             const teamSnap = await getDoc(teamRef);
             if (!teamSnap.exists()) {
-                // Team might have been deleted, so clear from user profile.
                 handleLeaveTeam();
                 return;
             }
             setTeamData({ id: teamSnap.id, ...teamSnap.data() });
             
-            // Fetch team members
-            const usersRef = collection(db, 'artifacts', appId, 'users');
-            const q = query(usersRef, where("teamId", "==", userProfile.teamId));
-            const memberSnaps = await getDocs(q);
-            const memberProfiles = memberSnaps.docs.map(d => ({ uid: d.id, ...d.data() }));
-
-            // Calculate weekly stats for each member
-            const today = new Date();
-            const startOfWeek = new Date(today);
-            startOfWeek.setDate(today.getDate() - today.getDay());
-            startOfWeek.setHours(0, 0, 0, 0);
-
-            const membersWithStats = await Promise.all(memberProfiles.map(async (member) => {
-                let weeklyExposures = 0;
-                let weeklyPresentations = 0;
-                
-                let currentDate = new Date(startOfWeek);
-                const activityDocsToFetch = new Set();
-                while (currentDate <= today) {
-                    activityDocsToFetch.add(`${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`);
-                    currentDate.setDate(currentDate.getDate() + 1);
-                }
-
-                const activityData = {};
-                for (const monthId of activityDocsToFetch) {
-                    const activityRef = doc(db, 'artifacts', appId, 'users', member.uid, 'activities', monthId);
-                    const activitySnap = await getDoc(activityRef);
-                    if (activitySnap.exists()) {
-                        activityData[monthId] = activitySnap.data().dailyData || {};
-                    }
-                }
-                
-                currentDate = new Date(startOfWeek);
-                while (currentDate <= today) {
-                    const monthId = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
-                    const dayData = activityData[monthId]?.[currentDate.getDate()];
-                    if (dayData) {
-                        weeklyExposures += Number(dayData.exposures) || 0;
-                        weeklyPresentations += (dayData.presentations?.length || 0) + (Number(dayData.pbrs) || 0);
-                    }
-                    currentDate.setDate(currentDate.getDate() + 1);
-                }
-
-                return { ...member, weeklyExposures, weeklyPresentations };
-            }));
-
-            setTeamMembers(membersWithStats);
-            setIsLoading(false);
+            const statsCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'teamMemberStats');
+            const q = query(statsCollectionRef, where("teamId", "==", userProfile.teamId));
+            
+            unsubscribe = onSnapshot(q, (snapshot) => {
+                const members = snapshot.docs.map(d => d.data());
+                setTeamMembers(members);
+                setIsLoading(false);
+            }, (error) => {
+                console.error("Error fetching team members in real-time:", error);
+                setIsLoading(false);
+            });
         };
 
-        if (db && user) {
+        if (db && user && userProfile.uid) {
             fetchTeamData();
+        } else if (!userProfile.teamId) {
+            setIsLoading(false);
         }
-    }, [user, db, userProfile, setUserProfile, handleLeaveTeam]);
+        
+        return () => unsubscribe();
+
+    }, [user, db, userProfile.uid, userProfile.teamId, handleLeaveTeam]);
 
     if (isLoading) {
         return <div className="text-center p-10">Loading Team...</div>;
@@ -1759,6 +1756,49 @@ const App = () => {
     const [isSharing, setIsSharing] = useState(false);
     const [reportCardData, setReportCardData] = useState(null);
     const reportCardRef = useRef(null);
+
+    const updateTeamMemberStats = useCallback(async (currentMonthlyData, currentLastMonthData, currentProfile) => {
+        if (!db || !user || !currentProfile.teamId || !currentProfile.displayName) return;
+
+        const today = new Date();
+        const startOfWeek = new Date(today);
+        startOfWeek.setDate(today.getDate() - today.getDay());
+        startOfWeek.setHours(0, 0, 0, 0);
+
+        let weeklyExposures = 0;
+        let weeklyPresentations = 0;
+        
+        let currentDate = new Date(startOfWeek);
+        while (currentDate <= today) {
+            const dataSet = currentDate.getMonth() === today.getMonth() ? currentMonthlyData : currentLastMonthData;
+            const dayData = dataSet?.[currentDate.getDate()];
+            if (dayData) {
+                weeklyExposures += Number(dayData.exposures) || 0;
+                weeklyPresentations += (dayData.presentations?.length || 0) + (Number(dayData.pbrs) || 0);
+            }
+            currentDate.setDate(currentDate.getDate() + 1);
+        }
+
+        const statsRef = doc(db, 'artifacts', appId, 'public', 'data', 'teamMemberStats', user.uid);
+        await setDoc(statsRef, {
+            displayName: currentProfile.displayName,
+            teamId: currentProfile.teamId,
+            weeklyExposures,
+            weeklyPresentations,
+            lastUpdated: new Date(),
+            uid: user.uid
+        }, { merge: true });
+
+    }, [db, user]);
+
+    const debouncedUpdateStats = useMemo(() => debounce(updateTeamMemberStats, 2500), [updateTeamMemberStats]);
+
+    useEffect(() => {
+        if (userProfile.teamId) {
+            debouncedUpdateStats(monthlyData, lastMonthData, userProfile);
+        }
+    }, [monthlyData, lastMonthData, userProfile, debouncedUpdateStats]);
+
 
     // --- Firebase Initialization ---
     useEffect(() => {
@@ -2115,7 +2155,7 @@ const App = () => {
     }, [reportCardData, handleShareReportAsText]);
 
     const streaks = useMemo(() => {
-        const calculateAndUpdateStreak = (activityKey) => {
+        const calculateStreak = (activityKey) => {
             if (!user || !userProfile.uid || !monthlyData || !lastMonthData) return 0;
             let currentStreak = 0;
             const today = new Date();
@@ -2131,8 +2171,8 @@ const App = () => {
                     } else if (activityKey === 'enrolls') {
                         hasActivity = (dayData.enrolls && Number(dayData.enrolls) > 0) || (dayData.sitdowns && dayData.sitdowns.some(s => s === 'E'));
                     } else {
-                        if (Array.isArray(dayData[activityKey])) hasActivity = dayData[activityKey].length > 0;
-                        else hasActivity = Number(dayData[activityKey]) > 0;
+                         if (Array.isArray(dayData[activityKey])) hasActivity = dayData[activityKey].length > 0;
+                         else hasActivity = Number(dayData[activityKey]) > 0;
                     }
                 }
                 if (hasActivity) {
@@ -2142,26 +2182,42 @@ const App = () => {
                     break;
                 }
             }
-            const longestStreaks = userProfile.longestStreaks || {};
-            if (currentStreak > (longestStreaks[activityKey] || 0)) {
-                const newLongestStreaks = {...longestStreaks, [activityKey]: currentStreak };
-                const db = getFirestore();
-                if (db) { 
-                    const profileRef = doc(db, 'artifacts', appId, 'users', user.uid);
-                    setDoc(profileRef, { longestStreaks: newLongestStreaks }, { merge: true });
-                    setUserProfile(prev => ({...prev, longestStreaks: newLongestStreaks}));
-                }
-            }
             return currentStreak;
         };
         return {
-            exposures: calculateAndUpdateStreak('exposures'),
-            followUps: calculateAndUpdateStreak('followUps'),
-            presentations: calculateAndUpdateStreak('presentations'),
-            threeWays: calculateAndUpdateStreak('threeWays'),
-            enrolls: calculateAndUpdateStreak('enrolls'),
+            exposures: calculateStreak('exposures'),
+            followUps: calculateStreak('followUps'),
+            presentations: calculateStreak('presentations'),
+            threeWays: calculateStreak('threeWays'),
+            enrolls: calculateStreak('enrolls'),
         };
-    }, [monthlyData, lastMonthData, user, userProfile, setUserProfile]);
+    }, [monthlyData, lastMonthData, user, userProfile.uid]);
+
+    // This new effect handles the side-effect of updating the longest streak in Firestore
+    useEffect(() => {
+        if (!db || !user || !userProfile.uid || !streaks) return;
+
+        const longestStreaks = userProfile.longestStreaks || {};
+        const updates = {};
+
+        for (const key in streaks) {
+            if (streaks[key] > (longestStreaks[key] || 0)) {
+                updates[key] = streaks[key];
+            }
+        }
+
+        if (Object.keys(updates).length > 0) {
+            const newLongestStreaks = { ...longestStreaks, ...updates };
+            const profileRef = doc(db, 'artifacts', appId, 'users', user.uid);
+            
+            // We create a function to avoid having setUserProfile in dependency array
+            const updateProfile = async () => {
+                await setDoc(profileRef, { longestStreaks: newLongestStreaks }, { merge: true });
+                setUserProfile(prev => ({ ...prev, longestStreaks: newLongestStreaks }));
+            };
+            updateProfile();
+        }
+    }, [streaks, user, db, userProfile.longestStreaks, userProfile.uid]);
 
 
     if (loading) return <div className="flex items-center justify-center h-screen bg-gray-100"><div className="text-xl font-semibold">Loading...</div></div>;
@@ -2222,5 +2278,10 @@ const App = () => {
 };
 
 export default App;
+
+
+
+
+
 
 
