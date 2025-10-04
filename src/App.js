@@ -734,7 +734,7 @@ const HotList = ({ user, db, onDataChange, monthlyData, hotlist: allProspects })
 
     const statusConfig = {
         Hot: { title: 'HOT - Closing Zone', icon: Flame, color: 'red', description: 'Prospects who have seen a presentation. Follow up to close!'},
-        Warm: { title: 'WARM - Building Interest', icon: TrendingUp, color: 'amber', description: 'Actively sending tools and having conversations.'},
+        Warm: { title: 'WARM - Building Interest', icon: TrendingUp, color: 'amber', description: "Actively sending tools and having conversations. These prospects haven't seen a full presentation yet."},
         Cold: { title: 'COLD - Prospect List', icon: Users, color: 'blue', description: 'New prospects to start conversations with.'},
     };
 
@@ -1894,4 +1894,5 @@ const App = () => {
 };
 
 export default App;
+
 
