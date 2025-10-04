@@ -9,7 +9,7 @@ import {
 } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, query, limit, addDoc, deleteDoc, orderBy, where, getCountFromServer, updateDoc } from 'firebase/firestore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { ChevronUp, ChevronDown, Plus, X, List, BarChart2, Target, Users, PhoneCall, Trash2, Trophy, LogOut, Share2, Flame, Edit2, Calendar, Minus, Info, Archive, ArchiveRestore, TrendingUp, ChevronsRight, Award, Lightbulb, UserCheck } from 'lucide-react';
+import { Sun, ChevronUp, ChevronDown, Plus, X, List, BarChart2, Target, Users, PhoneCall, Trash2, Trophy, LogOut, Share2, Flame, Edit2, Calendar, Minus, Info, Archive, ArchiveRestore, TrendingUp, ChevronsRight, Award, Lightbulb, UserCheck, Dumbbell, BookOpen, Headphones, User, Video } from 'lucide-react';
 // Note: This implementation assumes html2canvas is loaded via a script tag in the main HTML file.
 // <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
@@ -37,6 +37,304 @@ const debounce = (func, wait) => {
     };
 };
 
+// --- UI Components (Defined before App component) ---
+
+const AuthPage = ({ auth }) => {
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [isSignUp, setIsSignUp] = useState(false);
+    const [error, setError] = useState('');
+
+    const handleAuthAction = async (e) => {
+        e.preventDefault();
+        setError('');
+        try {
+            if (isSignUp) {
+                await createUserWithEmailAndPassword(auth, email, password);
+            } else {
+                await signInWithEmailAndPassword(auth, email, password);
+            }
+        } catch (err) {
+            setError(err.message);
+        }
+    };
+
+    return (
+        <div className="flex items-center justify-center min-h-screen bg-gray-100">
+            <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md">
+                <h2 className="text-2xl font-bold text-center text-gray-800">
+                    {isSignUp ? 'Create an Account' : 'Sign In'}
+                </h2>
+                <form onSubmit={handleAuthAction} className="space-y-6">
+                    <div>
+                        <label className="text-sm font-medium text-gray-700">Email</label>
+                        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                               className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required />
+                    </div>
+                    <div>
+                        <label className="text-sm font-medium text-gray-700">Password</label>
+                        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+                               className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required />
+                    </div>
+                    {error && <p className="text-sm text-red-600">{error}</p>}
+                    <button type="submit" className="w-full py-2 px-4 font-semibold text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                        {isSignUp ? 'Sign Up' : 'Sign In'}
+                    </button>
+                </form>
+                <p className="text-sm text-center text-gray-600">
+                    {isSignUp ? 'Already have an account?' : "Don't have an account?"}
+                    <button onClick={() => setIsSignUp(!isSignUp)} className="ml-1 font-semibold text-indigo-600 hover:underline">
+                        {isSignUp ? 'Sign In' : 'Sign Up'}
+                    </button>
+                </p>
+            </div>
+        </div>
+    );
+};
+
+const Header = ({ displayName, onSignOut, onEditName }) => (
+    <header className="flex justify-between items-center mb-6 pb-4 border-b border-gray-200">
+        <div className="flex items-center">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+                Welcome, {displayName || 'User'}!
+            </h1>
+            <button onClick={onEditName} className="ml-3 text-gray-500 hover:text-indigo-600">
+                <Edit2 className="h-5 w-5" />
+            </button>
+        </div>
+        <button onClick={onSignOut} className="flex items-center text-sm font-medium text-gray-600 hover:text-red-600 transition-colors">
+            <LogOut className="h-5 w-5 mr-1" /> Sign Out
+        </button>
+    </header>
+);
+
+const TabBar = ({ activeTab, setActiveTab }) => {
+    const tabs = [
+        { id: 'today', name: 'Today', icon: Sun },
+        { id: 'tracker', name: 'Calendar', icon: Calendar },
+        { id: 'leaderboard', name: 'Leaderboard', icon: Trophy },
+        { id: 'hotlist', name: '10 in Play', icon: List },
+        { id: 'analytics', name: 'Analytics', icon: BarChart2 }
+    ];
+    return (
+        <div className="border-b border-gray-200"><nav className="-mb-px flex space-x-4 sm:space-x-6 overflow-x-auto" aria-label="Tabs">
+            {tabs.map(tab => (<button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`${ activeTab === tab.id ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' } whitespace-nowrap py-3 px-1 sm:py-4 border-b-2 font-medium text-sm flex items-center`}>
+                <tab.icon className="mr-2 h-5 w-5" />{tab.name}
+            </button>))}
+        </nav></div>
+    );
+};
+
+const ActivityCard = ({ label, value, streak, icon: Icon, color, onIncrement, onDecrement }) => {
+    return (
+        <div className={`bg-white border p-4 rounded-lg shadow-sm flex flex-col justify-between`}>
+            <div className="flex items-start justify-between">
+                <h3 className={`font-semibold text-gray-700`}>{label}</h3>
+                <Icon className={`h-7 w-7 text-${color}-400`} />
+            </div>
+            <div className="flex items-center justify-center space-x-4 my-4">
+                <button onClick={onDecrement} className="p-3 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50" disabled={value <= 0}>
+                    <Minus className="h-5 w-5" />
+                </button>
+                <span className="text-5xl font-bold text-gray-900 w-16 text-center">{value}</span>
+                <button onClick={onIncrement} className="p-3 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <Plus className="h-5 w-5" />
+                </button>
+            </div>
+            <div className="flex items-center justify-center text-sm text-amber-600 bg-amber-50 rounded-full px-3 py-1 self-center">
+                <Flame className="h-4 w-4 mr-1.5 text-amber-500"/>
+                <span className="font-semibold">{streak} Day Streak</span>
+            </div>
+        </div>
+    );
+};
+
+const PresentationActivityCard = ({ label, value, streak, icon: Icon, color, onAddPresentation }) => {
+    return (
+        <div className={`bg-white border p-4 rounded-lg shadow-sm flex flex-col justify-between`}>
+            <div className="flex items-start justify-between">
+                <h3 className={`font-semibold text-gray-700`}>{label}</h3>
+                <Icon className={`h-7 w-7 text-${color}-400`} />
+            </div>
+            <div className="text-center my-4">
+                <span className="text-5xl font-bold text-gray-900">{value}</span>
+            </div>
+            <div className="flex items-center justify-center space-x-2">
+                <button onClick={() => onAddPresentation('P')} className="flex-1 flex items-center justify-center p-2 text-sm rounded-md bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <User className="h-4 w-4 mr-1.5" /> In Person
+                </button>
+                <button onClick={() => onAddPresentation('V')} className="flex-1 flex items-center justify-center p-2 text-sm rounded-md bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    <Video className="h-4 w-4 mr-1.5" /> Virtual
+                </button>
+            </div>
+            <div className="flex items-center justify-center text-sm text-amber-600 bg-amber-50 rounded-full px-3 py-1 self-center mt-3">
+                <Flame className="h-4 w-4 mr-1.5 text-amber-500"/>
+                <span className="font-semibold">{streak} Day Streak</span>
+            </div>
+        </div>
+    );
+};
+
+const DisciplineCheckbox = ({ label, icon: Icon, isChecked, onChange }) => {
+    const baseClasses = "flex items-center p-4 rounded-lg cursor-pointer transition-all border-2";
+    const checkedClasses = "bg-indigo-50 border-indigo-500 text-indigo-800";
+    const uncheckedClasses = "bg-white border-gray-200 hover:border-gray-300";
+
+    return (
+        <label className={`${baseClasses} ${isChecked ? checkedClasses : uncheckedClasses}`}>
+            <div className={`mr-4 p-2 rounded-full ${isChecked ? 'bg-indigo-100' : 'bg-gray-100'}`}>
+                <Icon className={`h-6 w-6 ${isChecked ? 'text-indigo-600' : 'text-gray-500'}`}/>
+            </div>
+            <span className="font-semibold flex-grow">{label}</span>
+            <input
+                type="checkbox"
+                checked={isChecked}
+                onChange={onChange}
+                className="h-6 w-6 rounded text-indigo-600 border-gray-300 focus:ring-indigo-500 self-center"
+            />
+        </label>
+    );
+};
+
+const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAddPresentation, onShare, isSharing }) => {
+    const today = new Date();
+    const todayData = monthlyData[today.getDate()] || {};
+
+    const metrics = [
+        { key: 'exposures', label: 'Exposures', icon: Target, color: 'indigo' },
+        { key: 'followUps', label: 'Follow Ups', icon: Users, color: 'green' },
+        { key: 'presentations', label: 'Presentations', icon: BarChart2, color: 'purple', isPresentation: true },
+        { key: 'threeWays', label: '3-Way Calls', icon: PhoneCall, color: 'pink' },
+        { key: 'enrolls', label: 'Memberships Sold', icon: UserCheck, color: 'teal' }
+    ];
+
+    const disciplines = [
+        { key: 'exerc', label: 'Exercise', icon: Dumbbell },
+        { key: 'personalDevelopment', label: 'Personal Development', icon: BookOpen },
+    ];
+
+    return (
+        <div className="space-y-8">
+            <div>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
+                    <div>
+                        <h2 className="text-2xl font-semibold text-gray-800 mb-1">Today's Focus</h2>
+                        <p className="text-gray-500">Log your key business activities for {today.toLocaleDateString('default', { weekday: 'long', month: 'long', day: 'numeric' })}.</p>
+                    </div>
+                    <button 
+                        onClick={onShare} 
+                        disabled={isSharing} 
+                        className="flex items-center bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition text-sm disabled:bg-indigo-400 disabled:cursor-wait mt-3 sm:mt-0 w-full sm:w-auto justify-center"
+                    >
+                        <Share2 className="h-4 w-4 mr-2" /> {isSharing ? 'Generating...' : 'Share Weekly Report'}
+                    </button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {metrics.map(metric => {
+                        if (metric.isPresentation) {
+                            const value = (todayData.presentations?.length || 0) + (Number(todayData.pbrs) || 0);
+                            return (
+                                <PresentationActivityCard
+                                    key={metric.key}
+                                    label={metric.label}
+                                    value={value}
+                                    streak={streaks.presentations || 0}
+                                    icon={metric.icon}
+                                    color={metric.color}
+                                    onAddPresentation={onAddPresentation}
+                                />
+                            );
+                        }
+                        const value = Number(todayData[metric.key]) || 0;
+                        return (
+                            <ActivityCard
+                                key={metric.key}
+                                label={metric.label}
+                                value={value}
+                                streak={streaks[metric.key] || 0}
+                                icon={metric.icon}
+                                color={metric.color}
+                                onIncrement={() => onQuickAdd(metric.key, 1)}
+                                onDecrement={() => onQuickAdd(metric.key, -1)}
+                            />
+                        );
+                    })}
+                </div>
+            </div>
+            
+            <div>
+                <h2 className="text-2xl font-semibold text-gray-800 mb-1">Daily Disciplines</h2>
+                <p className="text-gray-500">Check off your personal growth habits for today.</p>
+                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+                    {disciplines.map(discipline => {
+                        let isChecked = !!todayData[discipline.key];
+                        if (discipline.key === 'personalDevelopment') {
+                            isChecked = !!(todayData.personalDevelopment || todayData.read || todayData.audio);
+                        }
+                        return (
+                             <DisciplineCheckbox
+                                key={discipline.key}
+                                label={discipline.label}
+                                icon={discipline.icon}
+                                isChecked={isChecked}
+                                onChange={(e) => onHabitChange(today, discipline.key, e.target.checked)}
+                            />
+                        );
+                    })}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const Leaderboard = ({ db, monthYearId, user }) => {
+    const [scores, setScores] = useState([]);
+    const [userRank, setUserRank] = useState(null);
+
+    useEffect(() => {
+        const fetchLeaderboard = async () => {
+            if (!db) return;
+            const leaderboardColRef = collection(db, 'artifacts', appId, 'leaderboard', monthYearId, 'entries');
+            const q = query(leaderboardColRef, orderBy('exposures', 'desc'), limit(20));
+            const snapshot = await getDocs(q);
+            const leaderboardData = snapshot.docs.map(d => ({...d.data(), id: d.id}));
+            setScores(leaderboardData);
+
+            const userEntry = leaderboardData.find(entry => entry.userId === user.uid);
+            if (userEntry) {
+                 const rankQuery = query(leaderboardColRef, where('exposures', '>', userEntry.exposures));
+                 const higherScoresSnap = await getCountFromServer(rankQuery);
+                 setUserRank(higherScoresSnap.data().count + 1);
+            } else {
+                setUserRank(null);
+            }
+        };
+        fetchLeaderboard();
+    }, [db, monthYearId, user.uid]);
+
+    return (
+        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
+            <h2 className="text-2xl font-semibold mb-4">Top 20 Leaderboard</h2>
+            <div className="space-y-3">
+                {scores.map((entry, index) => (
+                    <div key={entry.id} className={`p-3 rounded-lg flex items-center justify-between ${entry.userId === user.uid ? 'bg-indigo-100 border-2 border-indigo-500' : 'bg-gray-50'}`}>
+                        <div className="flex items-center">
+                            <span className="font-bold text-lg w-8">{index + 1}</span>
+                            <span className="font-medium">{entry.displayName}</span>
+                        </div>
+                        <span className="font-bold text-lg text-indigo-600">{entry.exposures}</span>
+                    </div>
+                ))}
+            </div>
+            {userRank && (
+                <div className="mt-4 text-center p-3 bg-amber-100 text-amber-800 font-semibold rounded-lg">
+                    Your Rank: {userRank}
+                </div>
+            )}
+        </div>
+    );
+};
+
 // --- Main App Component ---
 const App = () => {
     // --- State Management ---
@@ -53,8 +351,8 @@ const App = () => {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [monthlyData, setMonthlyData] = useState({});
     const [lastMonthData, setLastMonthData] = useState({});
-    const [monthlyGoals, setMonthlyGoals] = useState({ exposures: 0, followUps: 0, presentations: 0, pbrs: 0, threeWays: 0, enrolls: 0 });
-    const [activeTab, setActiveTab] = useState('tracker');
+    const [monthlyGoals, setMonthlyGoals] = useState({ exposures: 0, followUps: 0, presentations: 0, threeWays: 0, enrolls: 0 });
+    const [activeTab, setActiveTab] = useState('today');
     
     // State for image report card generation
     const [isSharing, setIsSharing] = useState(false);
@@ -172,7 +470,9 @@ const App = () => {
     
     useEffect(() => {
         if (user && db) {
-            if (activeTab === 'tracker') fetchData();
+            if (activeTab === 'tracker' || activeTab === 'leaderboard' || activeTab === 'today') {
+               fetchData();
+            }
         }
     }, [user, db, currentDate, fetchData, activeTab]);
 
@@ -238,6 +538,18 @@ const App = () => {
         handleDataChange(today, metricKey, newValue);
     };
 
+    const handleAddPresentation = (type) => {
+        const today = new Date();
+         if (today.getFullYear() !== year || today.getMonth() !== month) {
+            alert("Quick add is only available for the current day on the current month's view.");
+            return;
+        }
+        const todayData = monthlyData[today.getDate()] || {};
+        const currentPresentations = todayData.presentations || [];
+        const newPresentations = [...currentPresentations, type];
+        handleDataChange(today, 'presentations', newPresentations);
+    };
+
     const handleGoalChange = (goalKey, value) => {
         const newGoals = { ...monthlyGoals, [goalKey]: Number(value) || 0 };
         setMonthlyGoals(newGoals);
@@ -261,7 +573,7 @@ const App = () => {
         endOfLastWeek.setDate(startOfWeek.getDate() - 1);
 
         const getWeekTotals = (startDate, endDate) => {
-            const totals = { exposures: 0, followUps: 0, pbrs: 0, threeWays: 0, enrolls: 0 };
+            const totals = { exposures: 0, followUps: 0, presentations: 0, threeWays: 0, enrolls: 0 };
             let current = new Date(startDate);
             while(current <= endDate) {
                 const dataSet = current.getMonth() === today.getMonth() ? monthlyData : lastMonthData;
@@ -269,7 +581,7 @@ const App = () => {
                 if(dayData) {
                     totals.exposures += Number(dayData.exposures) || 0;
                     totals.followUps += Number(dayData.followUps) || 0;
-                    totals.pbrs += Number(dayData.pbrs) || 0;
+                    totals.presentations += (dayData.presentations?.length || 0) + (Number(dayData.pbrs) || 0);
                     totals.threeWays += Number(dayData.threeWays) || 0;
                     totals.enrolls += Number(dayData.enrolls) || 0;
                 }
@@ -294,8 +606,8 @@ const App = () => {
         const { totals, lastWeekTotals, dateRange, hotlist: reportHotlist } = await getWeekDataForReport();
 
         let shareText = `My Activity Tracker Report\nFrom: ${userProfile.displayName}\nWeek of: ${dateRange}\n\n`;
-        shareText += `**This Week's Numbers:**\n- Exposures: ${totals.exposures}\n- Follow Ups: ${totals.followUps}\n- PBRs: ${totals.pbrs}\n- Memberships Sold: ${totals.enrolls}\n\n`;
-        shareText += `**Last Week's Numbers:**\n- Exposures: ${lastWeekTotals.exposures}\n- Follow Ups: ${lastWeekTotals.followUps}\n- PBRs: ${lastWeekTotals.pbrs}\n- Memberships Sold: ${lastWeekTotals.enrolls}\n\n`;
+        shareText += `**This Week's Numbers:**\n- Exposures: ${totals.exposures}\n- Follow Ups: ${totals.followUps}\n- Presentations: ${totals.presentations}\n- Memberships Sold: ${totals.enrolls}\n\n`;
+        shareText += `**Last Week's Numbers:**\n- Exposures: ${lastWeekTotals.exposures}\n- Follow Ups: ${lastWeekTotals.followUps}\n- Presentations: ${lastWeekTotals.presentations}\n- Memberships Sold: ${lastWeekTotals.enrolls}\n\n`;
         shareText += "--------------------\n\n";
         shareText += `My "10 in Play" Hotlist\n\n`;
         reportHotlist.forEach((item, index) => { shareText += `${index + 1}. ${item.name}\n${item.notes ? `- Notes: ${item.notes}\n\n` : '\n'}`;});
@@ -357,6 +669,56 @@ const App = () => {
 
     }, [reportCardData, handleShareReportAsText]);
 
+    const streaks = useMemo(() => {
+        const calculateAndUpdateStreak = (activityKey) => {
+            if (!user || !userProfile.uid || !monthlyData || !lastMonthData) return 0;
+            let currentStreak = 0;
+            const today = new Date();
+            let dayToCheck = new Date(today);
+            while (true) {
+                const monthData = dayToCheck.getMonth() === today.getMonth() ? monthlyData : lastMonthData;
+                if (!monthData) break;
+                const dayData = monthData[dayToCheck.getDate()];
+                let hasActivity = false;
+                if (dayData) {
+                    if (activityKey === 'presentations') {
+                        hasActivity = (dayData.presentations?.length > 0) || (Number(dayData.pbrs) > 0);
+                    } else if (activityKey === 'enrolls') {
+                        hasActivity = (dayData.enrolls && Number(dayData.enrolls) > 0) || (dayData.sitdowns && dayData.sitdowns.some(s => s === 'E'));
+                    } else {
+                        if (Array.isArray(dayData[activityKey])) hasActivity = dayData[activityKey].length > 0;
+                        else hasActivity = Number(dayData[activityKey]) > 0;
+                    }
+                }
+                if (hasActivity) {
+                    currentStreak++;
+                    dayToCheck.setDate(dayToCheck.getDate() - 1);
+                } else {
+                    break;
+                }
+            }
+            const longestStreaks = userProfile.longestStreaks || {};
+            if (currentStreak > (longestStreaks[activityKey] || 0)) {
+                const newLongestStreaks = {...longestStreaks, [activityKey]: currentStreak };
+                const db = getFirestore();
+                if (db) { 
+                    const profileRef = doc(db, 'artifacts', appId, 'users', user.uid);
+                    setDoc(profileRef, { longestStreaks: newLongestStreaks }, { merge: true });
+                    setUserProfile(prev => ({...prev, longestStreaks: newLongestStreaks}));
+                }
+            }
+            return currentStreak;
+        };
+        return {
+            exposures: calculateAndUpdateStreak('exposures'),
+            followUps: calculateAndUpdateStreak('followUps'),
+            presentations: calculateAndUpdateStreak('presentations'),
+            threeWays: calculateAndUpdateStreak('threeWays'),
+            enrolls: calculateAndUpdateStreak('enrolls'),
+        };
+    }, [monthlyData, lastMonthData, user, userProfile, setUserProfile, db]);
+
+
     if (loading) return <div className="flex items-center justify-center h-screen bg-gray-100"><div className="text-xl font-semibold">Loading...</div></div>;
     if (!user) return <AuthPage auth={auth} />;
 
@@ -366,7 +728,16 @@ const App = () => {
                 <Header displayName={userProfile.displayName} onSignOut={handleSignOut} onEditName={() => setShowEditNameModal(true)} />
                 <TabBar activeTab={activeTab} setActiveTab={setActiveTab} />
                 <main className="mt-6">
-                    {activeTab === 'tracker' && <ActivityTracker date={currentDate} setDate={setCurrentDate} goals={monthlyGoals} onGoalChange={handleGoalChange} data={{current: monthlyData, last: lastMonthData}} onDataChange={handleDataChange} onShare={handleShare} isSharing={isSharing} user={user} userProfile={userProfile} setUserProfile={setUserProfile} onQuickAdd={handleQuickAdd} showGoalInstruction={showGoalInstruction} onDismissGoalInstruction={handleDismissGoalInstruction} />}
+                    {activeTab === 'today' && <TodayDashboard 
+                        monthlyData={monthlyData}
+                        streaks={streaks}
+                        onQuickAdd={handleQuickAdd}
+                        onHabitChange={handleDataChange}
+                        onAddPresentation={handleAddPresentation}
+                        onShare={handleShare}
+                        isSharing={isSharing}
+                    /> }
+                    {activeTab === 'tracker' && <ActivityTracker date={currentDate} setDate={setCurrentDate} goals={monthlyGoals} onGoalChange={handleGoalChange} data={{current: monthlyData, last: lastMonthData}} onDataChange={handleDataChange} onShare={handleShare} isSharing={isSharing} user={user} userProfile={userProfile} setUserProfile={setUserProfile} onQuickAdd={handleQuickAdd} showGoalInstruction={showGoalInstruction} onDismissGoalInstruction={handleDismissGoalInstruction} streaks={streaks} />}
                     {activeTab === 'hotlist' && <HotList user={user} db={db} />}
                     {activeTab === 'analytics' && <AnalyticsDashboard db={db} user={user} />}
                     {activeTab === 'leaderboard' && <Leaderboard db={db} monthYearId={monthYearId} user={user} />}
@@ -388,170 +759,9 @@ const App = () => {
     );
 };
 
+// --- Child Components of App ---
 
-// ... (AuthPage, Header, TabBar components remain unchanged)
-const AuthPage = ({ auth }) => {
-    const [isSignUp, setIsSignUp] = useState(false);
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [error, setError] = useState('');
-    const handleAction = async (e) => {
-        e.preventDefault();
-        setError('');
-        if (!auth) { setError("Authentication service is not available."); return; }
-        try {
-            if (isSignUp) { await createUserWithEmailAndPassword(auth, email, password); }
-            else { await signInWithEmailAndPassword(auth, email, password); }
-        } catch (err) { setError(err.message); }
-    };
-    return (
-        <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center p-4">
-            <div className="text-center mb-8"><h1 className="text-4xl font-bold">Activity Tracker</h1><p className="text-lg text-gray-500 mt-1">Sign in or create an account.</p></div>
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
-                <form onSubmit={handleAction}>
-                    <div className="p-6 space-y-4">
-                        {error && <p className="text-red-500 text-sm bg-red-100 p-3 rounded-md">{error}</p>}
-                        <div><label className="block text-sm font-medium">Email</label><input type="email" value={email} onChange={e => setEmail(e.target.value)} required className="mt-1 block w-full p-2 border rounded-md" /></div>
-                        <div><label className="block text-sm font-medium">Password</label><input type="password" value={password} onChange={e => setPassword(e.target.value)} required className="mt-1 block w-full p-2 border rounded-md" /></div>
-                    </div>
-                    <div className="p-4 bg-gray-50 flex flex-col items-center space-y-2 rounded-b-lg">
-                        <button type="submit" className="w-full bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">{isSignUp ? 'Sign Up' : 'Login'}</button>
-                        <button type="button" onClick={() => setIsSignUp(!isSignUp)} className="text-sm text-indigo-600 hover:underline">{isSignUp ? 'Already have an account? Login' : "Don't have an account? Sign Up"}</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    );
-};
-
-const Header = ({ displayName, onSignOut, onEditName }) => (
-    <header className="mb-6 flex justify-between items-start">
-        <div>
-            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight">Activity Tracker</h1>
-            <div className="flex items-center space-x-2 mt-1">
-                <p className="text-md sm:text-lg text-gray-500">{displayName ? `Welcome, ${displayName}` : 'Your dashboard for business growth.'}</p>
-                {displayName && (
-                    <button onClick={onEditName} className="text-gray-400 hover:text-gray-600" title="Edit your name">
-                        <Edit2 className="h-4 w-4" />
-                    </button>
-                )}
-            </div>
-        </div>
-        <button onClick={onSignOut} className="flex items-center bg-gray-200 text-gray-700 px-3 py-2 rounded-md hover:bg-gray-300 transition text-sm">
-            <LogOut className="h-4 w-4 mr-2"/>Sign Out
-        </button>
-    </header>
-);
-
-const TabBar = ({ activeTab, setActiveTab }) => {
-    const tabs = [
-        { id: 'tracker', name: 'Tracker', icon: Calendar },
-        { id: 'leaderboard', name: 'Leaderboard', icon: Trophy },
-        { id: 'hotlist', name: '10 in Play', icon: List },
-        { id: 'analytics', name: 'Analytics', icon: BarChart2 }
-    ];
-
-    return (
-        <div className="border-b border-gray-200"><nav className="-mb-px flex space-x-4 sm:space-x-6 overflow-x-auto" aria-label="Tabs">
-            {tabs.map(tab => (<button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`${ activeTab === tab.id ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' } whitespace-nowrap py-3 px-1 sm:py-4 border-b-2 font-medium text-sm flex items-center`}>
-                <tab.icon className="mr-2 h-5 w-5" />{tab.name}
-            </button>))}
-        </nav></div>
-    );
-};
-
-const Leaderboard = ({ db, monthYearId, user }) => {
-    const [scores, setScores] = useState([]);
-    const [userRank, setUserRank] = useState(null);
-    const [userScore, setUserScore] = useState(null);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        const fetchScores = async () => {
-            if (!db || !user) return;
-            setLoading(true);
-
-            try {
-                const scoresColRef = collection(db, 'artifacts', appId, 'leaderboard', monthYearId, 'entries');
-
-                // 1. Fetch top 25
-                const top25Query = query(scoresColRef, orderBy('exposures', 'desc'), limit(25));
-                const top25Snapshot = await getDocs(top25Query);
-                const top25Scores = top25Snapshot.docs.map(doc => doc.data());
-                setScores(top25Scores);
-
-                // 2. Fetch current user's score
-                const userDocRef = doc(scoresColRef, user.uid);
-                const userDocSnap = await getDoc(userDocRef);
-
-                if (userDocSnap.exists()) {
-                    const currentUserData = userDocSnap.data();
-                    setUserScore(currentUserData);
-
-                    // 3. Calculate user's rank
-                    const higherRankQuery = query(scoresColRef, where('exposures', '>', currentUserData.exposures));
-                    const higherRankSnapshot = await getCountFromServer(higherRankQuery);
-                    setUserRank(higherRankSnapshot.data().count + 1);
-                } else {
-                    setUserRank(null);
-                    setUserScore(null);
-                }
-            } catch (error) {
-                console.error("Error fetching leaderboard:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchScores();
-    }, [db, monthYearId, user]);
-
-    const isUserInTop25 = scores.some(score => score.userId === user.uid);
-
-    if (loading) return <div className="text-center p-10">Loading Leaderboard...</div>;
-
-    return (
-        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
-            <h2 className="text-xl sm:text-2xl font-semibold mb-4">Top 25 Performers</h2>
-            {scores.length === 0 ? (
-                <p className="text-gray-500">The leaderboard is empty for this month.</p>
-            ) : (
-                <ol className="space-y-3">
-                    {scores.map((score, index) => {
-                        const isCurrentUser = score.userId === user.uid;
-                        return (
-                            <li
-                                key={score.userId}
-                                className={`flex items-center justify-between p-3 rounded-md ${isCurrentUser ? 'bg-indigo-100 border-l-4 border-indigo-500' : 'bg-gray-50'}`}
-                            >
-                                <div className="flex items-center">
-                                    <span className="text-lg font-bold text-gray-400 w-8">{index + 1}</span>
-                                    <span className="font-medium">{score.displayName}</span>
-                                    {isCurrentUser && <span className="ml-2 text-xs font-semibold text-indigo-700 bg-indigo-200 px-2 py-0.5 rounded-full">You</span>}
-                                </div>
-                                <span className="font-bold text-lg text-indigo-600">{score.exposures}</span>
-                            </li>
-                        );
-                    })}
-                </ol>
-            )}
-
-            {userRank && userScore && !isUserInTop25 && (
-                <div className="mt-6 border-t pt-4">
-                     <h3 className="text-md font-semibold text-gray-600 mb-2">Your Position</h3>
-                     <div className="flex items-center justify-between p-3 rounded-md bg-indigo-50 border border-indigo-200">
-                         <div className="flex items-center">
-                             <span className="text-lg font-bold text-gray-500 w-8">#{userRank}</span>
-                             <span className="font-medium">{userScore.displayName}</span>
-                         </div>
-                         <span className="font-bold text-lg text-indigo-600">{userScore.exposures}</span>
-                     </div>
-                </div>
-            )}
-        </div>
-    );
-};
-
-const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChange, onShare, isSharing, user, userProfile, setUserProfile, onQuickAdd, showGoalInstruction, onDismissGoalInstruction }) => {
+const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChange, onShare, isSharing, user, userProfile, setUserProfile, onQuickAdd, showGoalInstruction, onDismissGoalInstruction, streaks }) => {
     const [selectedDay, setSelectedDay] = useState(null);
     const [viewMode, setViewMode] = useState('week');
     const year = date.getFullYear();
@@ -578,7 +788,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
             const dayData = dataSet ? (dataSet[currentDay.getDate()] || {}) : {};
 
             const isPast = currentDay < today && today.toDateString() !== currentDay.toDateString();
-            const noActivity = !dayData || ((Number(dayData.exposures || 0) === 0) && (Number(dayData.followUps || 0) === 0) && (Array.isArray(dayData.presentations) ? dayData.presentations.length === 0 : true));
+            const noActivity = !dayData || ((Number(dayData.exposures || 0) === 0) && (Number(dayData.followUps || 0) === 0) && ((dayData.presentations?.length || 0) + (Number(dayData.pbrs) || 0) === 0));
             const isToday = today.toDateString() === currentDay.toDateString();
             const isWeekend = currentDay.getDay() === 0 || currentDay.getDay() === 6;
 
@@ -600,7 +810,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
             const dayData = data.current[day] || {};
             const isTodayFlag = today.toDateString() === currentDateObj.toDateString();
             const isPast = currentDateObj < today && !isTodayFlag;
-            const noActivity = Object.keys(dayData).filter(k => k !== 'exerc' && k !== 'read').length === 0 || (Number(dayData.exposures || 0) === 0 && Number(dayData.followUps || 0) === 0 && (dayData.presentations || []).length === 0);
+            const noActivity = Object.keys(dayData).filter(k => k !== 'exerc' && k !== 'read' && k !== 'pbrs').length === 0 || (Number(dayData.exposures || 0) === 0 && Number(dayData.followUps || 0) === 0 && (dayData.presentations || []).length === 0 && (Number(dayData.pbrs) || 0) === 0);
             const dayOfWeek = currentDateObj.getDay();
             const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
@@ -613,61 +823,12 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
         return Object.values(data.current).reduce((acc, dayData) => {
             acc.exposures += Number(dayData.exposures) || 0;
             acc.followUps += Number(dayData.followUps) || 0;
-            acc.presentations += (Array.isArray(dayData.presentations) ? dayData.presentations.length : 0) + (Array.isArray(dayData.sitdowns) ? dayData.sitdowns.length : 0);
-            acc.pbrs += Number(dayData.pbrs) || 0;
+            acc.presentations += (dayData.presentations?.length || 0) + (Number(dayData.pbrs) || 0);
             acc.threeWays += Number(dayData.threeWays) || 0;
             acc.enrolls += (Number(dayData.enrolls) || 0) + (Array.isArray(dayData.sitdowns) ? dayData.sitdowns.filter(s => s === 'E').length : 0);
             return acc;
-        }, { exposures: 0, followUps: 0, presentations: 0, pbrs: 0, threeWays: 0, enrolls: 0 });
+        }, { exposures: 0, followUps: 0, presentations: 0, threeWays: 0, enrolls: 0 });
     }, [data]);
-
-    const streaks = useMemo(() => {
-        const calculateAndUpdateStreak = (activityKey) => {
-            if (!user || !userProfile.uid || !data) return 0;
-            let currentStreak = 0;
-            const today = new Date();
-            let dayToCheck = new Date(today);
-            while (true) {
-                const monthData = dayToCheck.getMonth() === today.getMonth() ? data.current : data.last;
-                if (!monthData) break;
-                const dayData = monthData[dayToCheck.getDate()];
-                let hasActivity = false;
-                if (dayData) {
-                    if (activityKey === 'presentations') {
-                        hasActivity = (dayData.presentations && dayData.presentations.length > 0) || (dayData.sitdowns && dayData.sitdowns.length > 0);
-                    } else if (activityKey === 'enrolls') {
-                        hasActivity = (dayData.enrolls && Number(dayData.enrolls) > 0) || (dayData.sitdowns && dayData.sitdowns.some(s => s === 'E'));
-                    } else {
-                        if (Array.isArray(dayData[activityKey])) hasActivity = dayData[activityKey].length > 0;
-                        else hasActivity = Number(dayData[activityKey]) > 0;
-                    }
-                }
-                if (hasActivity) {
-                    currentStreak++;
-                    dayToCheck.setDate(dayToCheck.getDate() - 1);
-                } else {
-                    break;
-                }
-            }
-            const longestStreaks = userProfile.longestStreaks || {};
-            if (currentStreak > (longestStreaks[activityKey] || 0)) {
-                const newLongestStreaks = {...longestStreaks, [activityKey]: currentStreak };
-                const db = getFirestore();
-                const profileRef = doc(db, 'artifacts', appId, 'users', user.uid);
-                setDoc(profileRef, { longestStreaks: newLongestStreaks }, { merge: true });
-                setUserProfile(prev => ({...prev, longestStreaks: newLongestStreaks}));
-            }
-            return currentStreak;
-        };
-        return {
-            exposures: calculateAndUpdateStreak('exposures'),
-            followUps: calculateAndUpdateStreak('followUps'),
-            presentations: calculateAndUpdateStreak('presentations'),
-            pbrs: calculateAndUpdateStreak('pbrs'),
-            threeWays: calculateAndUpdateStreak('threeWays'),
-            enrolls: calculateAndUpdateStreak('enrolls'),
-        };
-    }, [data, user, userProfile, setUserProfile]);
 
     const handleDayClick = (dayObj) => {
         if (dayObj.isBlank) return;
@@ -676,7 +837,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
     const closeModal = () => setSelectedDay(null);
     const handleModalDataChange = (field, value) => onDataChange(selectedDay, field, value);
 
-    const activityColors = { exposures: 'bg-blue-500', followUps: 'bg-green-500', presentations: 'bg-amber-500', pbrs: 'bg-purple-500', threeWays: 'bg-pink-500', enrolls: 'bg-teal-500' };
+    const activityColors = { exposures: 'bg-blue-500', followUps: 'bg-green-500', presentations: 'bg-purple-500', threeWays: 'bg-pink-500', enrolls: 'bg-teal-500' };
 
     let modalData = {};
     if (selectedDay) {
@@ -712,8 +873,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
                                 <div className="flex justify-center items-center space-x-1 h-2">
                                     {d.data.exposures > 0 && <div className={`h-2 w-2 ${activityColors.exposures} rounded-full`}></div>}
                                     {d.data.followUps > 0 && <div className={`h-2 w-2 ${activityColors.followUps} rounded-full`}></div>}
-                                    {(d.data.presentations?.length > 0 || d.data.sitdowns?.length > 0) && <div className={`h-2 w-2 ${activityColors.presentations} rounded-full`}></div>}
-                                    {d.data.pbrs > 0 && <div className={`h-2 w-2 ${activityColors.pbrs} rounded-full`}></div>}
+                                    {((d.data.presentations?.length || 0) + (Number(d.data.pbrs) || 0)) > 0 && <div className={`h-2 w-2 ${activityColors.presentations} rounded-full`}></div>}
                                     {(d.data.enrolls > 0 || d.data.sitdowns?.some(s=>s==='E')) && <div className={`h-2 w-2 ${activityColors.enrolls} rounded-full`}></div>}
                                 </div>
                             </div>
@@ -736,8 +896,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
                                         <div className="flex justify-center items-end space-x-1 mt-auto h-2">
                                             {d.data.exposures > 0 && <div className={`h-2 w-2 ${activityColors.exposures} rounded-full`}></div>}
                                             {d.data.followUps > 0 && <div className={`h-2 w-2 ${activityColors.followUps} rounded-full`}></div>}
-                                            {(d.data.presentations?.length > 0 || d.data.sitdowns?.length > 0) && <div className={`h-2 w-2 ${activityColors.presentations} rounded-full`}></div>}
-                                            {d.data.pbrs > 0 && <div className={`h-2 w-2 ${activityColors.pbrs} rounded-full`}></div>}
+                                            {((d.data.presentations?.length || 0) + (Number(d.data.pbrs) || 0)) > 0 && <div className={`h-2 w-2 ${activityColors.presentations} rounded-full`}></div>}
                                             {(d.data.enrolls > 0 || d.data.sitdowns?.some(s=>s==='E')) && <div className={`h-2 w-2 ${activityColors.enrolls} rounded-full`}></div>}
                                         </div>
                                     </>
@@ -759,7 +918,7 @@ const TotalsFooter = ({ totals, onShare, isSharing, streaks, goals, onGoalChange
     const metrics = [
         { key: 'exposures', label: 'Total Exposures', value: totals.exposures, icon: Target, color: 'indigo' },
         { key: 'followUps', label: 'Follow Ups', value: totals.followUps, icon: Users, color: 'green' },
-        { key: 'pbrs', label: 'PBRs', value: totals.pbrs, icon: Users, color: 'purple' },
+        { key: 'presentations', label: 'Presentations', value: totals.presentations, icon: BarChart2, color: 'purple' },
         { key: 'threeWays', label: '3-Way Calls', value: totals.threeWays, icon: PhoneCall, color: 'pink' },
         { key: 'enrolls', label: 'Memberships Sold', value: totals.enrolls, icon: UserCheck, color: 'teal' }
     ];
@@ -827,7 +986,7 @@ const TotalsFooter = ({ totals, onShare, isSharing, streaks, goals, onGoalChange
                                                 </button>
                                             </div>
                                         ) : (
-                                            <p className={`text-4xl sm:text-5xl font-bold text-gray-900`}>{totals.presentations}</p>
+                                            <p className={`text-4xl sm:text-5xl font-bold text-gray-900`}>{metric.value}</p>
                                         )}
                                     </div>
                                 </div>
@@ -872,11 +1031,10 @@ const DayEntryModal = ({ day, data, onClose, onChange }) => {
                    <div className="flex items-center justify-between"><label className="font-medium text-gray-700">Follow Ups</label><NumberInput value={data.followUps || ''} onChange={e => onChange('followUps', e.target.value)} /></div>
                    <div className="flex items-center justify-between"><label className="font-medium text-gray-700">Memberships Sold</label><NumberInput value={data.enrolls || ''} onChange={e => onChange('enrolls', e.target.value)} /></div>
                    <div className="flex items-center justify-between"><label className="font-medium text-gray-700">3 Ways</label><NumberInput value={data.threeWays || ''} onChange={e => onChange('threeWays', e.target.value)} /></div>
-                   <PresentationTracker value={data.presentations || data.sitdowns} onChange={val => onChange('presentations', val)} />
-                    <div className="flex items-center justify-between"><label className="font-medium text-gray-700">PBRs</label><NumberInput value={data.pbrs || ''} onChange={e => onChange('pbrs', e.target.value)} /></div>
+                   <PresentationTracker value={data.presentations || []} onChange={val => onChange('presentations', val)} />
                    <div className="flex items-center justify-between"><label className="font-medium text-gray-700">Gameplans</label><NumberInput value={data.gameplans || ''} onChange={e => onChange('gameplans', e.target.value)} /></div>
                    <div className="flex items-center justify-between"><label className="font-medium text-gray-700">Exercise</label><CheckboxInput checked={!!data.exerc} onChange={e => onChange('exerc', e.target.checked)} /></div>
-                   <div className="flex items-center justify-between"><label className="font-medium text-gray-700">Read</label><CheckboxInput checked={!!data.read} onChange={e => onChange('read', e.target.checked)} /></div>
+                   <div className="flex items-center justify-between"><label className="font-medium text-gray-700">Personal Development</label><CheckboxInput checked={!!(data.personalDevelopment || data.read || data.audio)} onChange={e => onChange('personalDevelopment', e.target.checked)} /></div>
                 </div>
                 <div className="p-4 bg-gray-50 text-right rounded-b-lg"><button onClick={onClose} className="bg-indigo-600 text-white px-5 py-2 rounded-md">Done</button></div>
             </div>
@@ -885,39 +1043,50 @@ const DayEntryModal = ({ day, data, onClose, onChange }) => {
 };
 
 const PresentationTracker = ({ value = [], onChange }) => {
-    const options = { 'P': 'Phone', 'Z': 'Zoom', 'V': 'Video', 'D': 'DM Mtg' };
-    const [isAdding, setIsAdding] = useState(false);
+    const options = { 'P': 'In Person', 'V': 'Virtual' };
     
-    // Filter out old 'E' for Enroll type from the list
-    const presentationsOnly = value.filter(item => item !== 'E');
+    // Legacy support: Map old types to new ones for display
+    const getDisplayType = (type) => {
+        if (type === 'P') return 'In Person';
+        if (['Z', 'V', 'D'].includes(type)) return 'Virtual'; // Old virtual types
+        return options[type] || 'Unknown'; // New 'V' type and fallback
+    };
+    
+    // For counting, treat legacy virtual types as 'V'
+    const presentationsOnly = value.map(item => {
+        if (['Z', 'V', 'D'].includes(item)) return 'V';
+        return item;
+    }).filter(item => item !== 'E'); // Filter out old 'E' for Enroll type
 
     const handleAdd = (type) => { 
-        const newValue = [...presentationsOnly, type]; 
+        const newValue = [...value, type]; // Add to original array to not lose legacy data
         onChange(newValue); 
-        setIsAdding(false); 
     };
     const handleRemove = (indexToRemove) => { 
-        const newValue = presentationsOnly.filter((_, index) => index !== indexToRemove); 
+        const newValue = value.filter((_, index) => index !== indexToRemove); 
         onChange(newValue); 
     };
+
+    const totalPresentations = (value.length || 0);
+
     return (
         <div className="pt-2">
-            <label className="font-medium text-gray-700">Presentations ({presentationsOnly.length})</label>
+            <label className="font-medium text-gray-700">Presentations ({totalPresentations})</label>
+             <div className="mt-2 flex items-center justify-center space-x-2">
+                <button onClick={() => handleAdd('P')} className="flex-1 flex items-center justify-center p-2 text-sm rounded-md bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <User className="h-4 w-4 mr-1.5" /> Add In Person
+                </button>
+                <button onClick={() => handleAdd('V')} className="flex-1 flex items-center justify-center p-2 text-sm rounded-md bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    <Video className="h-4 w-4 mr-1.5" /> Add Virtual
+                </button>
+            </div>
             <div className="mt-2 space-y-2">
-                {presentationsOnly.map((item, index) => (
+                {value.map((item, index) => (
                     <div key={index} className="flex items-center justify-between bg-gray-100 p-2 rounded-md">
-                        <span className="text-sm">{options[item] || 'Unknown'}</span>
-                        <button onClick={() => handleRemove(index)} className="text-red-500"><Trash2 className="h-4 w-4" /></button>
+                        <span className="text-sm">{getDisplayType(item)}</span>
+                        <button onClick={() => handleRemove(index)} className="text-red-500 hover:text-red-700"><Trash2 className="h-4 w-4" /></button>
                     </div>
                 ))}
-                {isAdding ? (
-                     <select onChange={(e) => handleAdd(e.target.value)} onBlur={() => setIsAdding(false)} className="w-full bg-white border p-2 rounded-md" autoFocus>
-                         <option value="">Select type...</option>
-                         {Object.entries(options).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-                     </select>
-                ) : (
-                    <button onClick={() => setIsAdding(true)} className="w-full flex items-center justify-center bg-indigo-100 text-indigo-700 px-3 py-2 rounded-md"><Plus className="h-4 w-4 mr-2" /> Add Presentation</button>
-                )}
             </div>
         </div>
     );
@@ -1265,9 +1434,7 @@ const AnalyticsDashboard = ({ db, user }) => {
 
                 Object.values(data).forEach(day => {
                     const exposures = Number(day.exposures) || 0;
-                    // Backward compatibility for presentations
-                    const presentations = (Array.isArray(day.presentations) ? day.presentations.length : 0) + (Array.isArray(day.sitdowns) ? day.sitdowns.length : 0);
-                    // Backward compatibility for enrolls
+                    const presentations = (day.presentations?.length || 0) + (Number(day.pbrs) || 0);
                     const enrolls = (Number(day.enrolls) || 0) + (Array.isArray(day.sitdowns) ? day.sitdowns.filter(s => s === 'E').length : 0);
 
                     lifetimeExposures += exposures;
@@ -1311,7 +1478,7 @@ const AnalyticsDashboard = ({ db, user }) => {
                     const data = doc.data().dailyData || {};
                     Object.values(data).forEach(day => {
                         monthlyTotals[doc.id].Exposures += Number(day.exposures) || 0;
-                        monthlyTotals[doc.id].Presentations += (Array.isArray(day.presentations) ? day.presentations.length : 0) + (Array.isArray(day.sitdowns) ? day.sitdowns.length : 0);
+                        monthlyTotals[doc.id].Presentations += (day.presentations?.length || 0) + (Number(day.pbrs) || 0);
                     });
                 }
             });
@@ -1516,8 +1683,8 @@ const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
     const metrics = [
         { key: 'exposures', label: 'Exposures', value: weekData.totals.exposures, lastWeek: weekData.lastWeekTotals.exposures, color: 'indigo' },
         { key: 'followUps', label: 'Follow Ups', value: weekData.totals.followUps, lastWeek: weekData.lastWeekTotals.followUps, color: 'green' },
+        { key: 'presentations', label: 'Presentations', value: weekData.totals.presentations, lastWeek: weekData.lastWeekTotals.presentations, color: 'purple' },
         { key: 'enrolls', label: 'Memberships Sold', value: weekData.totals.enrolls, lastWeek: weekData.lastWeekTotals.enrolls, color: 'teal' },
-        { key: 'pbrs', label: 'PBRs', value: weekData.totals.pbrs, lastWeek: weekData.lastWeekTotals.pbrs, color: 'purple' },
     ];
 
     return (
@@ -1586,4 +1753,6 @@ const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
 });
 
 export default App;
+
+
 
