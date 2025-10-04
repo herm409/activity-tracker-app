@@ -2231,9 +2231,12 @@ const App = () => {
 
     return (
         <div className="bg-gray-50 min-h-screen font-sans text-gray-800">
-            <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
-                <Header displayName={userProfile.displayName} onSignOut={handleSignOut} onEditName={() => setShowEditNameModal(true)} />
-                <TabBar activeTab={activeTab} setActiveTab={setActiveTab} />
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4 sm:pb-6 lg:pb-8">
+                <div className="sticky top-0 z-40 bg-gray-50 pt-4 sm:pt-6 lg:pt-8">
+                    <Header displayName={userProfile.displayName} onSignOut={handleSignOut} onEditName={() => setShowEditNameModal(true)} />
+                    <TabBar activeTab={activeTab} setActiveTab={setActiveTab} />
+                </div>
+                
                 <main className="mt-6">
                     {activeTab === 'today' && <TodayDashboard 
                         monthlyData={monthlyData}
@@ -2284,5 +2287,4 @@ const App = () => {
 };
 
 export default App;
-
 
