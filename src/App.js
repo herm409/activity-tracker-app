@@ -37,7 +37,7 @@ const debounce = (func, wait) => {
     };
 };
 
-// --- UI Components (Defined before App component) ---
+// --- Child UI Components (Defined before App component) ---
 
 const AuthPage = ({ auth }) => {
     const [email, setEmail] = useState('');
@@ -196,7 +196,7 @@ const DisciplineCheckbox = ({ label, icon: Icon, isChecked, onChange }) => {
     );
 };
 
-const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAddPresentation, onShare, isSharing }) => {
+const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAddPresentation, onShare, isSharing, onLogFollowUp }) => {
     const today = new Date();
     const todayData = monthlyData[today.getDate()] || {};
 
@@ -246,6 +246,7 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
                             );
                         }
                         const value = Number(todayData[metric.key]) || 0;
+                        const onIncrement = metric.key === 'followUps' ? onLogFollowUp : () => onQuickAdd(metric.key, 1);
                         return (
                             <ActivityCard
                                 key={metric.key}
@@ -254,7 +255,7 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
                                 streak={streaks[metric.key] || 0}
                                 icon={metric.icon}
                                 color={metric.color}
-                                onIncrement={() => onQuickAdd(metric.key, 1)}
+                                onIncrement={onIncrement}
                                 onDecrement={() => onQuickAdd(metric.key, -1)}
                             />
                         );
@@ -334,452 +335,6 @@ const Leaderboard = ({ db, monthYearId, user }) => {
         </div>
     );
 };
-
-// --- Main App Component ---
-const App = () => {
-    // --- State Management ---
-    const [db, setDb] = useState(null);
-    const [auth, setAuth] = useState(null);
-    const [user, setUser] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [userProfile, setUserProfile] = useState({});
-    const [showNameModal, setShowNameModal] = useState(false);
-    const [showEditNameModal, setShowEditNameModal] = useState(false);
-    const [showOnboarding, setShowOnboarding] = useState(false);
-    const [showGoalInstruction, setShowGoalInstruction] = useState(false);
-
-    const [currentDate, setCurrentDate] = useState(new Date());
-    const [monthlyData, setMonthlyData] = useState({});
-    const [lastMonthData, setLastMonthData] = useState({});
-    const [monthlyGoals, setMonthlyGoals] = useState({ exposures: 0, followUps: 0, presentations: 0, threeWays: 0, enrolls: 0 });
-    const [activeTab, setActiveTab] = useState('today');
-    
-    // State for image report card generation
-    const [isSharing, setIsSharing] = useState(false);
-    const [reportCardData, setReportCardData] = useState(null);
-    const reportCardRef = useRef(null);
-
-    // --- Firebase Initialization ---
-    useEffect(() => {
-        try {
-            const app = initializeApp(finalFirebaseConfig);
-            const authInstance = getAuth(app);
-            const dbInstance = getFirestore(app);
-            setAuth(authInstance);
-            setDb(dbInstance);
-
-            const unsubscribe = onAuthStateChanged(authInstance, (currentUser) => {
-                setUser(currentUser);
-                setLoading(false);
-            });
-            return () => unsubscribe();
-        } catch (error) {
-            console.error("Firebase initialization error:", error);
-            setLoading(false);
-        }
-    }, []);
-
-    // --- Data Fetching and Saving ---
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
-    const monthYearId = `${year}-${String(month + 1).padStart(2, '0')}`;
-
-    const lastMonthDate = new Date(currentDate);
-    lastMonthDate.setMonth(currentDate.getMonth() - 1);
-    const lastMonthYearId = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, '0')}`;
-
-
-    const fetchData = useCallback(async () => {
-        if (!user || !db) return;
-
-        const profileRef = doc(db, 'artifacts', appId, 'users', user.uid);
-        const profileSnap = await getDoc(profileRef);
-
-        let profileData = {};
-        if (profileSnap.exists()) {
-            profileData = profileSnap.data();
-            setUserProfile({ ...profileData, uid: user.uid });
-            if (!profileData.displayName) {
-                setShowNameModal(true);
-            }
-            if (!profileData.hasCompletedOnboarding) {
-                setShowOnboarding(true);
-            }
-        } else {
-            setShowNameModal(true);
-            setShowOnboarding(true);
-        }
-
-        const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', monthYearId);
-        const docSnap = await getDoc(docRef);
-        let currentGoals = { exposures: 0, followUps: 0, presentations: 0, pbrs: 0, threeWays: 0, enrolls: 0 };
-        if (docSnap.exists()) {
-            const data = docSnap.data();
-            setMonthlyData(data.dailyData || {});
-            currentGoals = data.monthlyGoals || currentGoals;
-            setMonthlyGoals(currentGoals);
-        } else {
-            setMonthlyData({});
-            setMonthlyGoals(currentGoals);
-        }
-
-        const allGoalsZero = Object.values(currentGoals).every(goal => goal === 0);
-        if (!profileData.hasSeenGoalInstruction && allGoalsZero) {
-            setShowGoalInstruction(true);
-        }
-
-        const lastMonthDocRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', lastMonthYearId);
-        const lastMonthDocSnap = await getDoc(lastMonthDocRef);
-        if (lastMonthDocSnap.exists()) {
-            setLastMonthData(lastMonthDocSnap.data().dailyData || {});
-        } else {
-            setLastMonthData({});
-        }
-    }, [user, db, monthYearId, lastMonthYearId]);
-
-    const handleSetDisplayName = async (name) => {
-        if (!user || !db || !name.trim()) {
-            setShowNameModal(false);
-            setShowEditNameModal(false);
-            return;
-        }
-        const trimmedName = name.trim();
-        const newProfile = { ...userProfile, displayName: trimmedName };
-        const profileRef = doc(db, 'artifacts', appId, 'users', user.uid);
-        await setDoc(profileRef, newProfile, { merge: true });
-        setUserProfile(newProfile);
-        setShowNameModal(false);
-        setShowEditNameModal(false);
-    };
-
-    const handleDismissOnboarding = async () => {
-        if (!user || !db) return;
-        setShowOnboarding(false);
-        const profileRef = doc(db, 'artifacts', appId, 'users', user.uid);
-        await setDoc(profileRef, { hasCompletedOnboarding: true }, { merge: true });
-        setUserProfile(prev => ({ ...prev, hasCompletedOnboarding: true }));
-    };
-
-    const handleDismissGoalInstruction = async () => {
-        if (!user || !db) return;
-        setShowGoalInstruction(false);
-        const profileRef = doc(db, 'artifacts', appId, 'users', user.uid);
-        await setDoc(profileRef, { hasSeenGoalInstruction: true }, { merge: true });
-        setUserProfile(prev => ({ ...prev, hasSeenGoalInstruction: true }));
-    };
-    
-    useEffect(() => {
-        if (user && db) {
-            if (activeTab === 'tracker' || activeTab === 'leaderboard' || activeTab === 'today' || activeTab === 'hotlist') {
-               fetchData();
-            }
-        }
-    }, [user, db, currentDate, fetchData, activeTab]);
-
-    const updateLeaderboard = useCallback(async (currentMonthData, targetMonthId) => {
-        if (!user || !db || !userProfile.displayName) return;
-        const totalExposures = Object.values(currentMonthData).reduce((sum, day) => sum + (Number(day.exposures) || 0), 0);
-        const leaderboardRef = doc(db, 'artifacts', appId, 'leaderboard', targetMonthId, 'entries', user.uid);
-        await setDoc(leaderboardRef, {
-            displayName: userProfile.displayName,
-            exposures: totalExposures,
-            userId: user.uid
-        });
-    }, [user, db, userProfile.displayName]);
-
-    const debouncedSave = useMemo(() => debounce(async (dataToSave, goalsToSave) => {
-        if (!user || !db) return;
-        const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', monthYearId);
-        await setDoc(docRef, { dailyData: dataToSave, monthlyGoals: goalsToSave }, { merge: true });
-        if (dataToSave) {
-            updateLeaderboard(dataToSave, monthYearId);
-        }
-    }, 1500), [user, db, monthYearId, updateLeaderboard]);
-
-    const handleDataChange = (date, field, value) => {
-        const day = date.getDate();
-        const targetMonthId = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-
-        if (targetMonthId === monthYearId) {
-            const updatedData = { ...monthlyData, [day]: { ...monthlyData[day], [field]: value } };
-            setMonthlyData(updatedData);
-            debouncedSave(updatedData, monthlyGoals);
-        } else {
-            const handleSave = async () => {
-                if (!user || !db) return;
-
-                if(targetMonthId === lastMonthYearId) {
-                    const updatedLastMonthData = { ...lastMonthData, [day]: { ...lastMonthData[day], [field]: value } };
-                    setLastMonthData(updatedLastMonthData);
-                }
-
-                const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', targetMonthId);
-                const docSnap = await getDoc(docRef);
-                const existingData = docSnap.exists() ? docSnap.data() : { dailyData: {}, monthlyGoals: {} };
-                const updatedDailyData = { ...existingData.dailyData, [day]: { ...existingData.dailyData[day], [field]: value } };
-
-                await setDoc(docRef, { ...existingData, dailyData: updatedDailyData }, { merge: true });
-                updateLeaderboard(updatedDailyData, targetMonthId);
-            };
-            handleSave();
-        }
-    };
-
-    const handleQuickAdd = (metricKey, amount) => {
-        const today = new Date();
-        if (today.getFullYear() !== year || today.getMonth() !== month) {
-            alert("Quick add is only available for the current day on the current month's view.");
-            return;
-        }
-        const todayData = monthlyData[today.getDate()] || {};
-        const currentValue = Number(todayData[metricKey]) || 0;
-        const newValue = Math.max(0, currentValue + amount);
-
-        handleDataChange(today, metricKey, newValue);
-    };
-
-    const handleAddPresentation = (type) => {
-        const today = new Date();
-         if (today.getFullYear() !== year || today.getMonth() !== month) {
-            alert("Quick add is only available for the current day on the current month's view.");
-            return;
-        }
-        const todayData = monthlyData[today.getDate()] || {};
-        const currentPresentations = todayData.presentations || [];
-        const newPresentations = [...currentPresentations, type];
-        handleDataChange(today, 'presentations', newPresentations);
-    };
-
-    const handleGoalChange = (goalKey, value) => {
-        const newGoals = { ...monthlyGoals, [goalKey]: Number(value) || 0 };
-        setMonthlyGoals(newGoals);
-        debouncedSave(null, newGoals);
-    };
-
-    const handleSignOut = async () => auth && await signOut(auth);
-
-    const getWeekDataForReport = useCallback(async () => {
-        const today = new Date();
-        const dayOfWeek = today.getDay(); // Sunday - 0, Monday - 1
-        const startOfWeek = new Date(today);
-        startOfWeek.setDate(today.getDate() - dayOfWeek); // Set to Sunday
-        startOfWeek.setHours(0, 0, 0, 0);
-
-        const endOfWeek = new Date(startOfWeek);
-        endOfWeek.setDate(startOfWeek.getDate() + 6);
-        endOfWeek.setHours(23, 59, 59, 999);
-
-        const startOfLastWeek = new Date(startOfWeek);
-        startOfLastWeek.setDate(startOfWeek.getDate() - 7);
-        const endOfLastWeek = new Date(startOfWeek);
-        endOfLastWeek.setDate(startOfWeek.getDate() - 1);
-
-        const getWeekTotals = (startDate, endDate) => {
-            const totals = { exposures: 0, followUps: 0, presentations: 0, threeWays: 0, enrolls: 0 };
-            let current = new Date(startDate);
-            while (current <= endDate) {
-                const dataSet = current.getMonth() === today.getMonth() ? monthlyData : lastMonthData;
-                const dayData = dataSet[current.getDate()];
-                if (dayData) {
-                    totals.exposures += Number(dayData.exposures) || 0;
-                    totals.followUps += Number(dayData.followUps) || 0;
-                    totals.presentations += (dayData.presentations?.length || 0) + (Number(dayData.pbrs) || 0);
-                    totals.threeWays += Number(dayData.threeWays) || 0;
-                    totals.enrolls += (Number(dayData.enrolls) || 0) + (Array.isArray(dayData.sitdowns) ? dayData.sitdowns.filter(s => s === 'E').length : 0);
-                }
-                current.setDate(current.getDate() + 1);
-            }
-            return totals;
-        };
-
-        const thisWeekTotals = getWeekTotals(startOfWeek, endOfWeek);
-        const lastWeekTotals = getWeekTotals(startOfLastWeek, endOfLastWeek);
-        const dateRange = `${startOfWeek.toLocaleDateString('default', { month: 'short', day: 'numeric' })} - ${endOfWeek.toLocaleDateString('default', { month: 'short', day: 'numeric' })}`;
-
-        const hotlistColRef = collection(db, 'artifacts', appId, 'users', user.uid, 'hotlist');
-        const allDocsSnap = await getDocs(hotlistColRef);
-        const allItems = allDocsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-        const activeInPipeline = allItems.filter(item => item.isArchived !== true && (item.status === 'Hot' || item.status === 'Warm')).length;
-        const closingZone = allItems.filter(item => item.isArchived !== true && item.status === 'Hot');
-
-        const newMembersThisWeek = allItems.filter(item => {
-            if (item.outcome === 'Member' && item.decisionDate) {
-                const decisionDate = new Date(item.decisionDate);
-                return decisionDate >= startOfWeek && decisionDate <= endOfWeek;
-            }
-            return false;
-        }).length;
-
-        return {
-            totals: thisWeekTotals,
-            lastWeekTotals,
-            dateRange,
-            activeInPipeline,
-            closingZone,
-            newMembersThisWeek
-        };
-    }, [monthlyData, lastMonthData, user, db]);
-
-
-    const handleShareReportAsText = useCallback(async () => {
-        const { totals, dateRange, activeInPipeline, closingZone, newMembersThisWeek } = await getWeekDataForReport();
-
-        let shareText = `My Activity Tracker Report\nFrom: ${userProfile.displayName}\nWeek of: ${dateRange}\n\n`;
-        shareText += `**This Week's Numbers:**\n- Exposures: ${totals.exposures}\n- Follow Ups: ${totals.followUps}\n- Presentations: ${totals.presentations}\n- 3-Way Calls: ${totals.threeWays}\n- Memberships Sold: ${totals.enrolls}\n\n`;
-        shareText += `**Prospect Pipeline:**\n- Active Prospects: ${activeInPipeline}\n- New Members This Week: ${newMembersThisWeek}\n\n`;
-        shareText += "--------------------\n\n";
-        shareText += `My "Closing Zone" Prospects\n\n`;
-        closingZone.forEach((item, index) => { shareText += `${index + 1}. ${item.name} (${item.exposureCount || 0} exposures)\n`; });
-        shareText += "\nSent from my Activity Tracker App";
-
-        try {
-            await navigator.share({ title: 'My Weekly Activity Report', text: shareText });
-        } catch (error) { console.error('Error sharing text:', error); }
-    }, [getWeekDataForReport, userProfile.displayName]);
-
-    const handleShare = async () => {
-        if (typeof window.html2canvas === 'undefined') {
-            console.error("html2canvas library is not available. Falling back to text share.");
-            await handleShareReportAsText();
-            return;
-        }
-        setIsSharing(true);
-        const weekData = await getWeekDataForReport();
-        setReportCardData(weekData);
-    };
-
-    useEffect(() => {
-        if (!reportCardData || !reportCardRef.current) return;
-
-        const generateAndShareImage = async () => {
-            try {
-                const element = reportCardRef.current;
-                const canvas = await window.html2canvas(element, { scale: 2, useCORS: true, backgroundColor: '#f9fafb' });
-                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-
-                if (!blob) throw new Error("Canvas to Blob conversion failed.");
-
-                const file = new File([blob], 'activity-report.png', { type: 'image/png' });
-                const shareData = {
-                    files: [file],
-                    title: 'My Weekly Activity Report',
-                    text: `Here's my activity report for the week of ${reportCardData.dateRange}.`,
-                };
-
-                if (navigator.canShare && navigator.canShare(shareData)) {
-                    await navigator.share(shareData);
-                } else {
-                    console.log("File sharing not supported, falling back to text.");
-                    await handleShareReportAsText();
-                }
-
-            } catch (error) {
-                console.error('Error generating or sharing report image:', error);
-                alert('Could not generate report card. Sharing as text instead.');
-                await handleShareReportAsText();
-            } finally {
-                setIsSharing(false);
-                setReportCardData(null);
-            }
-        };
-
-        const timer = setTimeout(generateAndShareImage, 100);
-        return () => clearTimeout(timer);
-
-    }, [reportCardData, handleShareReportAsText]);
-
-    const streaks = useMemo(() => {
-        const calculateAndUpdateStreak = (activityKey) => {
-            if (!user || !userProfile.uid || !monthlyData || !lastMonthData) return 0;
-            let currentStreak = 0;
-            const today = new Date();
-            let dayToCheck = new Date(today);
-            while (true) {
-                const monthData = dayToCheck.getMonth() === today.getMonth() ? monthlyData : lastMonthData;
-                if (!monthData) break;
-                const dayData = monthData[dayToCheck.getDate()];
-                let hasActivity = false;
-                if (dayData) {
-                    if (activityKey === 'presentations') {
-                        hasActivity = (dayData.presentations?.length > 0) || (Number(dayData.pbrs) > 0);
-                    } else if (activityKey === 'enrolls') {
-                        hasActivity = (dayData.enrolls && Number(dayData.enrolls) > 0) || (dayData.sitdowns && dayData.sitdowns.some(s => s === 'E'));
-                    } else {
-                        if (Array.isArray(dayData[activityKey])) hasActivity = dayData[activityKey].length > 0;
-                        else hasActivity = Number(dayData[activityKey]) > 0;
-                    }
-                }
-                if (hasActivity) {
-                    currentStreak++;
-                    dayToCheck.setDate(dayToCheck.getDate() - 1);
-                } else {
-                    break;
-                }
-            }
-            const longestStreaks = userProfile.longestStreaks || {};
-            if (currentStreak > (longestStreaks[activityKey] || 0)) {
-                const newLongestStreaks = {...longestStreaks, [activityKey]: currentStreak };
-                const db = getFirestore();
-                if (db) { 
-                    const profileRef = doc(db, 'artifacts', appId, 'users', user.uid);
-                    setDoc(profileRef, { longestStreaks: newLongestStreaks }, { merge: true });
-                    setUserProfile(prev => ({...prev, longestStreaks: newLongestStreaks}));
-                }
-            }
-            return currentStreak;
-        };
-        return {
-            exposures: calculateAndUpdateStreak('exposures'),
-            followUps: calculateAndUpdateStreak('followUps'),
-            presentations: calculateAndUpdateStreak('presentations'),
-            threeWays: calculateAndUpdateStreak('threeWays'),
-            enrolls: calculateAndUpdateStreak('enrolls'),
-        };
-    }, [monthlyData, lastMonthData, user, userProfile, setUserProfile]);
-
-
-    if (loading) return <div className="flex items-center justify-center h-screen bg-gray-100"><div className="text-xl font-semibold">Loading...</div></div>;
-    if (!user) return <AuthPage auth={auth} />;
-
-    return (
-        <div className="bg-gray-50 min-h-screen font-sans text-gray-800">
-            <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
-                <Header displayName={userProfile.displayName} onSignOut={handleSignOut} onEditName={() => setShowEditNameModal(true)} />
-                <TabBar activeTab={activeTab} setActiveTab={setActiveTab} />
-                <main className="mt-6">
-                    {activeTab === 'today' && <TodayDashboard 
-                        monthlyData={monthlyData}
-                        streaks={streaks}
-                        onQuickAdd={handleQuickAdd}
-                        onHabitChange={handleDataChange}
-                        onAddPresentation={handleAddPresentation}
-                        onShare={handleShare}
-                        isSharing={isSharing}
-                    /> }
-                    {activeTab === 'tracker' && <ActivityTracker date={currentDate} setDate={setCurrentDate} goals={monthlyGoals} onGoalChange={handleGoalChange} data={{current: monthlyData, last: lastMonthData}} onDataChange={handleDataChange} onShare={handleShare} isSharing={isSharing} user={user} userProfile={userProfile} setUserProfile={setUserProfile} onQuickAdd={handleQuickAdd} showGoalInstruction={showGoalInstruction} onDismissGoalInstruction={handleDismissGoalInstruction} streaks={streaks} />}
-                    {activeTab === 'hotlist' && <HotList user={user} db={db} />}
-                    {activeTab === 'analytics' && <AnalyticsDashboard db={db} user={user} />}
-                    {activeTab === 'leaderboard' && <Leaderboard db={db} monthYearId={monthYearId} user={user} />}
-                </main>
-                {showNameModal && <DisplayNameModal onSave={handleSetDisplayName} />}
-                {showEditNameModal && <DisplayNameModal onSave={handleSetDisplayName} onClose={() => setShowEditNameModal(false)} currentName={userProfile.displayName} />}
-                {showOnboarding && <OnboardingModal onDismiss={handleDismissOnboarding} />}
-                {reportCardData && (
-                    <div style={{ position: 'fixed', left: '-9999px', top: 0, zIndex: -1 }}>
-                        <ReportCard ref={reportCardRef} profile={userProfile} weekData={reportCardData} goals={monthlyGoals} />
-                    </div>
-                )}
-            </div>
-            <footer className="text-center p-4 mt-8 text-xs text-gray-400 border-t border-gray-200">
-                <p>&copy; 2025 Platinum Toolkit. All Rights Reserved.</p>
-                <p>Unauthorized duplication or distribution is strictly prohibited.</p>
-            </footer>
-        </div>
-    );
-};
-
-// --- Child Components of App ---
 
 const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChange, onShare, isSharing, user, userProfile, setUserProfile, onQuickAdd, showGoalInstruction, onDismissGoalInstruction, streaks }) => {
     const [selectedDay, setSelectedDay] = useState(null);
@@ -1106,33 +661,24 @@ const PresentationTracker = ({ value = [], onChange }) => {
     );
 };
 
-const HotList = ({ user, db }) => {
-    const [hotlist, setHotlist] = useState([]);
+const HotList = ({ user, db, onDataChange, monthlyData, hotlist: allProspects }) => {
     const [isArchiveView, setIsArchiveView] = useState(false);
     const [showAddModal, setShowAddModal] = useState(false);
     const [itemToDecide, setItemToDecide] = useState(null); // For outcome modal
     const [itemToDelete, setItemToDelete] = useState(null);
 
-    const hotlistColRef = useMemo(() => collection(db, 'artifacts', appId, 'users', user.uid, 'hotlist'), [db, user.uid]);
-
-    const fetchHotlist = useCallback(async () => {
-        const q = query(hotlistColRef, orderBy('name'));
-        const allDocsSnap = await getDocs(q);
-        const allItems = allDocsSnap.docs.map(d => ({id: d.id, ...d.data()}));
-
-        setHotlist(allItems.filter(item => (isArchiveView ? item.isArchived === true : item.isArchived !== true)));
-    }, [hotlistColRef, isArchiveView]);
-
-    useEffect(() => {
-        const unsubscribe = onSnapshot(hotlistColRef, () => {
-            fetchHotlist();
-        });
-        return () => unsubscribe();
-    }, [fetchHotlist, hotlistColRef]);
+    const hotlistColRef = useMemo(() => {
+        if (!db || !user?.uid) return null;
+        return collection(db, 'artifacts', appId, 'users', user.uid, 'hotlist');
+    }, [db, user]);
+    
+    const hotlist = useMemo(() => {
+        return allProspects.filter(item => (isArchiveView ? item.isArchived === true : item.isArchived !== true));
+    }, [allProspects, isArchiveView]);
     
     const handleAdd = async (name) => {
         setShowAddModal(false);
-        if (!name) return;
+        if (!name || !hotlistColRef) return;
         const newItem = {
             name,
             notes: "",
@@ -1148,16 +694,19 @@ const HotList = ({ user, db }) => {
     };
 
     const debouncedUpdate = useMemo(() => debounce(async (id, field, value) => {
+        if (!hotlistColRef) return;
         const docRef = doc(hotlistColRef, id);
         await updateDoc(docRef, { [field]: value });
     }, 1000), [hotlistColRef]);
 
     const handleUpdate = (id, field, value) => {
-        setHotlist(prevList => prevList.map(item => item.id === id ? { ...item, [field]: value } : item));
+        // Optimistic UI update
+        // setHotlist(prevList => prevList.map(item => item.id === id ? { ...item, [field]: value } : item));
         debouncedUpdate(id, field, value);
     };
     
     const handleInstantUpdate = async (id, update) => {
+        if (!hotlistColRef) return;
         const docRef = doc(hotlistColRef, id);
         await updateDoc(docRef, update);
     };
@@ -1174,7 +723,7 @@ const HotList = ({ user, db }) => {
     };
 
     const handleDelete = async () => {
-        if (!itemToDelete) return;
+        if (!itemToDelete || !hotlistColRef) return;
         const docRef = doc(hotlistColRef, itemToDelete);
         await deleteDoc(docRef);
         setItemToDelete(null);
@@ -1237,6 +786,8 @@ const HotList = ({ user, db }) => {
                                                 onUpdate={handleUpdate} 
                                                 onInstantUpdate={handleInstantUpdate} 
                                                 onDecide={setItemToDecide}
+                                                onDataChange={onDataChange}
+                                                monthlyData={monthlyData}
                                             />
                                         ))}
                                     </div>
@@ -1260,12 +811,20 @@ const HotList = ({ user, db }) => {
     );
 };
 
-const ProspectCard = ({ item, onUpdate, onInstantUpdate, onDecide }) => {
+const ProspectCard = ({ item, onUpdate, onInstantUpdate, onDecide, onDataChange, monthlyData }) => {
     const isOverdue = item.nextActionDate && new Date(item.nextActionDate) < new Date();
     const exposureCount = item.exposureCount || 0;
     
-    const incrementExposure = () => {
+    const handleLogFollowUp = () => {
+        // First, increment the prospect's specific exposure count
         onInstantUpdate(item.id, { exposureCount: exposureCount + 1 });
+
+        // Then, increment the main follow-up count for today
+        const today = new Date();
+        const day = today.getDate();
+        const currentFollowUps = Number(monthlyData[day]?.followUps || 0);
+        const newFollowUps = currentFollowUps + 1;
+        onDataChange(today, 'followUps', newFollowUps);
     };
 
     const getExposureColor = () => {
@@ -1310,9 +869,9 @@ const ProspectCard = ({ item, onUpdate, onInstantUpdate, onDecide }) => {
                             className={`p-1 border rounded-md text-xs ${isOverdue ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
                         />
                     </div>
-                    <button onClick={incrementExposure} className="mt-2 sm:mt-0 flex items-center justify-center space-x-1 px-3 py-1.5 text-xs font-medium rounded-full bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition w-full sm:w-auto">
+                    <button onClick={handleLogFollowUp} className="mt-2 sm:mt-0 flex items-center justify-center space-x-1 px-3 py-1.5 text-xs font-medium rounded-full bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition w-full sm:w-auto">
                         <Plus className="h-3 w-3" />
-                        <span>Log Exposure</span>
+                        <span>Log Follow Up</span>
                     </button>
                 </div>
             </div>
@@ -1673,9 +1232,11 @@ const NumberInput = ({ value, onChange, ...props }) => {
         </div>
     );
 };
+
 const CheckboxInput = (props) => (
     <input type="checkbox" className="h-5 w-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 transition" {...props} />
 );
+
 const AddHotlistItemModal = ({ onClose, onAdd }) => {
     const [name, setName] = useState('');
     const handleAdd = () => { if (name.trim()) { onAdd(name.trim()); } };
@@ -1692,6 +1253,7 @@ const AddHotlistItemModal = ({ onClose, onAdd }) => {
         </div>
     );
 };
+
 const ConfirmDeleteModal = ({ onClose, onConfirm }) => {
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -1726,6 +1288,43 @@ const OutcomeModal = ({ onClose, onDecide }) => {
         </div>
     );
 };
+
+const FollowUpModal = ({ prospects, onClose, onQuickLog, onLogForProspect }) => {
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
+                <div className="p-6 border-b flex justify-between items-center">
+                    <h3 className="text-xl font-semibold">Log a Follow-Up</h3>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="h-6 w-6" /></button>
+                </div>
+                <div className="p-4 space-y-3">
+                    <button 
+                        onClick={onQuickLog}
+                        className="w-full flex items-center justify-center p-3 text-white bg-indigo-600 hover:bg-indigo-700 rounded-md font-semibold"
+                    >
+                        <Plus className="h-5 w-5 mr-2" /> Someone Else (Quick Log)
+                    </button>
+                    <div className="text-center text-xs text-gray-400">or select a prospect</div>
+                    <div className="max-h-60 overflow-y-auto space-y-2 pr-2">
+                        {prospects.length > 0 ? prospects.map(prospect => (
+                            <button 
+                                key={prospect.id}
+                                onClick={() => onLogForProspect(prospect.id)}
+                                className="w-full text-left p-3 bg-gray-100 hover:bg-gray-200 rounded-md flex justify-between items-center"
+                            >
+                                <span>{prospect.name}</span>
+                                <span className="text-xs font-semibold bg-white px-2 py-1 rounded-full">{prospect.exposureCount || 0}</span>
+                            </button>
+                        )) : (
+                            <p className="text-center text-sm text-gray-500 py-4">No "Hot" or "Warm" prospects to select.</p>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 
 const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
     const { totals, lastWeekTotals, dateRange, activeInPipeline, closingZone, newMembersThisWeek } = weekData;
@@ -1802,7 +1401,485 @@ const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
     );
 });
 
-export default App;
+// --- Main App Component ---
+const App = () => {
+    // --- State Management ---
+    const [db, setDb] = useState(null);
+    const [auth, setAuth] = useState(null);
+    const [user, setUser] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [userProfile, setUserProfile] = useState({});
+    const [showNameModal, setShowNameModal] = useState(false);
+    const [showEditNameModal, setShowEditNameModal] = useState(false);
+    const [showOnboarding, setShowOnboarding] = useState(false);
+    const [showGoalInstruction, setShowGoalInstruction] = useState(false);
+    const [showFollowUpModal, setShowFollowUpModal] = useState(false);
+    const [hotlist, setHotlist] = useState([]);
 
+    const [currentDate, setCurrentDate] = useState(new Date());
+    const [monthlyData, setMonthlyData] = useState({});
+    const [lastMonthData, setLastMonthData] = useState({});
+    const [monthlyGoals, setMonthlyGoals] = useState({ exposures: 0, followUps: 0, presentations: 0, threeWays: 0, enrolls: 0 });
+    const [activeTab, setActiveTab] = useState('today');
+    
+    // State for image report card generation
+    const [isSharing, setIsSharing] = useState(false);
+    const [reportCardData, setReportCardData] = useState(null);
+    const reportCardRef = useRef(null);
+
+    // --- Firebase Initialization ---
+    useEffect(() => {
+        try {
+            const app = initializeApp(finalFirebaseConfig);
+            const authInstance = getAuth(app);
+            const dbInstance = getFirestore(app);
+            setAuth(authInstance);
+            setDb(dbInstance);
+
+            const unsubscribe = onAuthStateChanged(authInstance, (currentUser) => {
+                setUser(currentUser);
+                setLoading(false);
+            });
+            return () => unsubscribe();
+        } catch (error) {
+            console.error("Firebase initialization error:", error);
+            setLoading(false);
+        }
+    }, []);
+
+    // --- Data Fetching and Saving ---
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const monthYearId = `${year}-${String(month + 1).padStart(2, '0')}`;
+
+    const lastMonthDate = new Date(currentDate);
+    lastMonthDate.setMonth(currentDate.getMonth() - 1);
+    const lastMonthYearId = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, '0')}`;
+
+
+    const fetchData = useCallback(async () => {
+        if (!user || !db) return;
+
+        const profileRef = doc(db, 'artifacts', appId, 'users', user.uid);
+        const profileSnap = await getDoc(profileRef);
+
+        let profileData = {};
+        if (profileSnap.exists()) {
+            profileData = profileSnap.data();
+            setUserProfile({ ...profileData, uid: user.uid });
+            if (!profileData.displayName) {
+                setShowNameModal(true);
+            }
+            if (!profileData.hasCompletedOnboarding) {
+                setShowOnboarding(true);
+            }
+        } else {
+            setShowNameModal(true);
+            setShowOnboarding(true);
+        }
+
+        const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', monthYearId);
+        const docSnap = await getDoc(docRef);
+        let currentGoals = { exposures: 0, followUps: 0, presentations: 0, pbrs: 0, threeWays: 0, enrolls: 0 };
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            setMonthlyData(data.dailyData || {});
+            currentGoals = data.monthlyGoals || currentGoals;
+            setMonthlyGoals(currentGoals);
+        } else {
+            setMonthlyData({});
+            setMonthlyGoals(currentGoals);
+        }
+
+        const allGoalsZero = Object.values(currentGoals).every(goal => goal === 0);
+        if (!profileData.hasSeenGoalInstruction && allGoalsZero) {
+            setShowGoalInstruction(true);
+        }
+
+        const lastMonthDocRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', lastMonthYearId);
+        const lastMonthDocSnap = await getDoc(lastMonthDocRef);
+        if (lastMonthDocSnap.exists()) {
+            setLastMonthData(lastMonthDocSnap.data().dailyData || {});
+        } else {
+            setLastMonthData({});
+        }
+    }, [user, db, monthYearId, lastMonthYearId]);
+
+    useEffect(() => {
+        if (!user || !db) return;
+        const hotlistColRef = collection(db, 'artifacts', appId, 'users', user.uid, 'hotlist');
+        const q = query(hotlistColRef, orderBy('name'));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+            setHotlist(list);
+        });
+        return () => unsubscribe();
+    }, [user, db]);
+
+    const handleSetDisplayName = async (name) => {
+        if (!user || !db || !name.trim()) {
+            setShowNameModal(false);
+            setShowEditNameModal(false);
+            return;
+        }
+        const trimmedName = name.trim();
+        const newProfile = { ...userProfile, displayName: trimmedName };
+        const profileRef = doc(db, 'artifacts', appId, 'users', user.uid);
+        await setDoc(profileRef, newProfile, { merge: true });
+        setUserProfile(newProfile);
+        setShowNameModal(false);
+        setShowEditNameModal(false);
+    };
+
+    const handleDismissOnboarding = async () => {
+        if (!user || !db) return;
+        setShowOnboarding(false);
+        const profileRef = doc(db, 'artifacts', appId, 'users', user.uid);
+        await setDoc(profileRef, { hasCompletedOnboarding: true }, { merge: true });
+        setUserProfile(prev => ({ ...prev, hasCompletedOnboarding: true }));
+    };
+
+    const handleDismissGoalInstruction = async () => {
+        if (!user || !db) return;
+        setShowGoalInstruction(false);
+        const profileRef = doc(db, 'artifacts', appId, 'users', user.uid);
+        await setDoc(profileRef, { hasSeenGoalInstruction: true }, { merge: true });
+        setUserProfile(prev => ({ ...prev, hasSeenGoalInstruction: true }));
+    };
+    
+    useEffect(() => {
+        if (user && db) {
+            if (activeTab === 'tracker' || activeTab === 'leaderboard' || activeTab === 'today' || activeTab === 'hotlist') {
+               fetchData();
+            }
+        }
+    }, [user, db, currentDate, fetchData, activeTab]);
+
+    const updateLeaderboard = useCallback(async (currentMonthData, targetMonthId) => {
+        if (!user || !db || !userProfile.displayName) return;
+        const totalExposures = Object.values(currentMonthData).reduce((sum, day) => sum + (Number(day.exposures) || 0), 0);
+        const leaderboardRef = doc(db, 'artifacts', appId, 'leaderboard', targetMonthId, 'entries', user.uid);
+        await setDoc(leaderboardRef, {
+            displayName: userProfile.displayName,
+            exposures: totalExposures,
+            userId: user.uid
+        });
+    }, [user, db, userProfile.displayName]);
+
+    const debouncedSave = useMemo(() => debounce(async (dataToSave, goalsToSave) => {
+        if (!user || !db) return;
+        const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', monthYearId);
+        await setDoc(docRef, { dailyData: dataToSave, monthlyGoals: goalsToSave }, { merge: true });
+        if (dataToSave) {
+            updateLeaderboard(dataToSave, monthYearId);
+        }
+    }, 1500), [user, db, monthYearId, updateLeaderboard]);
+
+    const handleDataChange = (date, field, value) => {
+        const day = date.getDate();
+        const targetMonthId = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+        if (targetMonthId === monthYearId) {
+            const updatedData = { ...monthlyData, [day]: { ...monthlyData[day], [field]: value } };
+            setMonthlyData(updatedData);
+            debouncedSave(updatedData, monthlyGoals);
+        } else {
+            const handleSave = async () => {
+                if (!user || !db) return;
+
+                if(targetMonthId === lastMonthYearId) {
+                    const updatedLastMonthData = { ...lastMonthData, [day]: { ...lastMonthData[day], [field]: value } };
+                    setLastMonthData(updatedLastMonthData);
+                }
+
+                const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', targetMonthId);
+                const docSnap = await getDoc(docRef);
+                const existingData = docSnap.exists() ? docSnap.data() : { dailyData: {}, monthlyGoals: {} };
+                const updatedDailyData = { ...existingData.dailyData, [day]: { ...existingData.dailyData[day], [field]: value } };
+
+                await setDoc(docRef, { ...existingData, dailyData: updatedDailyData }, { merge: true });
+                updateLeaderboard(updatedDailyData, targetMonthId);
+            };
+            handleSave();
+        }
+    };
+
+    const handleQuickAdd = (metricKey, amount) => {
+        const today = new Date();
+        if (today.getFullYear() !== year || today.getMonth() !== month) {
+            alert("Quick add is only available for the current day on the current month's view.");
+            return;
+        }
+        const todayData = monthlyData[today.getDate()] || {};
+        const currentValue = Number(todayData[metricKey]) || 0;
+        const newValue = Math.max(0, currentValue + amount);
+
+        handleDataChange(today, metricKey, newValue);
+    };
+
+    const handleAddPresentation = (type) => {
+        const today = new Date();
+         if (today.getFullYear() !== year || today.getMonth() !== month) {
+            alert("Quick add is only available for the current day on the current month's view.");
+            return;
+        }
+        const todayData = monthlyData[today.getDate()] || {};
+        const currentPresentations = todayData.presentations || [];
+        const newPresentations = [...currentPresentations, type];
+        handleDataChange(today, 'presentations', newPresentations);
+    };
+
+    const handleGoalChange = (goalKey, value) => {
+        const newGoals = { ...monthlyGoals, [goalKey]: Number(value) || 0 };
+        setMonthlyGoals(newGoals);
+        debouncedSave(null, newGoals);
+    };
+
+    const handleLogFollowUpForProspect = async (prospectId) => {
+        const prospect = hotlist.find(p => p.id === prospectId);
+        if (!prospect) return;
+
+        // Increment exposure count on the prospect
+        const prospectRef = doc(db, 'artifacts', appId, 'users', user.uid, 'hotlist', prospectId);
+        await updateDoc(prospectRef, { exposureCount: (prospect.exposureCount || 0) + 1 });
+
+        // Increment total follow-ups for the day
+        handleQuickAdd('followUps', 1);
+        setShowFollowUpModal(false);
+    };
+
+    const handleSignOut = async () => auth && await signOut(auth);
+
+    const getWeekDataForReport = useCallback(async () => {
+        const today = new Date();
+        const dayOfWeek = today.getDay(); // Sunday - 0, Monday - 1
+        const startOfWeek = new Date(today);
+        startOfWeek.setDate(today.getDate() - dayOfWeek); // Set to Sunday
+        startOfWeek.setHours(0, 0, 0, 0);
+
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(startOfWeek.getDate() + 6);
+        endOfWeek.setHours(23, 59, 59, 999);
+
+        const startOfLastWeek = new Date(startOfWeek);
+        startOfLastWeek.setDate(startOfWeek.getDate() - 7);
+        const endOfLastWeek = new Date(startOfWeek);
+        endOfLastWeek.setDate(startOfWeek.getDate() - 1);
+
+        const getWeekTotals = (startDate, endDate) => {
+            const totals = { exposures: 0, followUps: 0, presentations: 0, threeWays: 0, enrolls: 0 };
+            let current = new Date(startDate);
+            while (current <= endDate) {
+                const dataSet = current.getMonth() === today.getMonth() ? monthlyData : lastMonthData;
+                const dayData = dataSet[current.getDate()];
+                if (dayData) {
+                    totals.exposures += Number(dayData.exposures) || 0;
+                    totals.followUps += Number(dayData.followUps) || 0;
+                    totals.presentations += (dayData.presentations?.length || 0) + (Number(dayData.pbrs) || 0);
+                    totals.threeWays += Number(dayData.threeWays) || 0;
+                    totals.enrolls += (Number(dayData.enrolls) || 0) + (Array.isArray(dayData.sitdowns) ? dayData.sitdowns.filter(s => s === 'E').length : 0);
+                }
+                current.setDate(current.getDate() + 1);
+            }
+            return totals;
+        };
+
+        const thisWeekTotals = getWeekTotals(startOfWeek, endOfWeek);
+        const lastWeekTotals = getWeekTotals(startOfLastWeek, endOfLastWeek);
+        const dateRange = `${startOfWeek.toLocaleDateString('default', { month: 'short', day: 'numeric' })} - ${endOfWeek.toLocaleDateString('default', { month: 'short', day: 'numeric' })}`;
+
+        const hotlistColRef = collection(db, 'artifacts', appId, 'users', user.uid, 'hotlist');
+        const allDocsSnap = await getDocs(hotlistColRef);
+        const allItems = allDocsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        const activeInPipeline = allItems.filter(item => item.isArchived !== true && (item.status === 'Hot' || item.status === 'Warm')).length;
+        const closingZone = allItems.filter(item => item.isArchived !== true && item.status === 'Hot');
+
+        const newMembersThisWeek = allItems.filter(item => {
+            if (item.outcome === 'Member' && item.decisionDate) {
+                const decisionDate = new Date(item.decisionDate);
+                return decisionDate >= startOfWeek && decisionDate <= endOfWeek;
+            }
+            return false;
+        }).length;
+
+        return {
+            totals: thisWeekTotals,
+            lastWeekTotals,
+            dateRange,
+            activeInPipeline,
+            closingZone,
+            newMembersThisWeek
+        };
+    }, [monthlyData, lastMonthData, user, db]);
+
+
+    const handleShareReportAsText = useCallback(async () => {
+        const { totals, dateRange, activeInPipeline, closingZone, newMembersThisWeek } = await getWeekDataForReport();
+
+        let shareText = `My Activity Tracker Report\nFrom: ${userProfile.displayName}\nWeek of: ${dateRange}\n\n`;
+        shareText += `**This Week's Numbers:**\n- Exposures: ${totals.exposures}\n- Follow Ups: ${totals.followUps}\n- Presentations: ${totals.presentations}\n- 3-Way Calls: ${totals.threeWays}\n- Memberships Sold: ${totals.enrolls}\n\n`;
+        shareText += `**Prospect Pipeline:**\n- Active Prospects: ${activeInPipeline}\n- New Members This Week: ${newMembersThisWeek}\n\n`;
+        shareText += "--------------------\n\n";
+        shareText += `My "Closing Zone" Prospects\n\n`;
+        closingZone.forEach((item, index) => { shareText += `${index + 1}. ${item.name} (${item.exposureCount || 0} exposures)\n`; });
+        shareText += "\nSent from my Activity Tracker App";
+
+        try {
+            await navigator.share({ title: 'My Weekly Activity Report', text: shareText });
+        } catch (error) { console.error('Error sharing text:', error); }
+    }, [getWeekDataForReport, userProfile.displayName]);
+
+    const handleShare = async () => {
+        if (typeof window.html2canvas === 'undefined') {
+            console.error("html2canvas library is not available. Falling back to text share.");
+            await handleShareReportAsText();
+            return;
+        }
+        setIsSharing(true);
+        const weekData = await getWeekDataForReport();
+        setReportCardData(weekData);
+    };
+
+    useEffect(() => {
+        if (!reportCardData || !reportCardRef.current) return;
+
+        const generateAndShareImage = async () => {
+            try {
+                const element = reportCardRef.current;
+                const canvas = await window.html2canvas(element, { scale: 2, useCORS: true, backgroundColor: '#f9fafb' });
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+
+                if (!blob) throw new Error("Canvas to Blob conversion failed.");
+
+                const file = new File([blob], 'activity-report.png', { type: 'image/png' });
+                const shareData = {
+                    files: [file],
+                    title: 'My Weekly Activity Report',
+                    text: `Here's my activity report for the week of ${reportCardData.dateRange}.`,
+                };
+
+                if (navigator.canShare && navigator.canShare(shareData)) {
+                    await navigator.share(shareData);
+                } else {
+                    console.log("File sharing not supported, falling back to text.");
+                    await handleShareReportAsText();
+                }
+
+            } catch (error) {
+                console.error('Error generating or sharing report image:', error);
+                alert('Could not generate report card. Sharing as text instead.');
+                await handleShareReportAsText();
+            } finally {
+                setIsSharing(false);
+                setReportCardData(null);
+            }
+        };
+
+        const timer = setTimeout(generateAndShareImage, 100);
+        return () => clearTimeout(timer);
+
+    }, [reportCardData, handleShareReportAsText]);
+
+    const streaks = useMemo(() => {
+        const calculateAndUpdateStreak = (activityKey) => {
+            if (!user || !userProfile.uid || !monthlyData || !lastMonthData) return 0;
+            let currentStreak = 0;
+            const today = new Date();
+            let dayToCheck = new Date(today);
+            while (true) {
+                const monthData = dayToCheck.getMonth() === today.getMonth() ? monthlyData : lastMonthData;
+                if (!monthData) break;
+                const dayData = monthData[dayToCheck.getDate()];
+                let hasActivity = false;
+                if (dayData) {
+                    if (activityKey === 'presentations') {
+                        hasActivity = (dayData.presentations?.length > 0) || (Number(dayData.pbrs) > 0);
+                    } else if (activityKey === 'enrolls') {
+                        hasActivity = (dayData.enrolls && Number(dayData.enrolls) > 0) || (dayData.sitdowns && dayData.sitdowns.some(s => s === 'E'));
+                    } else {
+                        if (Array.isArray(dayData[activityKey])) hasActivity = dayData[activityKey].length > 0;
+                        else hasActivity = Number(dayData[activityKey]) > 0;
+                    }
+                }
+                if (hasActivity) {
+                    currentStreak++;
+                    dayToCheck.setDate(dayToCheck.getDate() - 1);
+                } else {
+                    break;
+                }
+            }
+            const longestStreaks = userProfile.longestStreaks || {};
+            if (currentStreak > (longestStreaks[activityKey] || 0)) {
+                const newLongestStreaks = {...longestStreaks, [activityKey]: currentStreak };
+                const db = getFirestore();
+                if (db) { 
+                    const profileRef = doc(db, 'artifacts', appId, 'users', user.uid);
+                    setDoc(profileRef, { longestStreaks: newLongestStreaks }, { merge: true });
+                    setUserProfile(prev => ({...prev, longestStreaks: newLongestStreaks}));
+                }
+            }
+            return currentStreak;
+        };
+        return {
+            exposures: calculateAndUpdateStreak('exposures'),
+            followUps: calculateAndUpdateStreak('followUps'),
+            presentations: calculateAndUpdateStreak('presentations'),
+            threeWays: calculateAndUpdateStreak('threeWays'),
+            enrolls: calculateAndUpdateStreak('enrolls'),
+        };
+    }, [monthlyData, lastMonthData, user, userProfile, setUserProfile]);
+
+
+    if (loading) return <div className="flex items-center justify-center h-screen bg-gray-100"><div className="text-xl font-semibold">Loading...</div></div>;
+    if (!user) return <AuthPage auth={auth} />;
+
+    return (
+        <div className="bg-gray-50 min-h-screen font-sans text-gray-800">
+            <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+                <Header displayName={userProfile.displayName} onSignOut={handleSignOut} onEditName={() => setShowEditNameModal(true)} />
+                <TabBar activeTab={activeTab} setActiveTab={setActiveTab} />
+                <main className="mt-6">
+                    {activeTab === 'today' && <TodayDashboard 
+                        monthlyData={monthlyData}
+                        streaks={streaks}
+                        onQuickAdd={handleQuickAdd}
+                        onHabitChange={handleDataChange}
+                        onAddPresentation={handleAddPresentation}
+                        onShare={handleShare}
+                        isSharing={isSharing}
+                        onLogFollowUp={() => setShowFollowUpModal(true)}
+                    /> }
+                    {activeTab === 'tracker' && <ActivityTracker date={currentDate} setDate={setCurrentDate} goals={monthlyGoals} onGoalChange={handleGoalChange} data={{current: monthlyData, last: lastMonthData}} onDataChange={handleDataChange} onShare={handleShare} isSharing={isSharing} user={user} userProfile={userProfile} setUserProfile={setUserProfile} onQuickAdd={handleQuickAdd} showGoalInstruction={showGoalInstruction} onDismissGoalInstruction={handleDismissGoalInstruction} streaks={streaks} />}
+                    {activeTab === 'hotlist' && <HotList user={user} db={db} onDataChange={handleDataChange} monthlyData={monthlyData} hotlist={hotlist} />}
+                    {activeTab === 'analytics' && <AnalyticsDashboard db={db} user={user} />}
+                    {activeTab === 'leaderboard' && <Leaderboard db={db} monthYearId={monthYearId} user={user} />}
+                </main>
+                {showNameModal && <DisplayNameModal onSave={handleSetDisplayName} />}
+                {showEditNameModal && <DisplayNameModal onSave={handleSetDisplayName} onClose={() => setShowEditNameModal(false)} currentName={userProfile.displayName} />}
+                {showOnboarding && <OnboardingModal onDismiss={handleDismissOnboarding} />}
+                {reportCardData && (
+                    <div style={{ position: 'fixed', left: '-9999px', top: 0, zIndex: -1 }}>
+                        <ReportCard ref={reportCardRef} profile={userProfile} weekData={reportCardData} goals={monthlyGoals} />
+                    </div>
+                )}
+                {showFollowUpModal && (
+                    <FollowUpModal 
+                        prospects={hotlist.filter(p => p.status === 'Hot' || p.status === 'Warm')}
+                        onClose={() => setShowFollowUpModal(false)}
+                        onQuickLog={() => { handleQuickAdd('followUps', 1); setShowFollowUpModal(false); }}
+                        onLogForProspect={handleLogFollowUpForProspect}
+                    />
+                )}
+            </div>
+            <footer className="text-center p-4 mt-8 text-xs text-gray-400 border-t border-gray-200">
+                <p>&copy; 2025 Platinum Toolkit. All Rights Reserved.</p>
+                <p>Unauthorized duplication or distribution is strictly prohibited.</p>
+            </footer>
+        </div>
+    );
+};
+
+export default App;
 
 
