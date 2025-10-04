@@ -14,6 +14,7 @@ import { Sun, ChevronUp, ChevronDown, Plus, X, List, BarChart2, Target, Users, P
 // <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
 // --- Firebase Configuration ---
+// A placeholder config is provided, but the app will attempt to use the one injected by the environment.
 const firebaseConfig = {
     apiKey: "AIzaSyB3vzQe54l3ajY2LrwF_ZlwImxvhKwvLLw",
     authDomain: "activitytracker-e2b7a.firebaseapp.com",
@@ -1733,6 +1734,11 @@ const TeamPage = ({ user, db, userProfile, setUserProfile }) => {
 
 // --- Main App Component ---
 const App = () => {
+    // --- Set Page Title ---
+    useEffect(() => {
+        document.title = 'Activity Tracker';
+    }, []);
+
     // --- State Management ---
     const [db, setDb] = useState(null);
     const [auth, setAuth] = useState(null);
@@ -2278,10 +2284,4 @@ const App = () => {
 };
 
 export default App;
-
-
-
-
-
-
 
