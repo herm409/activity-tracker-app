@@ -9,7 +9,7 @@ import {
 } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, query, limit, addDoc, deleteDoc, orderBy, where, getCountFromServer, updateDoc, onSnapshot } from 'firebase/firestore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Sun, ChevronUp, ChevronDown, Plus, X, List, BarChart2, Target, Users, PhoneCall, Trash2, Trophy, LogOut, Share2, Flame, Edit2, Calendar, Minus, Info, Archive, ArchiveRestore, TrendingUp, ChevronsRight, Award, Lightbulb, UserCheck, Dumbbell, BookOpen, User, Video, ArrowRight, CheckCircle, XCircle, ArrowUp, ArrowDown } from 'lucide-react';
+import { Sun, ChevronUp, ChevronDown, Plus, X, List, BarChart2, Target, Users, PhoneCall, Trash2, Trophy, LogOut, Share2, Flame, Edit2, Calendar, Minus, Info, Archive, ArchiveRestore, TrendingUp, ChevronsRight, Award, Lightbulb, UserCheck, Dumbbell, BookOpen, User, Video, ArrowRight, CheckCircle, XCircle, ArrowUp, ArrowDown, MessageSquare } from 'lucide-react';
 // Note: This implementation assumes html2canvas is loaded via a script tag in the main HTML file.
 // <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
@@ -666,6 +666,11 @@ const HotList = ({ user, db, onDataChange, monthlyData, hotlist: allProspects })
     const [showAddModal, setShowAddModal] = useState(false);
     const [itemToDecide, setItemToDecide] = useState(null); // For outcome modal
     const [itemToDelete, setItemToDelete] = useState(null);
+    const [collapsedCategories, setCollapsedCategories] = useState({ Warm: true, Cold: true });
+
+    const toggleCategory = (category) => {
+        setCollapsedCategories(prev => ({ ...prev, [category]: !prev[category] }));
+    };
 
     const hotlistColRef = useMemo(() => {
         if (!db || !user?.uid) return null;
@@ -700,8 +705,6 @@ const HotList = ({ user, db, onDataChange, monthlyData, hotlist: allProspects })
     }, 1000), [hotlistColRef]);
 
     const handleUpdate = (id, field, value) => {
-        // Optimistic UI update
-        // setHotlist(prevList => prevList.map(item => item.id === id ? { ...item, [field]: value } : item));
         debouncedUpdate(id, field, value);
     };
     
@@ -773,33 +776,39 @@ const HotList = ({ user, db, onDataChange, monthlyData, hotlist: allProspects })
                     {Object.keys(statusConfig).map(statusKey => {
                         const { title, icon: Icon, color, description } = statusConfig[statusKey];
                         const prospects = groupedProspects[statusKey];
+                        const isCollapsed = collapsedCategories[statusKey];
                         return (
                             <div key={statusKey}>
-                                <div className={`flex items-center pb-2 border-b-2 border-${color}-500`}>
-                                    <Icon className={`h-6 w-6 text-${color}-500 mr-3`} />
-                                    <div>
-                                        <h3 className="text-lg font-bold text-gray-800">{title} ({prospects.length})</h3>
-                                        <p className="text-xs text-gray-500">{description}</p>
+                                <button onClick={() => toggleCategory(statusKey)} className={`w-full flex items-center justify-between pb-2 border-b-2 border-${color}-500`}>
+                                    <div className="flex items-center">
+                                        <Icon className={`h-6 w-6 text-${color}-500 mr-3`} />
+                                        <div>
+                                            <h3 className="text-lg font-bold text-gray-800 text-left">{title} ({prospects.length})</h3>
+                                            <p className="text-xs text-gray-500 text-left">{description}</p>
+                                        </div>
                                     </div>
-                                </div>
-                                {prospects.length > 0 ? (
-                                    <div className="mt-4 space-y-4">
-                                        {prospects.map(item => (
-                                            <ProspectCard 
-                                                key={item.id} 
-                                                item={item} 
-                                                onUpdate={handleUpdate} 
-                                                onInstantUpdate={handleInstantUpdate} 
-                                                onDecide={setItemToDecide}
-                                                onDataChange={onDataChange}
-                                                monthlyData={monthlyData}
-                                            />
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="text-center py-8 px-4 mt-4 bg-gray-50 rounded-lg">
-                                        <p className="text-sm text-gray-500">No prospects in this stage.</p>
-                                    </div>
+                                    {isCollapsed ? <ChevronDown className="h-5 w-5 text-gray-400"/> : <ChevronUp className="h-5 w-5 text-gray-400"/>}
+                                </button>
+                                {!isCollapsed && (
+                                    prospects.length > 0 ? (
+                                        <div className="mt-4 space-y-4">
+                                            {prospects.map(item => (
+                                                <ProspectCard 
+                                                    key={item.id} 
+                                                    item={item} 
+                                                    onUpdate={handleUpdate} 
+                                                    onInstantUpdate={handleInstantUpdate} 
+                                                    onDecide={setItemToDecide}
+                                                    onDataChange={onDataChange}
+                                                    monthlyData={monthlyData}
+                                                />
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="text-center py-8 px-4 mt-4 bg-gray-50 rounded-lg">
+                                            <p className="text-sm text-gray-500">No prospects in this stage.</p>
+                                        </div>
+                                    )
                                 )}
                             </div>
                         )
@@ -812,14 +821,12 @@ const HotList = ({ user, db, onDataChange, monthlyData, hotlist: allProspects })
 };
 
 const ProspectCard = ({ item, onUpdate, onInstantUpdate, onDecide, onDataChange, monthlyData }) => {
+    const [isNotesExpanded, setIsNotesExpanded] = useState(false);
     const isOverdue = item.nextActionDate && new Date(item.nextActionDate) < new Date();
     const exposureCount = item.exposureCount || 0;
     
     const handleLogFollowUp = () => {
-        // First, increment the prospect's specific exposure count
         onInstantUpdate(item.id, { exposureCount: exposureCount + 1 });
-
-        // Then, increment the main follow-up count for today
         const today = new Date();
         const day = today.getDate();
         const currentFollowUps = Number(monthlyData[day]?.followUps || 0);
@@ -850,13 +857,19 @@ const ProspectCard = ({ item, onUpdate, onInstantUpdate, onDecide, onDataChange,
             </div>
 
             <div className="mt-3 space-y-3">
-                 <textarea
-                    defaultValue={item.notes}
-                    onChange={(e) => onUpdate(item.id, 'notes', e.target.value)}
-                    placeholder="Add notes..."
-                    className="w-full text-sm text-gray-600 border-gray-200 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                    rows="2"
-                ></textarea>
+                 <div className="relative">
+                    <textarea
+                        defaultValue={item.notes}
+                        onChange={(e) => onUpdate(item.id, 'notes', e.target.value)}
+                        placeholder="Add notes..."
+                        className="w-full text-sm text-gray-600 border-gray-200 rounded-md focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                        rows={isNotesExpanded ? 6 : 2}
+                    ></textarea>
+                    <button onClick={() => setIsNotesExpanded(!isNotesExpanded)} className="absolute bottom-2 right-2 text-xs flex items-center font-semibold text-indigo-600 hover:text-indigo-800 bg-white/70 backdrop-blur-sm px-2 py-1 rounded-full">
+                        <MessageSquare className="h-3 w-3 mr-1" />
+                        {isNotesExpanded ? 'Hide' : 'View'} Notes
+                    </button>
+                 </div>
 
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between">
                     <div className="flex items-center space-x-2">
@@ -1881,6 +1894,4 @@ const App = () => {
 };
 
 export default App;
-
-
 
