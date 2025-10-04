@@ -756,9 +756,14 @@ const HotList = ({ user, db, onDataChange, monthlyData, hotlist: allProspects })
                      <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">Prospect Pipeline</h2>
                      <p className="text-sm text-gray-500 mt-1">Manage your prospects from initial contact to decision.</p>
                 </div>
-                <button onClick={() => setIsArchiveView(!isArchiveView)} className="flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-800 mt-3 sm:mt-0">
-                    {isArchiveView ? <><List className="h-4 w-4 mr-1"/> View Active Pipeline</> : <><Archive className="h-4 w-4 mr-1"/> View Archive</>}
-                </button>
+                <div className="flex items-center space-x-4 mt-3 sm:mt-0">
+                    <button onClick={() => setIsArchiveView(!isArchiveView)} className="flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-800">
+                        {isArchiveView ? <><List className="h-4 w-4 mr-1"/> View Active Pipeline</> : <><Archive className="h-4 w-4 mr-1"/> View Archive</>}
+                    </button>
+                    <button onClick={() => setShowAddModal(true)} className="flex items-center bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 shadow-sm">
+                        <Plus className="h-5 w-5 mr-2" /> Add Prospect
+                    </button>
+                </div>
             </div>
             
             {isArchiveView ? (
@@ -802,11 +807,6 @@ const HotList = ({ user, db, onDataChange, monthlyData, hotlist: allProspects })
                 </div>
             )}
 
-            <div className="mt-6 flex justify-end">
-                <button onClick={() => setShowAddModal(true)} className="flex items-center bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 shadow-sm">
-                    <Plus className="h-5 w-5 mr-2" /> Add Prospect
-                </button>
-            </div>
         </div>
     );
 };
@@ -1881,5 +1881,6 @@ const App = () => {
 };
 
 export default App;
+
 
 
