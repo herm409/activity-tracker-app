@@ -9,7 +9,7 @@ import {
 } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, query, limit, addDoc, deleteDoc, orderBy, where, getCountFromServer, updateDoc } from 'firebase/firestore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Sun, ChevronUp, ChevronDown, Plus, X, List, BarChart2, Target, Users, PhoneCall, Trash2, Trophy, LogOut, Share2, Flame, Edit2, Calendar, Minus, Info, Archive, ArchiveRestore, TrendingUp, ChevronsRight, Award, Lightbulb, UserCheck, Dumbbell, BookOpen, Headphones, User, Video } from 'lucide-react';
+import { Sun, ChevronUp, ChevronDown, Plus, X, List, BarChart2, Target, Users, PhoneCall, Trash2, Trophy, LogOut, Share2, Flame, Edit2, Calendar, Minus, Info, Archive, ArchiveRestore, TrendingUp, ChevronsRight, Award, Lightbulb, UserCheck, Dumbbell, BookOpen, User, Video } from 'lucide-react';
 // Note: This implementation assumes html2canvas is loaded via a script tag in the main HTML file.
 // <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
@@ -716,7 +716,7 @@ const App = () => {
             threeWays: calculateAndUpdateStreak('threeWays'),
             enrolls: calculateAndUpdateStreak('enrolls'),
         };
-    }, [monthlyData, lastMonthData, user, userProfile, setUserProfile, db]);
+    }, [monthlyData, lastMonthData, user, userProfile, setUserProfile]);
 
 
     if (loading) return <div className="flex items-center justify-center h-screen bg-gray-100"><div className="text-xl font-semibold">Loading...</div></div>;
@@ -1052,12 +1052,6 @@ const PresentationTracker = ({ value = [], onChange }) => {
         return options[type] || 'Unknown'; // New 'V' type and fallback
     };
     
-    // For counting, treat legacy virtual types as 'V'
-    const presentationsOnly = value.map(item => {
-        if (['Z', 'V', 'D'].includes(item)) return 'V';
-        return item;
-    }).filter(item => item !== 'E'); // Filter out old 'E' for Enroll type
-
     const handleAdd = (type) => { 
         const newValue = [...value, type]; // Add to original array to not lose legacy data
         onChange(newValue); 
@@ -1753,6 +1747,7 @@ const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
 });
 
 export default App;
+
 
 
 
