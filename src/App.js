@@ -623,7 +623,7 @@ const App = () => {
 
 
     const handleShareReportAsText = useCallback(async () => {
-        const { totals, lastWeekTotals, dateRange, activeInPipeline, closingZone, newMembersThisWeek } = await getWeekDataForReport();
+        const { totals, dateRange, activeInPipeline, closingZone, newMembersThisWeek } = await getWeekDataForReport();
 
         let shareText = `My Activity Tracker Report\nFrom: ${userProfile.displayName}\nWeek of: ${dateRange}\n\n`;
         shareText += `**This Week's Numbers:**\n- Exposures: ${totals.exposures}\n- Follow Ups: ${totals.followUps}\n- Presentations: ${totals.presentations}\n- 3-Way Calls: ${totals.threeWays}\n- Memberships Sold: ${totals.enrolls}\n\n`;
@@ -1128,7 +1128,7 @@ const HotList = ({ user, db }) => {
             fetchHotlist();
         });
         return () => unsubscribe();
-    }, [fetchHotlist]);
+    }, [fetchHotlist, hotlistColRef]);
     
     const handleAdd = async (name) => {
         setShowAddModal(false);
@@ -1728,7 +1728,6 @@ const OutcomeModal = ({ onClose, onDecide }) => {
 };
 
 const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
-    const WEEKS_IN_MONTH = 4.33;
     const { totals, lastWeekTotals, dateRange, activeInPipeline, closingZone, newMembersThisWeek } = weekData;
 
     const metrics = [
@@ -1804,5 +1803,6 @@ const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
 });
 
 export default App;
+
 
 
