@@ -9,7 +9,7 @@ import {
 } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, query, limit, addDoc, deleteDoc, orderBy, where, getCountFromServer, updateDoc, onSnapshot } from 'firebase/firestore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Sun, ChevronUp, ChevronDown, Plus, X, List, BarChart2, Target, Users, PhoneCall, Trash2, Trophy, LogOut, Share2, Flame, Edit2, Calendar, Minus, Info, Archive, ArchiveRestore, TrendingUp, ChevronsRight, Award, Lightbulb, UserCheck, Dumbbell, BookOpen, User, Video, ArrowRight, CheckCircle, XCircle, ArrowUp, ArrowDown, MessageSquare, Star } from 'lucide-react';
+import { Sun, ChevronUp, ChevronDown, Plus, X, List, BarChart2, Target, Users, PhoneCall, Trash2, Trophy, LogOut, Share2, Flame, Edit2, Calendar, Minus, Info, Archive, ArchiveRestore, TrendingUp, ChevronsRight, Award, Lightbulb, UserCheck, Dumbbell, BookOpen, User, Video, ArrowRight, CheckCircle, XCircle, ArrowUp, ArrowDown, MessageSquare } from 'lucide-react';
 // Note: This implementation assumes html2canvas is loaded via a script tag in the main HTML file.
 // <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
@@ -1894,4 +1894,5 @@ const App = () => {
 };
 
 export default App;
+
 
