@@ -4,12 +4,12 @@ import {
     getAuth, 
     onAuthStateChanged, 
     createUserWithEmailAndPassword,
-    signInWithEmailAndPassword,
-    signOut
+    signInWithEmailAndPassword, 
+    signOut 
 } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, query, limit, addDoc, deleteDoc, orderBy, where, getCountFromServer, updateDoc } from 'firebase/firestore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { ChevronUp, ChevronDown, Plus, X, List, BarChart2, Target, Users, PhoneCall, Trash2, Trophy, LogOut, Share2, Flame, Edit2, Calendar, Minus, Info, Archive, ArchiveRestore } from 'lucide-react';
+import { ChevronUp, ChevronDown, Plus, X, List, BarChart2, Target, Users, PhoneCall, Trash2, Trophy, LogOut, Share2, Flame, Edit2, Calendar, Minus, Info, Archive, ArchiveRestore, TrendingUp, ChevronsRight, Award, Lightbulb, UserCheck } from 'lucide-react';
 // Note: This implementation assumes html2canvas is loaded via a script tag in the main HTML file.
 // <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
@@ -53,8 +53,7 @@ const App = () => {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [monthlyData, setMonthlyData] = useState({});
     const [lastMonthData, setLastMonthData] = useState({});
-    const [monthlyGoals, setMonthlyGoals] = useState({ exposures: 0, followUps: 0, sitdowns: 0, pbrs: 0, threeWays: 0 });
-    const [analyticsData, setAnalyticsData] = useState([]);
+    const [monthlyGoals, setMonthlyGoals] = useState({ exposures: 0, followUps: 0, presentations: 0, pbrs: 0, threeWays: 0, enrolls: 0 });
     const [activeTab, setActiveTab] = useState('tracker');
     
     // State for image report card generation
@@ -81,12 +80,12 @@ const App = () => {
             setLoading(false);
         }
     }, []);
-    
+
     // --- Data Fetching and Saving ---
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
     const monthYearId = `${year}-${String(month + 1).padStart(2, '0')}`;
-    
+
     const lastMonthDate = new Date(currentDate);
     lastMonthDate.setMonth(currentDate.getMonth() - 1);
     const lastMonthYearId = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, '0')}`;
@@ -97,7 +96,7 @@ const App = () => {
 
         const profileRef = doc(db, 'artifacts', appId, 'users', user.uid);
         const profileSnap = await getDoc(profileRef);
-        
+
         let profileData = {};
         if (profileSnap.exists()) {
             profileData = profileSnap.data();
@@ -115,7 +114,7 @@ const App = () => {
 
         const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', monthYearId);
         const docSnap = await getDoc(docRef);
-        let currentGoals = { exposures: 0, followUps: 0, sitdowns: 0, pbrs: 0, threeWays: 0 };
+        let currentGoals = { exposures: 0, followUps: 0, presentations: 0, pbrs: 0, threeWays: 0, enrolls: 0 };
         if (docSnap.exists()) {
             const data = docSnap.data();
             setMonthlyData(data.dailyData || {});
@@ -130,7 +129,7 @@ const App = () => {
         if (!profileData.hasSeenGoalInstruction && allGoalsZero) {
             setShowGoalInstruction(true);
         }
-        
+
         const lastMonthDocRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', lastMonthYearId);
         const lastMonthDocSnap = await getDoc(lastMonthDocRef);
         if (lastMonthDocSnap.exists()) {
@@ -170,42 +169,12 @@ const App = () => {
         await setDoc(profileRef, { hasSeenGoalInstruction: true }, { merge: true });
         setUserProfile(prev => ({ ...prev, hasSeenGoalInstruction: true }));
     };
-
-    const fetchAnalytics = useCallback(async () => {
-        if (!user || !db) return;
-        const analyticsPromises = [];
-        const monthLabels = [];
-        let tempDate = new Date();
-        for (let i = 0; i < 6; i++) {
-            const y = tempDate.getFullYear();
-            const m = tempDate.getMonth();
-            const myId = `${y}-${String(m + 1).padStart(2, '0')}`;
-            monthLabels.unshift(tempDate.toLocaleString('default', { month: 'short', year: 'numeric' }));
-            const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', myId);
-            analyticsPromises.unshift(getDoc(docRef));
-            tempDate.setMonth(tempDate.getMonth() - 1);
-        }
-        const docSnaps = await Promise.all(analyticsPromises);
-        const processedData = docSnaps.map((snap, index) => {
-            const totals = { name: monthLabels[index], Exposures: 0, 'Follow Ups': 0 };
-            if (snap.exists()) {
-                const data = snap.data().dailyData || {};
-                Object.values(data).forEach(day => {
-                    totals.Exposures += Number(day.exposures) || 0;
-                    totals['Follow Ups'] += Number(day.followUps) || 0;
-                });
-            }
-            return totals;
-        });
-        setAnalyticsData(processedData);
-    }, [user, db]);
-
+    
     useEffect(() => {
         if (user && db) {
-           if(activeTab === 'analytics') fetchAnalytics();
-           if (activeTab === 'tracker') fetchData();
+            if (activeTab === 'tracker') fetchData();
         }
-    }, [user, db, currentDate, fetchData, fetchAnalytics, activeTab]);
+    }, [user, db, currentDate, fetchData, activeTab]);
 
     const updateLeaderboard = useCallback(async (currentMonthData, targetMonthId) => {
         if (!user || !db || !userProfile.displayName) return;
@@ -238,7 +207,7 @@ const App = () => {
         } else {
             const handleSave = async () => {
                 if (!user || !db) return;
-                
+
                 if(targetMonthId === lastMonthYearId) {
                     const updatedLastMonthData = { ...lastMonthData, [day]: { ...lastMonthData[day], [field]: value } };
                     setLastMonthData(updatedLastMonthData);
@@ -248,7 +217,7 @@ const App = () => {
                 const docSnap = await getDoc(docRef);
                 const existingData = docSnap.exists() ? docSnap.data() : { dailyData: {}, monthlyGoals: {} };
                 const updatedDailyData = { ...existingData.dailyData, [day]: { ...existingData.dailyData[day], [field]: value } };
-                
+
                 await setDoc(docRef, { ...existingData, dailyData: updatedDailyData }, { merge: true });
                 updateLeaderboard(updatedDailyData, targetMonthId);
             };
@@ -274,14 +243,14 @@ const App = () => {
         setMonthlyGoals(newGoals);
         debouncedSave(null, newGoals);
     };
-        
+
     const handleSignOut = async () => auth && await signOut(auth);
 
     const getWeekDataForReport = useCallback(async () => {
         const today = new Date();
         const dayOfWeek = today.getDay();
         const startOfWeek = new Date(today);
-        startOfWeek.setDate(today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1)); 
+        startOfWeek.setDate(today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1));
         startOfWeek.setHours(0,0,0,0);
         const endOfWeek = new Date(startOfWeek);
         endOfWeek.setDate(startOfWeek.getDate() + 6);
@@ -290,9 +259,9 @@ const App = () => {
         startOfLastWeek.setDate(startOfWeek.getDate() - 7);
         const endOfLastWeek = new Date(startOfWeek);
         endOfLastWeek.setDate(startOfWeek.getDate() - 1);
-        
+
         const getWeekTotals = (startDate, endDate) => {
-            const totals = { exposures: 0, followUps: 0, pbrs: 0, threeWays: 0 };
+            const totals = { exposures: 0, followUps: 0, pbrs: 0, threeWays: 0, enrolls: 0 };
             let current = new Date(startDate);
             while(current <= endDate) {
                 const dataSet = current.getMonth() === today.getMonth() ? monthlyData : lastMonthData;
@@ -302,6 +271,7 @@ const App = () => {
                     totals.followUps += Number(dayData.followUps) || 0;
                     totals.pbrs += Number(dayData.pbrs) || 0;
                     totals.threeWays += Number(dayData.threeWays) || 0;
+                    totals.enrolls += Number(dayData.enrolls) || 0;
                 }
                 current.setDate(current.getDate() + 1);
             }
@@ -311,7 +281,7 @@ const App = () => {
         const thisWeekTotals = getWeekTotals(startOfWeek, endOfWeek);
         const lastWeekTotals = getWeekTotals(startOfLastWeek, endOfLastWeek);
         const dateRange = `${startOfWeek.toLocaleDateString('default', {month: 'short', day: 'numeric'})} - ${endOfWeek.toLocaleDateString('default', {month: 'short', day: 'numeric'})}`;
-        
+
         const hotlistColRef = collection(db, 'artifacts', appId, 'users', user.uid, 'hotlist');
         const allDocsSnap = await getDocs(hotlistColRef);
         const allItems = allDocsSnap.docs.map(d => ({id: d.id, ...d.data()}));
@@ -324,8 +294,8 @@ const App = () => {
         const { totals, lastWeekTotals, dateRange, hotlist: reportHotlist } = await getWeekDataForReport();
 
         let shareText = `My Activity Tracker Report\nFrom: ${userProfile.displayName}\nWeek of: ${dateRange}\n\n`;
-        shareText += `**This Week's Numbers:**\n- Exposures: ${totals.exposures}\n- Follow Ups: ${totals.followUps}\n- PBRs: ${totals.pbrs}\n\n`;
-        shareText += `**Last Week's Numbers:**\n- Exposures: ${lastWeekTotals.exposures}\n- Follow Ups: ${lastWeekTotals.followUps}\n- PBRs: ${lastWeekTotals.pbrs}\n\n`;
+        shareText += `**This Week's Numbers:**\n- Exposures: ${totals.exposures}\n- Follow Ups: ${totals.followUps}\n- PBRs: ${totals.pbrs}\n- Memberships Sold: ${totals.enrolls}\n\n`;
+        shareText += `**Last Week's Numbers:**\n- Exposures: ${lastWeekTotals.exposures}\n- Follow Ups: ${lastWeekTotals.followUps}\n- PBRs: ${lastWeekTotals.pbrs}\n- Memberships Sold: ${lastWeekTotals.enrolls}\n\n`;
         shareText += "--------------------\n\n";
         shareText += `My "10 in Play" Hotlist\n\n`;
         reportHotlist.forEach((item, index) => { shareText += `${index + 1}. ${item.name}\n${item.notes ? `- Notes: ${item.notes}\n\n` : '\n'}`;});
@@ -335,7 +305,7 @@ const App = () => {
             await navigator.share({ title: 'My Weekly Activity Report', text: shareText });
         } catch (error) { console.error('Error sharing text:', error); }
     }, [getWeekDataForReport, userProfile.displayName]);
-    
+
     const handleShare = async () => {
         if (typeof window.html2canvas === 'undefined') {
             console.error("html2canvas library is not available. Falling back to text share.");
@@ -349,29 +319,29 @@ const App = () => {
 
     useEffect(() => {
         if (!reportCardData || !reportCardRef.current) return;
-    
+
         const generateAndShareImage = async () => {
             try {
                 const element = reportCardRef.current;
                 const canvas = await window.html2canvas(element, { scale: 2, useCORS: true, backgroundColor: '#f9fafb' });
                 const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-                
+
                 if (!blob) throw new Error("Canvas to Blob conversion failed.");
-    
+
                 const file = new File([blob], 'activity-report.png', { type: 'image/png' });
                 const shareData = {
                     files: [file],
                     title: 'My Weekly Activity Report',
                     text: `Here's my activity report for the week of ${reportCardData.dateRange}.`,
                 };
-    
+
                 if (navigator.canShare && navigator.canShare(shareData)) {
                     await navigator.share(shareData);
                 } else {
                     console.log("File sharing not supported, falling back to text.");
                     await handleShareReportAsText();
                 }
-    
+
             } catch (error) {
                 console.error('Error generating or sharing report image:', error);
                 alert('Could not generate report card. Sharing as text instead.');
@@ -381,12 +351,12 @@ const App = () => {
                 setReportCardData(null);
             }
         };
-    
+
         const timer = setTimeout(generateAndShareImage, 100);
         return () => clearTimeout(timer);
-    
+
     }, [reportCardData, handleShareReportAsText]);
-    
+
     if (loading) return <div className="flex items-center justify-center h-screen bg-gray-100"><div className="text-xl font-semibold">Loading...</div></div>;
     if (!user) return <AuthPage auth={auth} />;
 
@@ -398,7 +368,7 @@ const App = () => {
                 <main className="mt-6">
                     {activeTab === 'tracker' && <ActivityTracker date={currentDate} setDate={setCurrentDate} goals={monthlyGoals} onGoalChange={handleGoalChange} data={{current: monthlyData, last: lastMonthData}} onDataChange={handleDataChange} onShare={handleShare} isSharing={isSharing} user={user} userProfile={userProfile} setUserProfile={setUserProfile} onQuickAdd={handleQuickAdd} showGoalInstruction={showGoalInstruction} onDismissGoalInstruction={handleDismissGoalInstruction} />}
                     {activeTab === 'hotlist' && <HotList user={user} db={db} />}
-                    {activeTab === 'analytics' && <AnalyticsDashboard data={analyticsData} />}
+                    {activeTab === 'analytics' && <AnalyticsDashboard db={db} user={user} />}
                     {activeTab === 'leaderboard' && <Leaderboard db={db} monthYearId={monthYearId} user={user} />}
                 </main>
                 {showNameModal && <DisplayNameModal onSave={handleSetDisplayName} />}
@@ -430,7 +400,7 @@ const AuthPage = ({ auth }) => {
         setError('');
         if (!auth) { setError("Authentication service is not available."); return; }
         try {
-            if (isSignUp) { await createUserWithEmailAndPassword(auth, email, password); } 
+            if (isSignUp) { await createUserWithEmailAndPassword(auth, email, password); }
             else { await signInWithEmailAndPassword(auth, email, password); }
         } catch (err) { setError(err.message); }
     };
@@ -476,9 +446,9 @@ const Header = ({ displayName, onSignOut, onEditName }) => (
 const TabBar = ({ activeTab, setActiveTab }) => {
     const tabs = [
         { id: 'tracker', name: 'Tracker', icon: Calendar },
-        { id: 'leaderboard', name: 'Leaderboard', icon: Trophy }, 
-        { id: 'hotlist', name: '10 in Play', icon: List }, 
-        { id: 'analytics', name: 'Analytics', icon: BarChart2 } 
+        { id: 'leaderboard', name: 'Leaderboard', icon: Trophy },
+        { id: 'hotlist', name: '10 in Play', icon: List },
+        { id: 'analytics', name: 'Analytics', icon: BarChart2 }
     ];
 
     return (
@@ -503,7 +473,7 @@ const Leaderboard = ({ db, monthYearId, user }) => {
 
             try {
                 const scoresColRef = collection(db, 'artifacts', appId, 'leaderboard', monthYearId, 'entries');
-                
+
                 // 1. Fetch top 25
                 const top25Query = query(scoresColRef, orderBy('exposures', 'desc'), limit(25));
                 const top25Snapshot = await getDocs(top25Query);
@@ -517,7 +487,7 @@ const Leaderboard = ({ db, monthYearId, user }) => {
                 if (userDocSnap.exists()) {
                     const currentUserData = userDocSnap.data();
                     setUserScore(currentUserData);
-                    
+
                     // 3. Calculate user's rank
                     const higherRankQuery = query(scoresColRef, where('exposures', '>', currentUserData.exposures));
                     const higherRankSnapshot = await getCountFromServer(higherRankQuery);
@@ -538,7 +508,7 @@ const Leaderboard = ({ db, monthYearId, user }) => {
     const isUserInTop25 = scores.some(score => score.userId === user.uid);
 
     if (loading) return <div className="text-center p-10">Loading Leaderboard...</div>;
-    
+
     return (
         <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
             <h2 className="text-xl sm:text-2xl font-semibold mb-4">Top 25 Performers</h2>
@@ -549,8 +519,8 @@ const Leaderboard = ({ db, monthYearId, user }) => {
                     {scores.map((score, index) => {
                         const isCurrentUser = score.userId === user.uid;
                         return (
-                            <li 
-                                key={score.userId} 
+                            <li
+                                key={score.userId}
                                 className={`flex items-center justify-between p-3 rounded-md ${isCurrentUser ? 'bg-indigo-100 border-l-4 border-indigo-500' : 'bg-gray-50'}`}
                             >
                                 <div className="flex items-center">
@@ -569,12 +539,12 @@ const Leaderboard = ({ db, monthYearId, user }) => {
                 <div className="mt-6 border-t pt-4">
                      <h3 className="text-md font-semibold text-gray-600 mb-2">Your Position</h3>
                      <div className="flex items-center justify-between p-3 rounded-md bg-indigo-50 border border-indigo-200">
-                        <div className="flex items-center">
-                            <span className="text-lg font-bold text-gray-500 w-8">#{userRank}</span>
-                            <span className="font-medium">{userScore.displayName}</span>
-                        </div>
-                        <span className="font-bold text-lg text-indigo-600">{userScore.exposures}</span>
-                    </div>
+                         <div className="flex items-center">
+                             <span className="text-lg font-bold text-gray-500 w-8">#{userRank}</span>
+                             <span className="font-medium">{userScore.displayName}</span>
+                         </div>
+                         <span className="font-bold text-lg text-indigo-600">{userScore.exposures}</span>
+                     </div>
                 </div>
             )}
         </div>
@@ -606,9 +576,9 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
             currentDay.setDate(startOfWeek.getDate() + i);
             const dataSet = currentDay.getMonth() === date.getMonth() ? data.current : data.last;
             const dayData = dataSet ? (dataSet[currentDay.getDate()] || {}) : {};
-            
+
             const isPast = currentDay < today && today.toDateString() !== currentDay.toDateString();
-            const noActivity = !dayData || ((Number(dayData.exposures || 0) === 0) && (Number(dayData.followUps || 0) === 0) && (Array.isArray(dayData.sitdowns) ? dayData.sitdowns.length === 0 : true));
+            const noActivity = !dayData || ((Number(dayData.exposures || 0) === 0) && (Number(dayData.followUps || 0) === 0) && (Array.isArray(dayData.presentations) ? dayData.presentations.length === 0 : true));
             const isToday = today.toDateString() === currentDay.toDateString();
             const isWeekend = currentDay.getDay() === 0 || currentDay.getDay() === 6;
 
@@ -621,19 +591,19 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
         const today = new Date();
         const daysInMonth = new Date(year, month + 1, 0).getDate();
         const firstDayOfMonth = new Date(year, month, 1).getDay();
-    
+
         const days = [];
         for (let i = 0; i < firstDayOfMonth; i++) { days.push({ isBlank: true, day: `blank-${i}` }); }
-        
+
         for (let day = 1; day <= daysInMonth; day++) {
             const currentDateObj = new Date(year, month, day);
             const dayData = data.current[day] || {};
             const isTodayFlag = today.toDateString() === currentDateObj.toDateString();
             const isPast = currentDateObj < today && !isTodayFlag;
-            const noActivity = Object.keys(dayData).filter(k => k !== 'exerc' && k !== 'read').length === 0 || (Number(dayData.exposures || 0) === 0 && Number(dayData.followUps || 0) === 0 && (dayData.sitdowns || []).length === 0);
+            const noActivity = Object.keys(dayData).filter(k => k !== 'exerc' && k !== 'read').length === 0 || (Number(dayData.exposures || 0) === 0 && Number(dayData.followUps || 0) === 0 && (dayData.presentations || []).length === 0);
             const dayOfWeek = currentDateObj.getDay();
             const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-    
+
             days.push({ day, date: currentDateObj, isBlank: false, data: dayData, hasNoActivity: isPast && noActivity, isToday: isTodayFlag, isWeekend });
         }
         return days;
@@ -643,11 +613,12 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
         return Object.values(data.current).reduce((acc, dayData) => {
             acc.exposures += Number(dayData.exposures) || 0;
             acc.followUps += Number(dayData.followUps) || 0;
-            acc.sitdowns += Array.isArray(dayData.sitdowns) ? dayData.sitdowns.length : 0;
+            acc.presentations += (Array.isArray(dayData.presentations) ? dayData.presentations.length : 0) + (Array.isArray(dayData.sitdowns) ? dayData.sitdowns.length : 0);
             acc.pbrs += Number(dayData.pbrs) || 0;
             acc.threeWays += Number(dayData.threeWays) || 0;
+            acc.enrolls += (Number(dayData.enrolls) || 0) + (Array.isArray(dayData.sitdowns) ? dayData.sitdowns.filter(s => s === 'E').length : 0);
             return acc;
-        }, { exposures: 0, followUps: 0, sitdowns: 0, pbrs: 0, threeWays: 0 });
+        }, { exposures: 0, followUps: 0, presentations: 0, pbrs: 0, threeWays: 0, enrolls: 0 });
     }, [data]);
 
     const streaks = useMemo(() => {
@@ -662,8 +633,14 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
                 const dayData = monthData[dayToCheck.getDate()];
                 let hasActivity = false;
                 if (dayData) {
-                    if (Array.isArray(dayData[activityKey])) hasActivity = dayData[activityKey].length > 0;
-                    else hasActivity = Number(dayData[activityKey]) > 0;
+                    if (activityKey === 'presentations') {
+                        hasActivity = (dayData.presentations && dayData.presentations.length > 0) || (dayData.sitdowns && dayData.sitdowns.length > 0);
+                    } else if (activityKey === 'enrolls') {
+                        hasActivity = (dayData.enrolls && Number(dayData.enrolls) > 0) || (dayData.sitdowns && dayData.sitdowns.some(s => s === 'E'));
+                    } else {
+                        if (Array.isArray(dayData[activityKey])) hasActivity = dayData[activityKey].length > 0;
+                        else hasActivity = Number(dayData[activityKey]) > 0;
+                    }
                 }
                 if (hasActivity) {
                     currentStreak++;
@@ -685,12 +662,13 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
         return {
             exposures: calculateAndUpdateStreak('exposures'),
             followUps: calculateAndUpdateStreak('followUps'),
-            sitdowns: calculateAndUpdateStreak('sitdowns'),
+            presentations: calculateAndUpdateStreak('presentations'),
             pbrs: calculateAndUpdateStreak('pbrs'),
             threeWays: calculateAndUpdateStreak('threeWays'),
+            enrolls: calculateAndUpdateStreak('enrolls'),
         };
     }, [data, user, userProfile, setUserProfile]);
-    
+
     const handleDayClick = (dayObj) => {
         if (dayObj.isBlank) return;
         setSelectedDay(dayObj.date);
@@ -698,8 +676,8 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
     const closeModal = () => setSelectedDay(null);
     const handleModalDataChange = (field, value) => onDataChange(selectedDay, field, value);
 
-    const activityColors = { exposures: 'bg-blue-500', followUps: 'bg-green-500', sitdowns: 'bg-amber-500', pbrs: 'bg-purple-500', threeWays: 'bg-pink-500' };
-    
+    const activityColors = { exposures: 'bg-blue-500', followUps: 'bg-green-500', presentations: 'bg-amber-500', pbrs: 'bg-purple-500', threeWays: 'bg-pink-500', enrolls: 'bg-teal-500' };
+
     let modalData = {};
     if (selectedDay) {
         const targetMonthId = `${selectedDay.getFullYear()}-${String(selectedDay.getMonth() + 1).padStart(2, '0')}`;
@@ -713,7 +691,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
                 <div className="flex items-center mb-4 sm:mb-0">
                     <button onClick={() => viewMode === 'week' ? changeWeek(-1) : changeMonth(-1)} className="p-2 rounded-md hover:bg-gray-100"><ChevronDown className="h-5 w-5 rotate-90" /></button>
                     <h2 className="text-xl sm:text-2xl font-semibold w-40 sm:w-56 text-center">
-                        {viewMode === 'week' 
+                        {viewMode === 'week'
                             ? `${weekDisplayDays[0].date.toLocaleDateString('default', { month: 'short', day: 'numeric' })} - ${weekDisplayDays[6].date.toLocaleDateString('default', { month: 'short', day: 'numeric' })}`
                             : date.toLocaleString('default', { month: 'long', year: 'numeric' })}
                     </h2>
@@ -734,8 +712,9 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
                                 <div className="flex justify-center items-center space-x-1 h-2">
                                     {d.data.exposures > 0 && <div className={`h-2 w-2 ${activityColors.exposures} rounded-full`}></div>}
                                     {d.data.followUps > 0 && <div className={`h-2 w-2 ${activityColors.followUps} rounded-full`}></div>}
-                                    {d.data.sitdowns?.length > 0 && <div className={`h-2 w-2 ${activityColors.sitdowns} rounded-full`}></div>}
+                                    {(d.data.presentations?.length > 0 || d.data.sitdowns?.length > 0) && <div className={`h-2 w-2 ${activityColors.presentations} rounded-full`}></div>}
                                     {d.data.pbrs > 0 && <div className={`h-2 w-2 ${activityColors.pbrs} rounded-full`}></div>}
+                                    {(d.data.enrolls > 0 || d.data.sitdowns?.some(s=>s==='E')) && <div className={`h-2 w-2 ${activityColors.enrolls} rounded-full`}></div>}
                                 </div>
                             </div>
                         )
@@ -748,7 +727,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
                         const dayClasses = `border rounded-md aspect-square p-1 sm:p-2 flex flex-col ${
                             d.isBlank ? 'bg-transparent border-transparent' : 'cursor-pointer hover:bg-indigo-50'
                         } ${d.isToday ? 'border-2 border-indigo-500' : ''} ${d.isWeekend && !d.isBlank ? 'bg-gray-50' : ''}`;
-                        
+
                         return (
                             <div key={d.day || `blank-${index}`} onClick={() => handleDayClick(d)} className={dayClasses}>
                                 {!d.isBlank && (
@@ -757,8 +736,9 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
                                         <div className="flex justify-center items-end space-x-1 mt-auto h-2">
                                             {d.data.exposures > 0 && <div className={`h-2 w-2 ${activityColors.exposures} rounded-full`}></div>}
                                             {d.data.followUps > 0 && <div className={`h-2 w-2 ${activityColors.followUps} rounded-full`}></div>}
-                                            {d.data.sitdowns?.length > 0 && <div className={`h-2 w-2 ${activityColors.sitdowns} rounded-full`}></div>}
+                                            {(d.data.presentations?.length > 0 || d.data.sitdowns?.length > 0) && <div className={`h-2 w-2 ${activityColors.presentations} rounded-full`}></div>}
                                             {d.data.pbrs > 0 && <div className={`h-2 w-2 ${activityColors.pbrs} rounded-full`}></div>}
+                                            {(d.data.enrolls > 0 || d.data.sitdowns?.some(s=>s==='E')) && <div className={`h-2 w-2 ${activityColors.enrolls} rounded-full`}></div>}
                                         </div>
                                     </>
                                 )}
@@ -774,13 +754,14 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
 };
 
 const TotalsFooter = ({ totals, onShare, isSharing, streaks, goals, onGoalChange, userProfile, onQuickAdd, showGoalInstruction, onDismissGoalInstruction }) => {
-    const [editingGoal, setEditingGoal] = useState(null); 
+    const [editingGoal, setEditingGoal] = useState(null);
     const longestStreaks = userProfile.longestStreaks || {};
     const metrics = [
         { key: 'exposures', label: 'Total Exposures', value: totals.exposures, icon: Target, color: 'indigo' },
         { key: 'followUps', label: 'Follow Ups', value: totals.followUps, icon: Users, color: 'green' },
         { key: 'pbrs', label: 'PBRs', value: totals.pbrs, icon: Users, color: 'purple' },
-        { key: 'threeWays', label: '3-Way Calls', value: totals.threeWays, icon: PhoneCall, color: 'pink' }
+        { key: 'threeWays', label: '3-Way Calls', value: totals.threeWays, icon: PhoneCall, color: 'pink' },
+        { key: 'enrolls', label: 'Memberships Sold', value: totals.enrolls, icon: UserCheck, color: 'teal' }
     ];
     const handleGoalEdit = (e) => {
         if (e.key === 'Enter' || e.type === 'blur') {
@@ -835,7 +816,7 @@ const TotalsFooter = ({ totals, onShare, isSharing, streaks, goals, onGoalChange
                                 <div>
                                     <h4 className={`text-sm sm:text-md font-semibold text-gray-600`}>{metric.label}</h4>
                                     <div className="flex items-center mt-1">
-                                        {metric.key !== 'sitdowns' ? (
+                                        {metric.key !== 'presentations' ? (
                                             <div className="flex items-center space-x-3">
                                                 <button onClick={() => onQuickAdd(metric.key, -1)} className="p-2 rounded-full bg-gray-200 text-gray-600 hover:bg-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500">
                                                     <Minus className="h-4 w-4" />
@@ -846,7 +827,7 @@ const TotalsFooter = ({ totals, onShare, isSharing, streaks, goals, onGoalChange
                                                 </button>
                                             </div>
                                         ) : (
-                                            <p className={`text-4xl sm:text-5xl font-bold text-gray-900`}>{metric.value}</p>
+                                            <p className={`text-4xl sm:text-5xl font-bold text-gray-900`}>{totals.presentations}</p>
                                         )}
                                     </div>
                                 </div>
@@ -865,7 +846,7 @@ const TotalsFooter = ({ totals, onShare, isSharing, streaks, goals, onGoalChange
                             <div className="mt-auto pt-4">
                                 <div className="flex justify-between items-center text-xs text-gray-500">
                                     <span onClick={() => setEditingGoal(metric.key)} className="cursor-pointer hover:text-indigo-600">
-                                        Goal: {editingGoal === metric.key ? 
+                                        Goal: {editingGoal === metric.key ?
                                             <input type="number" defaultValue={goal} onKeyDown={handleGoalEdit} onBlur={handleGoalEdit} autoFocus className="w-12 text-center bg-gray-100 rounded"/> : <span>{goal} <Edit2 className="h-3 w-3 inline-block ml-1"/></span>
                                         }
                                     </span>
@@ -889,9 +870,9 @@ const DayEntryModal = ({ day, data, onClose, onChange }) => {
                 <div className="p-4 sm:p-6 space-y-4 overflow-y-auto max-h-[70vh]">
                    <div className="flex items-center justify-between"><label className="font-medium text-gray-700">Exposures</label><NumberInput value={data.exposures || ''} onChange={e => onChange('exposures', e.target.value)} /></div>
                    <div className="flex items-center justify-between"><label className="font-medium text-gray-700">Follow Ups</label><NumberInput value={data.followUps || ''} onChange={e => onChange('followUps', e.target.value)} /></div>
-                   <div className="flex items-center justify-between"><label className="font-medium text-gray-700">Team Calls</label><NumberInput value={data.teamCalls || ''} onChange={e => onChange('teamCalls', e.target.value)} /></div>
+                   <div className="flex items-center justify-between"><label className="font-medium text-gray-700">Memberships Sold</label><NumberInput value={data.enrolls || ''} onChange={e => onChange('enrolls', e.target.value)} /></div>
                    <div className="flex items-center justify-between"><label className="font-medium text-gray-700">3 Ways</label><NumberInput value={data.threeWays || ''} onChange={e => onChange('threeWays', e.target.value)} /></div>
-                   <SitdownTracker value={data.sitdowns} onChange={val => onChange('sitdowns', val)} />
+                   <PresentationTracker value={data.presentations || data.sitdowns} onChange={val => onChange('presentations', val)} />
                     <div className="flex items-center justify-between"><label className="font-medium text-gray-700">PBRs</label><NumberInput value={data.pbrs || ''} onChange={e => onChange('pbrs', e.target.value)} /></div>
                    <div className="flex items-center justify-between"><label className="font-medium text-gray-700">Gameplans</label><NumberInput value={data.gameplans || ''} onChange={e => onChange('gameplans', e.target.value)} /></div>
                    <div className="flex items-center justify-between"><label className="font-medium text-gray-700">Exercise</label><CheckboxInput checked={!!data.exerc} onChange={e => onChange('exerc', e.target.checked)} /></div>
@@ -903,28 +884,39 @@ const DayEntryModal = ({ day, data, onClose, onChange }) => {
     );
 };
 
-const SitdownTracker = ({ value = [], onChange }) => {
-    const options = { 'P': 'Phone', 'Z': 'Zoom', 'V': 'Video', 'D': 'DM Mtg', 'E': 'Enroll' };
+const PresentationTracker = ({ value = [], onChange }) => {
+    const options = { 'P': 'Phone', 'Z': 'Zoom', 'V': 'Video', 'D': 'DM Mtg' };
     const [isAdding, setIsAdding] = useState(false);
-    const handleAdd = (type) => { const newValue = [...value, type]; onChange(newValue); setIsAdding(false); };
-    const handleRemove = (indexToRemove) => { const newValue = value.filter((_, index) => index !== indexToRemove); onChange(newValue); };
+    
+    // Filter out old 'E' for Enroll type from the list
+    const presentationsOnly = value.filter(item => item !== 'E');
+
+    const handleAdd = (type) => { 
+        const newValue = [...presentationsOnly, type]; 
+        onChange(newValue); 
+        setIsAdding(false); 
+    };
+    const handleRemove = (indexToRemove) => { 
+        const newValue = presentationsOnly.filter((_, index) => index !== indexToRemove); 
+        onChange(newValue); 
+    };
     return (
         <div className="pt-2">
-            <label className="font-medium text-gray-700">Sitdowns ({value.length})</label>
+            <label className="font-medium text-gray-700">Presentations ({presentationsOnly.length})</label>
             <div className="mt-2 space-y-2">
-                {value.map((sitdown, index) => (
+                {presentationsOnly.map((item, index) => (
                     <div key={index} className="flex items-center justify-between bg-gray-100 p-2 rounded-md">
-                        <span className="text-sm">{options[sitdown] || 'Unknown'}</span>
+                        <span className="text-sm">{options[item] || 'Unknown'}</span>
                         <button onClick={() => handleRemove(index)} className="text-red-500"><Trash2 className="h-4 w-4" /></button>
                     </div>
                 ))}
                 {isAdding ? (
                      <select onChange={(e) => handleAdd(e.target.value)} onBlur={() => setIsAdding(false)} className="w-full bg-white border p-2 rounded-md" autoFocus>
-                        <option value="">Select type...</option>
-                        {Object.entries(options).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+                         <option value="">Select type...</option>
+                         {Object.entries(options).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
                      </select>
                 ) : (
-                    <button onClick={() => setIsAdding(true)} className="w-full flex items-center justify-center bg-indigo-100 text-indigo-700 px-3 py-2 rounded-md"><Plus className="h-4 w-4 mr-2" /> Add Sitdown</button>
+                    <button onClick={() => setIsAdding(true)} className="w-full flex items-center justify-center bg-indigo-100 text-indigo-700 px-3 py-2 rounded-md"><Plus className="h-4 w-4 mr-2" /> Add Presentation</button>
                 )}
             </div>
         </div>
@@ -944,7 +936,7 @@ const HotList = ({ user, db }) => {
     const fetchHotlist = useCallback(async () => {
         const allDocsSnap = await getDocs(hotlistColRef);
         const allItems = allDocsSnap.docs.map(d => ({id: d.id, ...d.data()}));
-        
+
         setHotlist(allItems.filter(item => (isArchiveView ? item.isArchived === true : item.isArchived !== true)));
         setActiveProspectsCount(allItems.filter(item => item.isArchived !== true).length);
 
@@ -958,8 +950,8 @@ const HotList = ({ user, db }) => {
     const handleAdd = async (name) => {
         setShowAddModal(false);
         if (!name) return;
-        const newItem = { 
-            name, 
+        const newItem = {
+            name,
             notes: "",
             status: 'Warm',
             lastContacted: null,
@@ -1041,10 +1033,10 @@ const HotList = ({ user, db }) => {
                     </div>
                 </div>
             )}
-            
+
             <div className="my-4 flex items-center justify-end space-x-2">
                 <label htmlFor="sort-prospects" className="text-sm font-medium text-gray-600">Sort by:</label>
-                <select 
+                <select
                     id="sort-prospects"
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
@@ -1085,7 +1077,7 @@ const HotList = ({ user, db }) => {
                                 <div className="text-xs text-gray-500">
                                     Last Contact: {' '}
                                     <span className="font-semibold">
-                                        {item.lastContacted 
+                                        {item.lastContacted
                                             ? new Date(item.lastContacted).toLocaleDateString()
                                             : 'Never'}
                                     </span>
@@ -1134,7 +1126,7 @@ const HotList = ({ user, db }) => {
                                                 );
                                             })}
                                         </div>
-                                        <button 
+                                        <button
                                             onClick={() => handleInstantUpdate(item.id, 'lastContacted', new Date().toISOString())}
                                             className="flex w-full sm:w-auto items-center justify-center space-x-1 px-3 py-1.5 text-xs font-medium rounded-full bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition"
                                         >
@@ -1240,18 +1232,210 @@ const OnboardingModal = ({ onDismiss }) => (
     </div>
 );
 
+const AnalyticsDashboard = ({ db, user }) => {
+    const [stats, setStats] = useState({
+        funnelExposures: 0, 
+        funnelPresentations: 0, 
+        funnelEnrolls: 0,
+        expToPresentationRatio: 0, 
+        presentationToEnrollRatio: 0,
+    });
+    const [loading, setLoading] = useState(true);
+    const [historicalData, setHistoricalData] = useState([]);
+    const [monthName, setMonthName] = useState('');
 
-const AnalyticsDashboard = ({ data }) => {
+    useEffect(() => {
+        const fetchAllAnalyticsData = async () => {
+            if (!user || !db) return;
+            setLoading(true);
+
+            const today = new Date();
+            setMonthName(today.toLocaleString('default', { month: 'long' }));
+            const currentMonthYearId = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+            
+            let lifetimeExposures = 0, lifetimePresentations = 0, lifetimeEnrolls = 0;
+            let currentMonthExposures = 0, currentMonthPresentations = 0, currentMonthEnrolls = 0;
+            
+            const activitiesCollectionRef = collection(db, 'artifacts', appId, 'users', user.uid, 'activities');
+            const allDocsSnap = await getDocs(activitiesCollectionRef);
+
+            allDocsSnap.forEach(doc => {
+                const data = doc.data().dailyData || {};
+                const isCurrentMonth = doc.id === currentMonthYearId;
+
+                Object.values(data).forEach(day => {
+                    const exposures = Number(day.exposures) || 0;
+                    // Backward compatibility for presentations
+                    const presentations = (Array.isArray(day.presentations) ? day.presentations.length : 0) + (Array.isArray(day.sitdowns) ? day.sitdowns.length : 0);
+                    // Backward compatibility for enrolls
+                    const enrolls = (Number(day.enrolls) || 0) + (Array.isArray(day.sitdowns) ? day.sitdowns.filter(s => s === 'E').length : 0);
+
+                    lifetimeExposures += exposures;
+                    lifetimePresentations += presentations;
+                    lifetimeEnrolls += enrolls;
+
+                    if (isCurrentMonth) {
+                        currentMonthExposures += exposures;
+                        currentMonthPresentations += presentations;
+                        currentMonthEnrolls += enrolls;
+                    }
+                });
+            });
+
+            const expToPresentationRatio = lifetimePresentations > 0 ? (lifetimeExposures / lifetimePresentations) : 0;
+            const presentationToEnrollRatio = lifetimeEnrolls > 0 ? (lifetimePresentations / lifetimeEnrolls) : 0;
+            
+            setStats({
+                funnelExposures: currentMonthExposures,
+                funnelPresentations: currentMonthPresentations,
+                funnelEnrolls: currentMonthEnrolls,
+                expToPresentationRatio,
+                presentationToEnrollRatio,
+            });
+            
+            const monthLabels = [];
+            let tempDate = new Date();
+            const monthlyTotals = {};
+
+            for (let i = 0; i < 6; i++) {
+                const y = tempDate.getFullYear();
+                const m = tempDate.getMonth();
+                const myId = `${y}-${String(m + 1).padStart(2, '0')}`;
+                monthLabels.unshift(tempDate.toLocaleString('default', { month: 'short' }));
+                monthlyTotals[myId] = { name: monthLabels[0], Exposures: 0, Presentations: 0 };
+                tempDate.setMonth(tempDate.getMonth() - 1);
+            }
+
+            allDocsSnap.forEach(doc => {
+                if (monthlyTotals[doc.id]) {
+                    const data = doc.data().dailyData || {};
+                    Object.values(data).forEach(day => {
+                        monthlyTotals[doc.id].Exposures += Number(day.exposures) || 0;
+                        monthlyTotals[doc.id].Presentations += (Array.isArray(day.presentations) ? day.presentations.length : 0) + (Array.isArray(day.sitdowns) ? day.sitdowns.length : 0);
+                    });
+                }
+            });
+            
+            setHistoricalData(Object.values(monthlyTotals).reverse());
+            setLoading(false);
+        };
+        fetchAllAnalyticsData();
+    }, [user, db]);
+
+    const getInsight = () => {
+        const { expToPresentationRatio, presentationToEnrollRatio } = stats;
+        if (stats.expToPresentationRatio === 0 && stats.presentationToEnrollRatio === 0) {
+             return {
+                title: "Let's Get Some Data!",
+                text: "Start logging your activities—exposures, presentations, and memberships sold—to unlock powerful insights about your business.",
+                icon: Lightbulb
+            };
+        }
+        if (expToPresentationRatio > 20 && expToPresentationRatio >= presentationToEnrollRatio) {
+            return {
+                title: "Opportunity: Improve Exposure Quality",
+                text: "Your lifetime data suggests it takes a high number of exposures to get a presentation. Focus on refining your initial approach to convert more contacts into meetings.",
+                icon: Target
+            };
+        }
+        if (presentationToEnrollRatio > 12 && presentationToEnrollRatio > expToPresentationRatio) {
+            return {
+                title: "Opportunity: Refine Your Presentation",
+                text: "You're great at getting meetings! Your lifetime data shows an opportunity to improve your closing rate. Consider practicing your presentation or follow-up process.",
+                icon: Award
+            };
+        }
+        return {
+            title: "Keep Up the Consistent Work!",
+            text: "Your business ratios are looking solid. Consistency is key, so continue to focus on your daily activities and filling your funnel.",
+            icon: TrendingUp
+        };
+    };
+
+    if (loading) return <div className="text-center p-10">Loading Analytics...</div>;
+
+    const insight = getInsight();
+    
+    const FunnelStep = ({ value, label, color, isTop = false, isBottom = false }) => {
+        let borderRadius = '';
+        if (isTop) borderRadius = 'rounded-t-lg';
+        if (isBottom) borderRadius = 'rounded-b-lg';
+
+        return (
+            <div className={`p-4 flex justify-between items-center text-white ${color} ${borderRadius}`}>
+                <span className="font-medium">{label}</span>
+                <span className="text-2xl font-bold">{value}</span>
+            </div>
+        );
+    };
+
+    const RatioCard = ({ title, value, detail, icon: Icon }) => (
+        <div className="bg-gray-50 p-4 rounded-lg flex items-start space-x-4">
+            <div className="bg-white p-3 rounded-full shadow">
+                <Icon className="h-6 w-6 text-indigo-600" />
+            </div>
+            <div>
+                <p className="text-sm font-medium text-gray-600">{title}</p>
+                <p className="text-3xl font-bold text-gray-800">{value}</p>
+                <p className="text-xs text-gray-500">{detail}</p>
+            </div>
+        </div>
+    );
+    
     return (
-        <div className="bg-white p-2 sm:p-6 rounded-lg shadow-sm">
-            <h2 className="text-xl sm:text-2xl font-semibold mb-6 text-center sm:text-left">Month-Over-Month Performance</h2>
-            <div style={{ width: '100%', height: 300 }}>
-                <ResponsiveContainer>
-                    <BarChart data={data} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" tick={{fontSize: 12}} /><YAxis tick={{fontSize: 12}} /><Tooltip /><Legend wrapperStyle={{fontSize: "14px"}} />
-                        <Bar dataKey="Exposures" fill="#8884d8" /><Bar dataKey="Follow Ups" fill="#82ca9d" />
-                    </BarChart>
-                </ResponsiveContainer>
+        <div className="space-y-6">
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">Your Business Analytics</h2>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-1 bg-white p-4 rounded-lg shadow-sm">
+                    <h3 className="font-semibold mb-3 text-center text-gray-700">{monthName} Funnel</h3>
+                    <div className="space-y-1">
+                        <FunnelStep value={stats.funnelExposures} label="Exposures" color="bg-indigo-500" isTop />
+                        <div className="flex justify-center items-center text-gray-400 my-1"><ChevronsRight className="h-5 w-5"/></div>
+                        <FunnelStep value={stats.funnelPresentations} label="Presentations" color="bg-purple-500" />
+                        <div className="flex justify-center items-center text-gray-400 my-1"><ChevronsRight className="h-5 w-5"/></div>
+                        <FunnelStep value={stats.funnelEnrolls} label="Memberships Sold" color="bg-green-500" isBottom />
+                    </div>
+                </div>
+
+                <div className="lg:col-span-2 space-y-4">
+                     <RatioCard 
+                        title="Lifetime Exposure-to-Presentation"
+                        value={stats.expToPresentationRatio > 0 ? `${stats.expToPresentationRatio.toFixed(1)} : 1` : 'N/A'}
+                        detail="Exposures needed for one presentation"
+                        icon={Users}
+                     />
+                     <RatioCard 
+                        title="Lifetime Presentation-to-Membership"
+                        value={stats.presentationToEnrollRatio > 0 ? `${stats.presentationToEnrollRatio.toFixed(1)} : 1` : 'N/A'}
+                        detail="Presentations needed for one membership"
+                        icon={Award}
+                     />
+                </div>
+            </div>
+
+            <div className="bg-indigo-50 border-l-4 border-indigo-400 p-4 rounded-r-lg">
+                <div className="flex">
+                    <div className="flex-shrink-0">
+                        <insight.icon className="h-6 w-6 text-indigo-500" />
+                    </div>
+                    <div className="ml-3">
+                        <p className="text-md font-semibold text-indigo-800">{insight.title}</p>
+                        <p className="mt-1 text-sm text-indigo-700">{insight.text}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div className="bg-white p-2 sm:p-6 rounded-lg shadow-sm">
+                <h2 className="text-xl sm:text-2xl font-semibold mb-6 text-center sm:text-left">6-Month Activity Trends</h2>
+                <div style={{ width: '100%', height: 300 }}>
+                    <ResponsiveContainer>
+                        <BarChart data={historicalData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                            <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" tick={{fontSize: 12}} /><YAxis tick={{fontSize: 12}} /><Tooltip /><Legend wrapperStyle={{fontSize: "14px"}} />
+                            <Bar dataKey="Exposures" fill="#6366f1" /><Bar dataKey="Presentations" fill="#a855f7" />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
             </div>
         </div>
     );
@@ -1272,7 +1456,6 @@ const NumberInput = ({ value, onChange, ...props }) => {
 
     const handleChange = (e) => {
         const typedValue = e.target.value;
-        // Allow empty string to clear the input, otherwise parse as a number
         if (typedValue === '' || (!isNaN(typedValue) && Number(typedValue) >= 0)) {
             onChange(e);
         }
@@ -1283,14 +1466,14 @@ const NumberInput = ({ value, onChange, ...props }) => {
             <button type="button" onClick={handleDecrement} className="p-2 rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300 transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50" disabled={currentValue <= 0}>
                 <Minus className="h-4 w-4" />
             </button>
-            <input 
-                type="text" // Use text to better control value and avoid default browser number input UI
-                inputMode="numeric" // Brings up number pad on mobile
+            <input
+                type="text"
+                inputMode="numeric"
                 pattern="[0-9]*"
-                value={value} 
+                value={value}
                 onChange={handleChange}
-                className="w-16 p-1 border border-gray-300 rounded-md text-center text-sm focus:ring-indigo-500 focus:border-indigo-500 transition" 
-                {...props} 
+                className="w-16 p-1 border border-gray-300 rounded-md text-center text-sm focus:ring-indigo-500 focus:border-indigo-500 transition"
+                {...props}
             />
             <button type="button" onClick={handleIncrement} className="p-2 rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300 transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                 <Plus className="h-4 w-4" />
@@ -1328,14 +1511,13 @@ const ConfirmDeleteModal = ({ onClose, onConfirm }) => {
     );
 };
 
-// --- New Report Card Component ---
 const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
     const WEEKS_IN_MONTH = 4.33;
     const metrics = [
         { key: 'exposures', label: 'Exposures', value: weekData.totals.exposures, lastWeek: weekData.lastWeekTotals.exposures, color: 'indigo' },
         { key: 'followUps', label: 'Follow Ups', value: weekData.totals.followUps, lastWeek: weekData.lastWeekTotals.followUps, color: 'green' },
+        { key: 'enrolls', label: 'Memberships Sold', value: weekData.totals.enrolls, lastWeek: weekData.lastWeekTotals.enrolls, color: 'teal' },
         { key: 'pbrs', label: 'PBRs', value: weekData.totals.pbrs, lastWeek: weekData.lastWeekTotals.pbrs, color: 'purple' },
-        { key: 'threeWays', label: '3-Way Calls', value: weekData.totals.threeWays, lastWeek: weekData.lastWeekTotals.threeWays, color: 'pink' }
     ];
 
     return (
@@ -1345,14 +1527,14 @@ const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
                 <p className="text-md text-gray-600">{profile.displayName || 'User'}</p>
                 <p className="text-sm text-gray-500 font-medium">{weekData.dateRange}</p>
             </div>
-            
+
             <div className="space-y-4 mb-6">
                 <h3 className="font-semibold text-gray-700 border-b pb-2">This Week's Activity</h3>
                 {metrics.map(metric => {
                     const monthlyGoal = goals[metric.key] || 0;
                     const weeklyGoal = Math.ceil(monthlyGoal / WEEKS_IN_MONTH);
                     const progress = weeklyGoal > 0 ? (metric.value / weeklyGoal) * 100 : 0;
-                    
+
                     return (
                         <div key={metric.key}>
                             <div className="flex justify-between items-center mb-1">
@@ -1381,20 +1563,20 @@ const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
                     <ul className="text-sm text-gray-600 space-y-2">
                         {weekData.hotlist.map((item, index) => (
                              <li key={item.id} className="flex justify-between items-center border-b border-gray-100 py-1">
-                                <span>{index + 1}. {item.name}</span>
-                                <span className="text-xs text-gray-500">
-                                    {item.lastContacted 
-                                        ? `${new Date(item.lastContacted).toLocaleDateString()}`
-                                        : 'Never'}
-                                </span>
-                            </li>
+                                 <span>{index + 1}. {item.name}</span>
+                                 <span className="text-xs text-gray-500">
+                                     {item.lastContacted
+                                         ? `${new Date(item.lastContacted).toLocaleDateString()}`
+                                         : 'Never'}
+                                 </span>
+                             </li>
                         ))}
                     </ul>
                 ) : (
                     <p className="text-sm text-gray-500">No items in the hotlist.</p>
                 )}
             </div>
-            
+
             <div className="mt-6 pt-4 border-t border-gray-200 text-center text-xs text-gray-400">
                 <p>&copy; 2025 Platinum Toolkit. All Rights Reserved.</p>
                 <p>Unauthorized duplication or distribution is strictly prohibited.</p>
@@ -1404,6 +1586,4 @@ const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
 });
 
 export default App;
-
-
 
