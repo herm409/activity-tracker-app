@@ -7,9 +7,9 @@ import {
     signInWithEmailAndPassword, 
     signOut 
 } from 'firebase/auth';
-import { getFirestore, doc, setDoc, getDoc, collection, getDocs, query, limit, addDoc, deleteDoc, orderBy, where, getCountFromServer, updateDoc } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, getDoc, collection, getDocs, query, limit, addDoc, deleteDoc, orderBy, where, getCountFromServer, updateDoc, onSnapshot } from 'firebase/firestore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Sun, ChevronUp, ChevronDown, Plus, X, List, BarChart2, Target, Users, PhoneCall, Trash2, Trophy, LogOut, Share2, Flame, Edit2, Calendar, Minus, Info, Archive, ArchiveRestore, TrendingUp, ChevronsRight, Award, Lightbulb, UserCheck, Dumbbell, BookOpen, User, Video } from 'lucide-react';
+import { Sun, ChevronUp, ChevronDown, Plus, X, List, BarChart2, Target, Users, PhoneCall, Trash2, Trophy, LogOut, Share2, Flame, Edit2, Calendar, Minus, Info, Archive, ArchiveRestore, TrendingUp, ChevronsRight, Award, Lightbulb, UserCheck, Dumbbell, BookOpen, User, Video, ArrowRight, CheckCircle, XCircle, ArrowUp, ArrowDown } from 'lucide-react';
 // Note: This implementation assumes html2canvas is loaded via a script tag in the main HTML file.
 // <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
@@ -113,7 +113,7 @@ const TabBar = ({ activeTab, setActiveTab }) => {
         { id: 'today', name: 'Today', icon: Sun },
         { id: 'tracker', name: 'Calendar', icon: Calendar },
         { id: 'leaderboard', name: 'Leaderboard', icon: Trophy },
-        { id: 'hotlist', name: '10 in Play', icon: List },
+        { id: 'hotlist', name: 'Prospect Pipeline', icon: List },
         { id: 'analytics', name: 'Analytics', icon: BarChart2 }
     ];
     return (
@@ -470,7 +470,7 @@ const App = () => {
     
     useEffect(() => {
         if (user && db) {
-            if (activeTab === 'tracker' || activeTab === 'leaderboard' || activeTab === 'today') {
+            if (activeTab === 'tracker' || activeTab === 'leaderboard' || activeTab === 'today' || activeTab === 'hotlist') {
                fetchData();
             }
         }
@@ -560,13 +560,15 @@ const App = () => {
 
     const getWeekDataForReport = useCallback(async () => {
         const today = new Date();
-        const dayOfWeek = today.getDay();
+        const dayOfWeek = today.getDay(); // Sunday - 0, Monday - 1
         const startOfWeek = new Date(today);
-        startOfWeek.setDate(today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1));
-        startOfWeek.setHours(0,0,0,0);
+        startOfWeek.setDate(today.getDate() - dayOfWeek); // Set to Sunday
+        startOfWeek.setHours(0, 0, 0, 0);
+
         const endOfWeek = new Date(startOfWeek);
         endOfWeek.setDate(startOfWeek.getDate() + 6);
-        endOfWeek.setHours(23,59,59,999);
+        endOfWeek.setHours(23, 59, 59, 999);
+
         const startOfLastWeek = new Date(startOfWeek);
         startOfLastWeek.setDate(startOfWeek.getDate() - 7);
         const endOfLastWeek = new Date(startOfWeek);
@@ -575,15 +577,15 @@ const App = () => {
         const getWeekTotals = (startDate, endDate) => {
             const totals = { exposures: 0, followUps: 0, presentations: 0, threeWays: 0, enrolls: 0 };
             let current = new Date(startDate);
-            while(current <= endDate) {
+            while (current <= endDate) {
                 const dataSet = current.getMonth() === today.getMonth() ? monthlyData : lastMonthData;
                 const dayData = dataSet[current.getDate()];
-                if(dayData) {
+                if (dayData) {
                     totals.exposures += Number(dayData.exposures) || 0;
                     totals.followUps += Number(dayData.followUps) || 0;
                     totals.presentations += (dayData.presentations?.length || 0) + (Number(dayData.pbrs) || 0);
                     totals.threeWays += Number(dayData.threeWays) || 0;
-                    totals.enrolls += Number(dayData.enrolls) || 0;
+                    totals.enrolls += (Number(dayData.enrolls) || 0) + (Array.isArray(dayData.sitdowns) ? dayData.sitdowns.filter(s => s === 'E').length : 0);
                 }
                 current.setDate(current.getDate() + 1);
             }
@@ -592,25 +594,43 @@ const App = () => {
 
         const thisWeekTotals = getWeekTotals(startOfWeek, endOfWeek);
         const lastWeekTotals = getWeekTotals(startOfLastWeek, endOfLastWeek);
-        const dateRange = `${startOfWeek.toLocaleDateString('default', {month: 'short', day: 'numeric'})} - ${endOfWeek.toLocaleDateString('default', {month: 'short', day: 'numeric'})}`;
+        const dateRange = `${startOfWeek.toLocaleDateString('default', { month: 'short', day: 'numeric' })} - ${endOfWeek.toLocaleDateString('default', { month: 'short', day: 'numeric' })}`;
 
         const hotlistColRef = collection(db, 'artifacts', appId, 'users', user.uid, 'hotlist');
         const allDocsSnap = await getDocs(hotlistColRef);
-        const allItems = allDocsSnap.docs.map(d => ({id: d.id, ...d.data()}));
-        const hotlistForReport = allItems.filter(item => item.isArchived !== true).slice(0, 10);
+        const allItems = allDocsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-        return { totals: thisWeekTotals, lastWeekTotals, dateRange, hotlist: hotlistForReport };
+        const activeInPipeline = allItems.filter(item => item.isArchived !== true && (item.status === 'Hot' || item.status === 'Warm')).length;
+        const closingZone = allItems.filter(item => item.isArchived !== true && item.status === 'Hot');
+
+        const newMembersThisWeek = allItems.filter(item => {
+            if (item.outcome === 'Member' && item.decisionDate) {
+                const decisionDate = new Date(item.decisionDate);
+                return decisionDate >= startOfWeek && decisionDate <= endOfWeek;
+            }
+            return false;
+        }).length;
+
+        return {
+            totals: thisWeekTotals,
+            lastWeekTotals,
+            dateRange,
+            activeInPipeline,
+            closingZone,
+            newMembersThisWeek
+        };
     }, [monthlyData, lastMonthData, user, db]);
 
+
     const handleShareReportAsText = useCallback(async () => {
-        const { totals, lastWeekTotals, dateRange, hotlist: reportHotlist } = await getWeekDataForReport();
+        const { totals, lastWeekTotals, dateRange, activeInPipeline, closingZone, newMembersThisWeek } = await getWeekDataForReport();
 
         let shareText = `My Activity Tracker Report\nFrom: ${userProfile.displayName}\nWeek of: ${dateRange}\n\n`;
         shareText += `**This Week's Numbers:**\n- Exposures: ${totals.exposures}\n- Follow Ups: ${totals.followUps}\n- Presentations: ${totals.presentations}\n- 3-Way Calls: ${totals.threeWays}\n- Memberships Sold: ${totals.enrolls}\n\n`;
-        shareText += `**Last Week's Numbers:**\n- Exposures: ${lastWeekTotals.exposures}\n- Follow Ups: ${lastWeekTotals.followUps}\n- Presentations: ${lastWeekTotals.presentations}\n- 3-Way Calls: ${lastWeekTotals.threeWays}\n- Memberships Sold: ${lastWeekTotals.enrolls}\n\n`;
+        shareText += `**Prospect Pipeline:**\n- Active Prospects: ${activeInPipeline}\n- New Members This Week: ${newMembersThisWeek}\n\n`;
         shareText += "--------------------\n\n";
-        shareText += `My "10 in Play" Hotlist\n\n`;
-        reportHotlist.forEach((item, index) => { shareText += `${index + 1}. ${item.name}\n${item.notes ? `- Notes: ${item.notes}\n\n` : '\n'}`;});
+        shareText += `My "Closing Zone" Prospects\n\n`;
+        closingZone.forEach((item, index) => { shareText += `${index + 1}. ${item.name} (${item.exposureCount || 0} exposures)\n`; });
         shareText += "\nSent from my Activity Tracker App";
 
         try {
@@ -1089,39 +1109,42 @@ const PresentationTracker = ({ value = [], onChange }) => {
 const HotList = ({ user, db }) => {
     const [hotlist, setHotlist] = useState([]);
     const [isArchiveView, setIsArchiveView] = useState(false);
-    const [activeProspectsCount, setActiveProspectsCount] = useState(0);
     const [showAddModal, setShowAddModal] = useState(false);
+    const [itemToDecide, setItemToDecide] = useState(null); // For outcome modal
     const [itemToDelete, setItemToDelete] = useState(null);
-    const [sortBy, setSortBy] = useState('name');
 
     const hotlistColRef = useMemo(() => collection(db, 'artifacts', appId, 'users', user.uid, 'hotlist'), [db, user.uid]);
 
     const fetchHotlist = useCallback(async () => {
-        const allDocsSnap = await getDocs(hotlistColRef);
+        const q = query(hotlistColRef, orderBy('name'));
+        const allDocsSnap = await getDocs(q);
         const allItems = allDocsSnap.docs.map(d => ({id: d.id, ...d.data()}));
 
         setHotlist(allItems.filter(item => (isArchiveView ? item.isArchived === true : item.isArchived !== true)));
-        setActiveProspectsCount(allItems.filter(item => item.isArchived !== true).length);
-
     }, [hotlistColRef, isArchiveView]);
 
     useEffect(() => {
-        fetchHotlist();
-    }, [isArchiveView, fetchHotlist]);
-
-
+        const unsubscribe = onSnapshot(hotlistColRef, () => {
+            fetchHotlist();
+        });
+        return () => unsubscribe();
+    }, [fetchHotlist]);
+    
     const handleAdd = async (name) => {
         setShowAddModal(false);
         if (!name) return;
         const newItem = {
             name,
             notes: "",
-            status: 'Warm',
+            status: 'Cold', // Start as Cold
             lastContacted: null,
-            isArchived: false
+            isArchived: false,
+            exposureCount: 0,
+            nextActionDate: null,
+            outcome: null,
+            decisionDate: null
         };
         await addDoc(hotlistColRef, newItem);
-        fetchHotlist();
     };
 
     const debouncedUpdate = useMemo(() => debounce(async (id, field, value) => {
@@ -1133,216 +1156,224 @@ const HotList = ({ user, db }) => {
         setHotlist(prevList => prevList.map(item => item.id === id ? { ...item, [field]: value } : item));
         debouncedUpdate(id, field, value);
     };
-
-    const handleInstantUpdate = async (id, field, value) => {
+    
+    const handleInstantUpdate = async (id, update) => {
         const docRef = doc(hotlistColRef, id);
-        await updateDoc(docRef, { [field]: value });
-        fetchHotlist();
+        await updateDoc(docRef, update);
+    };
+
+    const handleSetOutcome = async (outcome) => {
+        if (!itemToDecide) return;
+        const update = {
+            isArchived: true,
+            outcome: outcome,
+            decisionDate: new Date().toISOString()
+        };
+        await handleInstantUpdate(itemToDecide.id, update);
+        setItemToDecide(null);
     };
 
     const handleDelete = async () => {
         if (!itemToDelete) return;
         const docRef = doc(hotlistColRef, itemToDelete);
         await deleteDoc(docRef);
-        fetchHotlist();
         setItemToDelete(null);
     };
 
     const statusConfig = {
-        Hot: { text: 'Hot', color: 'text-red-800', bg: 'bg-red-100', ring: 'ring-red-500' },
-        Warm: { text: 'Warm', color: 'text-amber-800', bg: 'bg-amber-100', ring: 'ring-amber-500' },
-        Cold: { text: 'Cold', color: 'text-blue-800', bg: 'bg-blue-100', ring: 'ring-blue-500' },
+        Hot: { title: 'HOT - Closing Zone', icon: Flame, color: 'red', description: 'Prospects who have seen a presentation. Follow up to close!'},
+        Warm: { title: 'WARM - Building Interest', icon: TrendingUp, color: 'amber', description: 'Actively sending tools and having conversations.'},
+        Cold: { title: 'COLD - Prospect List', icon: Users, color: 'blue', description: 'New prospects to start conversations with.'},
     };
 
-    const progress = Math.min((activeProspectsCount / 10) * 100, 100);
-
-    const sortedList = useMemo(() => {
-        const statusOrder = { Hot: 1, Warm: 2, Cold: 3 };
-        return [...hotlist].sort((a, b) => {
-            if (sortBy === 'name') {
-                return a.name.localeCompare(b.name);
+    const groupedProspects = useMemo(() => {
+        const groups = { Hot: [], Warm: [], Cold: [] };
+        hotlist.forEach(p => {
+            if (p.status === 'Hot' || p.status === 'Warm' || p.status === 'Cold') {
+                groups[p.status].push(p);
             }
-            if (sortBy === 'lastContacted') {
-                if (!a.lastContacted) return 1;
-                if (!b.lastContacted) return -1;
-                return new Date(b.lastContacted) - new Date(a.lastContacted);
-            }
-            if (sortBy === 'status') {
-                return (statusOrder[a.status] || 3) - (statusOrder[b.status] || 3);
-            }
-            return 0;
         });
-    }, [hotlist, sortBy]);
+        return groups;
+    }, [hotlist]);
 
     return (
-        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
-             {showAddModal && <AddHotlistItemModal onClose={() => setShowAddModal(false)} onAdd={handleAdd} />}
-             {itemToDelete && <ConfirmDeleteModal onConfirm={handleDelete} onClose={() => setItemToDelete(null)} />}
-            <div className="flex justify-between items-center mb-2">
-                <h2 className="text-xl sm:text-2xl font-semibold">{isArchiveView ? 'Archived Prospects' : '10 in Play / Hot List'}</h2>
-                <button onClick={() => setIsArchiveView(!isArchiveView)} className="flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-800">
-                    {isArchiveView ? <><List className="h-4 w-4 mr-1"/> View Active List</> : <><Archive className="h-4 w-4 mr-1"/> View Archive</>}
+        <div className="space-y-6">
+            {showAddModal && <AddHotlistItemModal onClose={() => setShowAddModal(false)} onAdd={handleAdd} />}
+            {itemToDecide && <OutcomeModal onClose={() => setItemToDecide(null)} onDecide={handleSetOutcome} />}
+            {itemToDelete && <ConfirmDeleteModal onConfirm={handleDelete} onClose={() => setItemToDelete(null)} />}
+            
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                <div>
+                     <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">Prospect Pipeline</h2>
+                     <p className="text-sm text-gray-500 mt-1">Manage your prospects from initial contact to decision.</p>
+                </div>
+                <button onClick={() => setIsArchiveView(!isArchiveView)} className="flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-800 mt-3 sm:mt-0">
+                    {isArchiveView ? <><List className="h-4 w-4 mr-1"/> View Active Pipeline</> : <><Archive className="h-4 w-4 mr-1"/> View Archive</>}
                 </button>
             </div>
-
-            {!isArchiveView && (
-                 <div className="mb-4">
-                    <div className="flex justify-between items-center text-sm font-medium text-gray-600 mb-1">
-                        <span>Progress to 10 Prospects</span>
-                        <span>{activeProspectsCount}/10</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2.5">
-                        <div className="bg-indigo-600 h-2.5 rounded-full" style={{ width: `${progress}%` }}></div>
-                    </div>
-                </div>
-            )}
-
-            <div className="my-4 flex items-center justify-end space-x-2">
-                <label htmlFor="sort-prospects" className="text-sm font-medium text-gray-600">Sort by:</label>
-                <select
-                    id="sort-prospects"
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
-                    className="rounded-md border-gray-300 shadow-sm text-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-                >
-                    <option value="name">Name (A-Z)</option>
-                    <option value="lastContacted">Last Contact (Newest)</option>
-                    <option value="status">Status (Hot-Cold)</option>
-                </select>
-            </div>
-
-            <div className="space-y-4">
-                {sortedList.length > 0 ? sortedList.map(item => {
-                    const currentStatus = item.status || 'Warm';
-                    const { text, color, bg } = statusConfig[currentStatus];
-
-                    return (
-                        <div key={item.id} className="p-4 border rounded-lg bg-white shadow-sm transition-shadow hover:shadow-md">
-                            <div className="flex justify-between items-start">
-                                <input
-                                    type="text"
-                                    defaultValue={item.name}
-                                    onChange={(e) => handleUpdate(item.id, 'name', e.target.value)}
-                                    className="text-md sm:text-lg font-semibold border-none p-0 w-full focus:ring-0"
-                                    placeholder="Enter name..."
-                                />
-                                {!isArchiveView && (
-                                    <button onClick={() => handleInstantUpdate(item.id, 'isArchived', true)} className="text-gray-400 hover:text-indigo-600 ml-2" title="Archive Prospect">
-                                        <Archive className="h-5 w-5" />
-                                    </button>
-                                )}
-                            </div>
-
-                            <div className="flex items-center space-x-4 mt-2">
-                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${bg} ${color}`}>
-                                    {text}
-                                </span>
-                                <div className="text-xs text-gray-500">
-                                    Last Contact: {' '}
-                                    <span className="font-semibold">
-                                        {item.lastContacted
-                                            ? new Date(item.lastContacted).toLocaleDateString()
-                                            : 'Never'}
-                                    </span>
+            
+            {isArchiveView ? (
+                <ArchivedProspectsList list={hotlist} onUnarchive={handleInstantUpdate} onDelete={setItemToDelete} />
+            ) : (
+                <div className="space-y-8">
+                    {Object.keys(statusConfig).map(statusKey => {
+                        const { title, icon: Icon, color, description } = statusConfig[statusKey];
+                        const prospects = groupedProspects[statusKey];
+                        return (
+                            <div key={statusKey}>
+                                <div className={`flex items-center pb-2 border-b-2 border-${color}-500`}>
+                                    <Icon className={`h-6 w-6 text-${color}-500 mr-3`} />
+                                    <div>
+                                        <h3 className="text-lg font-bold text-gray-800">{title} ({prospects.length})</h3>
+                                        <p className="text-xs text-gray-500">{description}</p>
+                                    </div>
                                 </div>
-                            </div>
-
-                            <textarea
-                                defaultValue={item.notes}
-                                onChange={(e) => handleUpdate(item.id, 'notes', e.target.value)}
-                                placeholder="Add notes..."
-                                className="mt-3 w-full text-sm text-gray-600 border-gray-200 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                                rows="2"
-                            ></textarea>
-
-                            <div className="mt-3 pt-3 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between space-y-3 sm:space-y-0">
-                                {isArchiveView ? (
-                                    <div className="flex items-center space-x-2">
-                                        <button onClick={() => handleInstantUpdate(item.id, 'isArchived', false)} className="flex items-center space-x-1 px-3 py-1.5 text-xs font-medium rounded-full bg-green-100 text-green-700 hover:bg-green-200 transition">
-                                            <ArchiveRestore className="h-3 w-3" />
-                                            <span>Unarchive</span>
-                                        </button>
-                                        <button onClick={() => setItemToDelete(item.id)} className="flex items-center space-x-1 px-3 py-1.5 text-xs font-medium rounded-full bg-red-100 text-red-700 hover:bg-red-200 transition">
-                                            <Trash2 className="h-3 w-3" />
-                                            <span>Delete</span>
-                                        </button>
+                                {prospects.length > 0 ? (
+                                    <div className="mt-4 space-y-4">
+                                        {prospects.map(item => (
+                                            <ProspectCard 
+                                                key={item.id} 
+                                                item={item} 
+                                                onUpdate={handleUpdate} 
+                                                onInstantUpdate={handleInstantUpdate} 
+                                                onDecide={setItemToDecide}
+                                            />
+                                        ))}
                                     </div>
                                 ) : (
-                                    <>
-                                        <div className="flex items-center space-x-2">
-                                            <span className="text-xs font-medium text-gray-500 hidden sm:inline">Status:</span>
-                                            {Object.keys(statusConfig).map(statusKey => {
-                                                const { text, ring } = statusConfig[statusKey];
-                                                const isSelected = currentStatus === statusKey;
-                                                return (
-                                                    <button
-                                                        key={statusKey}
-                                                        onClick={() => handleInstantUpdate(item.id, 'status', statusKey)}
-                                                        className={`px-3 py-1 text-xs font-medium rounded-full transition-all ${
-                                                            isSelected
-                                                                ? `${statusConfig[statusKey].bg} ${statusConfig[statusKey].color} ring-2 ${ring}`
-                                                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                                        }`}
-                                                    >
-                                                        {text}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                        <button
-                                            onClick={() => handleInstantUpdate(item.id, 'lastContacted', new Date().toISOString())}
-                                            className="flex w-full sm:w-auto items-center justify-center space-x-1 px-3 py-1.5 text-xs font-medium rounded-full bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition"
-                                        >
-                                            <Calendar className="h-3 w-3" />
-                                            <span>Log Today's Contact</span>
-                                        </button>
-                                    </>
+                                    <div className="text-center py-8 px-4 mt-4 bg-gray-50 rounded-lg">
+                                        <p className="text-sm text-gray-500">No prospects in this stage.</p>
+                                    </div>
                                 )}
                             </div>
-                        </div>
-                    );
-                }) : (
-                     <div className="text-center py-10 px-6 bg-gray-50 rounded-lg">
-                        {isArchiveView ? (
-                            <>
-                                <Archive className="mx-auto h-12 w-12 text-gray-400" />
-                                <h3 className="mt-2 text-lg font-semibold text-gray-900">Archive is Empty</h3>
-                                <p className="mt-1 text-sm text-gray-500">
-                                    When you archive prospects, they will appear here.
-                                </p>
-                            </>
-                        ) : (
-                            <>
-                                <List className="mx-auto h-12 w-12 text-gray-400" />
-                                <h3 className="mt-2 text-lg font-semibold text-gray-900">Build Your Hot List</h3>
-                                <p className="mt-1 text-sm text-gray-500">
-                                    This is your list of key prospects. Click the button below to add your first one.
-                                </p>
-                                <div className="mt-6">
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowAddModal(true)}
-                                        className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                                    >
-                                        <Plus className="-ml-1 mr-2 h-5 w-5" />
-                                        Add First Prospect
-                                    </button>
-                                </div>
-                            </>
-                        )}
-                    </div>
-                )}
-            </div>
-            {!isArchiveView && (
-                <div className="mt-4 flex justify-end">
-                    <button onClick={() => setShowAddModal(true)} className="flex items-center bg-indigo-600 text-white px-3 py-2 rounded-md">
-                        <Plus className="h-5 w-5 mr-1" /> Add Prospect
-                    </button>
+                        )
+                    })}
                 </div>
             )}
+
+            <div className="mt-6 flex justify-end">
+                <button onClick={() => setShowAddModal(true)} className="flex items-center bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 shadow-sm">
+                    <Plus className="h-5 w-5 mr-2" /> Add Prospect
+                </button>
+            </div>
         </div>
     );
 };
+
+const ProspectCard = ({ item, onUpdate, onInstantUpdate, onDecide }) => {
+    const isOverdue = item.nextActionDate && new Date(item.nextActionDate) < new Date();
+    const exposureCount = item.exposureCount || 0;
+    
+    const incrementExposure = () => {
+        onInstantUpdate(item.id, { exposureCount: exposureCount + 1 });
+    };
+
+    const getExposureColor = () => {
+        if (exposureCount >= 5 && exposureCount <= 12) return 'bg-green-100 text-green-800';
+        if (exposureCount > 12) return 'bg-amber-100 text-amber-800';
+        return 'bg-gray-100 text-gray-800';
+    };
+
+    return (
+        <div className={`p-4 border rounded-lg bg-white shadow-sm transition-shadow hover:shadow-md ${isOverdue ? 'border-red-500 border-2' : ''}`}>
+             <div className="flex justify-between items-start">
+                <input
+                    type="text"
+                    defaultValue={item.name}
+                    onChange={(e) => onUpdate(item.id, 'name', e.target.value)}
+                    className="text-lg font-semibold border-none p-0 w-full focus:ring-0"
+                    placeholder="Enter name..."
+                />
+                 <div className={`flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${getExposureColor()}`}>
+                     <span>{exposureCount}</span>
+                     <span className="ml-1.5 hidden sm:inline">Exposures</span>
+                 </div>
+            </div>
+
+            <div className="mt-3 space-y-3">
+                 <textarea
+                    defaultValue={item.notes}
+                    onChange={(e) => onUpdate(item.id, 'notes', e.target.value)}
+                    placeholder="Add notes..."
+                    className="w-full text-sm text-gray-600 border-gray-200 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                    rows="2"
+                ></textarea>
+
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                        <label htmlFor={`next-action-${item.id}`} className="text-xs font-medium text-gray-500">Next Action:</label>
+                        <input
+                            id={`next-action-${item.id}`}
+                            type="date"
+                            defaultValue={item.nextActionDate}
+                            onChange={(e) => onInstantUpdate(item.id, { nextActionDate: e.target.value })}
+                            className={`p-1 border rounded-md text-xs ${isOverdue ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
+                        />
+                    </div>
+                    <button onClick={incrementExposure} className="mt-2 sm:mt-0 flex items-center justify-center space-x-1 px-3 py-1.5 text-xs font-medium rounded-full bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition w-full sm:w-auto">
+                        <Plus className="h-3 w-3" />
+                        <span>Log Exposure</span>
+                    </button>
+                </div>
+            </div>
+
+            <div className="mt-3 pt-3 border-t border-gray-100 flex flex-wrap items-center justify-end gap-2">
+                {item.status === 'Cold' && <button onClick={() => onInstantUpdate(item.id, {status: 'Warm'})} className="ActionButton"><ArrowRight className="h-4 w-4 mr-1"/> Move to Warm</button>}
+                {item.status === 'Warm' && <>
+                    <button onClick={() => onInstantUpdate(item.id, {status: 'Cold'})} className="ActionButton ActionButton-Secondary"><ArrowDown className="h-4 w-4 mr-1"/> Move to Cold</button>
+                    <button onClick={() => onInstantUpdate(item.id, {status: 'Hot'})} className="ActionButton"><ArrowUp className="h-4 w-4 mr-1"/> Move to Hot</button>
+                </>}
+                 {item.status === 'Hot' && <>
+                    <button onClick={() => onInstantUpdate(item.id, {status: 'Warm'})} className="ActionButton ActionButton-Secondary"><ArrowDown className="h-4 w-4 mr-1"/> Move to Warm</button>
+                    <button onClick={() => onDecide(item)} className="ActionButton ActionButton-Success"><CheckCircle className="h-4 w-4 mr-1"/> Decision Made</button>
+                 </>}
+            </div>
+        </div>
+    );
+};
+
+const ArchivedProspectsList = ({ list, onUnarchive, onDelete }) => {
+    if (list.length === 0) {
+        return (
+            <div className="text-center py-10 px-6 bg-gray-50 rounded-lg">
+                <Archive className="mx-auto h-12 w-12 text-gray-400" />
+                <h3 className="mt-2 text-lg font-semibold text-gray-900">Archive is Empty</h3>
+                <p className="mt-1 text-sm text-gray-500">
+                    When you mark a prospect's decision as final, they will appear here.
+                </p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-3">
+            {list.map(item => (
+                <div key={item.id} className="p-3 border rounded-lg bg-white shadow-sm flex flex-col sm:flex-row justify-between sm:items-center">
+                    <div>
+                        <p className="font-semibold">{item.name}</p>
+                        <p className={`text-sm font-medium ${item.outcome === 'Member' ? 'text-green-600' : 'text-red-600'}`}>
+                            Outcome: {item.outcome || 'Archived'}
+                        </p>
+                         <p className="text-xs text-gray-500">
+                            Decision Date: {item.decisionDate ? new Date(item.decisionDate).toLocaleDateString() : 'N/A'}
+                        </p>
+                    </div>
+                    <div className="flex items-center space-x-2 mt-3 sm:mt-0">
+                        <button onClick={() => onUnarchive(item.id, { isArchived: false, outcome: null })} className="flex items-center space-x-1 px-3 py-1.5 text-xs font-medium rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200 transition">
+                            <ArchiveRestore className="h-3 w-3" />
+                            <span>Unarchive</span>
+                        </button>
+                        <button onClick={() => onDelete(item.id)} className="flex items-center space-x-1 px-3 py-1.5 text-xs font-medium rounded-full bg-red-100 text-red-700 hover:bg-red-200 transition">
+                            <Trash2 className="h-3 w-3" />
+                            <span>Delete</span>
+                        </button>
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+};
+
 
 const DisplayNameModal = ({ onSave, onClose, currentName }) => {
     const [name, setName] = useState(currentName || '');
@@ -1672,14 +1703,45 @@ const ConfirmDeleteModal = ({ onClose, onConfirm }) => {
     );
 };
 
+const OutcomeModal = ({ onClose, onDecide }) => {
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
+                <div className="p-6">
+                    <h3 className="text-xl font-semibold">Record Final Decision</h3>
+                    <p className="mt-2 text-gray-600">What was the outcome for this prospect?</p>
+                </div>
+                <div className="p-4 flex flex-col space-y-3">
+                     <button onClick={() => onDecide('Member')} className="w-full flex items-center justify-center p-3 text-white bg-green-500 hover:bg-green-600 rounded-md">
+                        <CheckCircle className="h-5 w-5 mr-2" /> Became a Member
+                    </button>
+                    <button onClick={() => onDecide('Not Interested')} className="w-full flex items-center justify-center p-3 text-white bg-red-500 hover:bg-red-600 rounded-md">
+                       <XCircle className="h-5 w-5 mr-2" /> Not Interested
+                    </button>
+                </div>
+                 <div className="p-4 bg-gray-50 flex justify-end">
+                    <button onClick={onClose} className="bg-gray-200 px-4 py-2 rounded-md">Cancel</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
     const WEEKS_IN_MONTH = 4.33;
+    const { totals, lastWeekTotals, dateRange, activeInPipeline, closingZone, newMembersThisWeek } = weekData;
+
     const metrics = [
-        { key: 'exposures', label: 'Exposures', value: weekData.totals.exposures, lastWeek: weekData.lastWeekTotals.exposures, color: 'indigo' },
-        { key: 'followUps', label: 'Follow Ups', value: weekData.totals.followUps, lastWeek: weekData.lastWeekTotals.followUps, color: 'green' },
-        { key: 'presentations', label: 'Presentations', value: weekData.totals.presentations, lastWeek: weekData.lastWeekTotals.presentations, color: 'purple' },
-        { key: 'threeWays', label: '3-Way Calls', value: weekData.totals.threeWays, lastWeek: weekData.lastWeekTotals.threeWays, color: 'pink' },
-        { key: 'enrolls', label: 'Memberships Sold', value: weekData.totals.enrolls, lastWeek: weekData.lastWeekTotals.enrolls, color: 'teal' },
+        { key: 'exposures', label: 'Exposures', value: totals.exposures, lastWeek: lastWeekTotals.exposures, color: 'indigo' },
+        { key: 'followUps', label: 'Follow Ups', value: totals.followUps, lastWeek: lastWeekTotals.followUps, color: 'green' },
+        { key: 'presentations', label: 'Presentations', value: totals.presentations, lastWeek: lastWeekTotals.presentations, color: 'purple' },
+        { key: 'threeWays', label: '3-Way Calls', value: totals.threeWays, lastWeek: lastWeekTotals.threeWays, color: 'pink' },
+        { key: 'enrolls', label: 'Memberships Sold', value: totals.enrolls, lastWeek: lastWeekTotals.enrolls, color: 'teal' },
+    ];
+
+    const pipelineMetrics = [
+        { label: 'Active in Pipeline', value: activeInPipeline },
+        { label: 'New Members This Week', value: newMembersThisWeek }
     ];
 
     return (
@@ -1687,55 +1749,49 @@ const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
             <div className="text-center mb-6">
                 <h1 className="text-2xl font-bold text-gray-800">Weekly Activity Report</h1>
                 <p className="text-md text-gray-600">{profile.displayName || 'User'}</p>
-                <p className="text-sm text-gray-500 font-medium">{weekData.dateRange}</p>
+                <p className="text-sm text-gray-500 font-medium">{dateRange}</p>
             </div>
 
             <div className="space-y-4 mb-6">
                 <h3 className="font-semibold text-gray-700 border-b pb-2">This Week's Activity</h3>
-                {metrics.map(metric => {
-                    const monthlyGoal = goals[metric.key] || 0;
-                    const weeklyGoal = Math.ceil(monthlyGoal / WEEKS_IN_MONTH);
-                    const progress = weeklyGoal > 0 ? (metric.value / weeklyGoal) * 100 : 0;
-
-                    return (
-                        <div key={metric.key}>
-                            <div className="flex justify-between items-center mb-1">
-                                <h4 className="font-semibold text-gray-600">{metric.label}</h4>
-                                <div className="text-right">
-                                    <p className="font-bold text-xl text-gray-800">{metric.value}</p>
-                                    <p className="text-xs text-gray-400">Last Week: {metric.lastWeek}</p>
-                                </div>
+                {metrics.map(metric => (
+                    <div key={metric.key}>
+                        <div className="flex justify-between items-center mb-1">
+                            <h4 className="font-semibold text-gray-600">{metric.label}</h4>
+                            <div className="text-right">
+                                <p className="font-bold text-xl text-gray-800">{metric.value}</p>
+                                <p className="text-xs text-gray-400">Last Week: {metric.lastWeek}</p>
                             </div>
-                            {weeklyGoal > 0 && (
-                                <>
-                                    <div className="w-full bg-gray-200 rounded-full h-1.5">
-                                        <div className={`bg-${metric.color}-500 h-1.5 rounded-full`} style={{ width: `${Math.min(progress, 100)}%` }}></div>
-                                    </div>
-                                    <p className="text-right text-xs text-gray-500 mt-1">Weekly Goal: {weeklyGoal}</p>
-                                </>
-                            )}
                         </div>
-                    );
-                })}
+                    </div>
+                ))}
+            </div>
+            
+            <div className="space-y-4 mb-6">
+                 <h3 className="font-semibold text-gray-700 border-b pb-2">Prospect Pipeline</h3>
+                 {pipelineMetrics.map(metric => (
+                     <div key={metric.label} className="flex justify-between items-center">
+                         <h4 className="font-semibold text-gray-600">{metric.label}</h4>
+                         <p className="font-bold text-xl text-gray-800">{metric.value}</p>
+                     </div>
+                 ))}
             </div>
 
             <div>
-                <h3 className="font-semibold text-gray-700 border-b pb-2 mb-3">10 in Play</h3>
-                {weekData.hotlist && weekData.hotlist.length > 0 ? (
+                <h3 className="font-semibold text-gray-700 border-b pb-2 mb-3">Closing Zone (Hot Prospects)</h3>
+                {closingZone && closingZone.length > 0 ? (
                     <ul className="text-sm text-gray-600 space-y-2">
-                        {weekData.hotlist.map((item, index) => (
+                        {closingZone.map((item, index) => (
                              <li key={item.id} className="flex justify-between items-center border-b border-gray-100 py-1">
                                  <span>{index + 1}. {item.name}</span>
-                                 <span className="text-xs text-gray-500">
-                                     {item.lastContacted
-                                         ? `${new Date(item.lastContacted).toLocaleDateString()}`
-                                         : 'Never'}
+                                 <span className="text-xs font-bold bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
+                                     {item.exposureCount || 0} exposures
                                  </span>
                              </li>
                         ))}
                     </ul>
                 ) : (
-                    <p className="text-sm text-gray-500">No items in the hotlist.</p>
+                    <p className="text-sm text-gray-500">No prospects in the closing zone.</p>
                 )}
             </div>
 
@@ -1748,8 +1804,5 @@ const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
 });
 
 export default App;
-
-
-
 
 
