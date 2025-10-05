@@ -2330,25 +2330,55 @@ const App = () => {
 
     const streaks = useMemo(() => {
         const calculateStreak = (activityKey) => {
-            if (!user || !userProfile.uid || !monthlyData || !lastMonthData) return 0;
+            if (!user || !userProfile.uid) return 0;
+            
             let currentStreak = 0;
             const today = new Date();
+            today.setHours(0, 0, 0, 0); // Normalize today to the start of the day
+            
             let dayToCheck = new Date(today);
+            
+            // First, check if there was activity yesterday.
+            const yesterday = new Date(today);
+            yesterday.setDate(today.getDate() - 1);
+            
+            const yesterdayMonthData = yesterday.getMonth() === today.getMonth() ? monthlyData : lastMonthData;
+            const yesterdayData = yesterdayMonthData ? yesterdayMonthData[yesterday.getDate()] : null;
+
+            let hasActivityYesterday = false;
+            if (yesterdayData) {
+                if (activityKey === 'presentations') hasActivityYesterday = (yesterdayData.presentations?.length > 0) || (Number(yesterdayData.pbrs) > 0);
+                else if (activityKey === 'enrolls') hasActivityYesterday = (yesterdayData.enrolls && Number(yesterdayData.enrolls) > 0) || (yesterdayData.sitdowns && yesterdayData.sitdowns.some(s => s === 'E'));
+                else hasActivityYesterday = Number(yesterdayData[activityKey]) > 0;
+            }
+
+            // If there's no activity today, our starting point for the streak is yesterday.
+            const todayData = monthlyData ? monthlyData[today.getDate()] : null;
+            let hasActivityToday = false;
+             if (todayData) {
+                if (activityKey === 'presentations') hasActivityToday = (todayData.presentations?.length > 0) || (Number(todayData.pbrs) > 0);
+                else if (activityKey === 'enrolls') hasActivityToday = (todayData.enrolls && Number(todayData.enrolls) > 0) || (todayData.sitdowns && todayData.sitdowns.some(s => s === 'E'));
+                else hasActivityToday = Number(todayData[activityKey]) > 0;
+            }
+
+            // If no activity today, start counting from yesterday. Otherwise, start from today.
+            if (!hasActivityToday) {
+                dayToCheck.setDate(dayToCheck.getDate() - 1);
+            }
+
+            // Now, loop backwards to count the streak
             while (true) {
                 const monthData = dayToCheck.getMonth() === today.getMonth() ? monthlyData : lastMonthData;
                 if (!monthData) break;
+                
                 const dayData = monthData[dayToCheck.getDate()];
                 let hasActivity = false;
                 if (dayData) {
-                    if (activityKey === 'presentations') {
-                        hasActivity = (dayData.presentations?.length > 0) || (Number(dayData.pbrs) > 0);
-                    } else if (activityKey === 'enrolls') {
-                        hasActivity = (dayData.enrolls && Number(dayData.enrolls) > 0) || (dayData.sitdowns && dayData.sitdowns.some(s => s === 'E'));
-                    } else {
-                         if (Array.isArray(dayData[activityKey])) hasActivity = dayData[activityKey].length > 0;
-                         else hasActivity = Number(dayData[activityKey]) > 0;
-                    }
+                    if (activityKey === 'presentations') hasActivity = (dayData.presentations?.length > 0) || (Number(dayData.pbrs) > 0);
+                    else if (activityKey === 'enrolls') hasActivity = (dayData.enrolls && Number(dayData.enrolls) > 0) || (dayData.sitdowns && dayData.sitdowns.some(s => s === 'E'));
+                    else hasActivity = Number(dayData[activityKey]) > 0;
                 }
+                
                 if (hasActivity) {
                     currentStreak++;
                     dayToCheck.setDate(dayToCheck.getDate() - 1);
@@ -2465,4 +2495,5 @@ const App = () => {
 };
 
 export default App;
+
 
