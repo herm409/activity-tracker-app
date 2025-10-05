@@ -294,10 +294,12 @@ const TODAY_DASHBOARD_DISCIPLINES = [
     { key: 'personalDevelopment', label: 'Personal Development', icon: BookOpen },
 ];
 
+const EMPTY_DAY_DATA = {};
+
 const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAddPresentation, onShare, isSharing, onLogFollowUp, onLogExposure }) => {
     const [dismissedStreaks, setDismissedStreaks] = useState({});
     const today = new Date();
-    const todayData = monthlyData[today.getDate()] || {};
+    const todayData = monthlyData[today.getDate()] || EMPTY_DAY_DATA;
 
     const handleDismissStreak = (metricKey) => {
         setDismissedStreaks(prev => ({ ...prev, [metricKey]: true }));
@@ -2614,4 +2616,3 @@ const App = () => {
 };
 
 export default App;
-
