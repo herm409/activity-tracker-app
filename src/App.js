@@ -2085,29 +2085,53 @@ const App = () => {
         const day = date.getDate();
         const targetMonthId = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 
+        // --- Logic for CURRENTLY VIEWED month ---
         if (targetMonthId === monthYearId) {
+            // Update local state for immediate UI feedback
             const updatedData = { ...monthlyData, [day]: { ...monthlyData[day], [field]: value } };
             setMonthlyData(updatedData);
-            isDirtyRef.current = true; // Mark data as dirty
+            
+            // Mark as dirty for save-on-exit
+            isDirtyRef.current = true;
+            
+            // Use the existing debounced save which saves the entire object
             debouncedSave(updatedData, monthlyGoals, monthYearId);
+
+        // --- Logic for ANY OTHER month (past or future) ---
         } else {
-            const handleSave = async () => {
+            // Provide immediate UI feedback if it's the previous month (visible in week view)
+            if (targetMonthId === lastMonthYearId) {
+                const updatedLastMonthData = { ...lastMonthData, [day]: { ...lastMonthData[day], [field]: value } };
+                setLastMonthData(updatedLastMonthData);
+            }
+
+            // Perform a direct, atomic update to Firestore. This is safer.
+            const saveAtomicUpdate = async () => {
                 if (!user || !db) return;
-
-                if(targetMonthId === lastMonthYearId) {
-                    const updatedLastMonthData = { ...lastMonthData, [day]: { ...lastMonthData[day], [field]: value } };
-                    setLastMonthData(updatedLastMonthData);
-                }
-
                 const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', targetMonthId);
-                const docSnap = await getDoc(docRef);
-                const existingData = docSnap.exists() ? docSnap.data() : { dailyData: {}, monthlyGoals: {} };
-                const updatedDailyData = { ...existingData.dailyData, [day]: { ...existingData.dailyData[day], [field]: value } };
+                const fieldPath = `dailyData.${day}.${field}`;
+                
+                try {
+                    // Atomically update just the one field.
+                    await updateDoc(docRef, { [fieldPath]: value });
 
-                await setDoc(docRef, { ...existingData, dailyData: updatedDailyData }, { merge: true });
-                updateLeaderboard(updatedDailyData, targetMonthId);
+                    // To update the leaderboard, we need the full month's data.
+                    const updatedDocSnap = await getDoc(docRef);
+                    if (updatedDocSnap.exists()) {
+                        updateLeaderboard(updatedDocSnap.data().dailyData, targetMonthId);
+                    }
+                } catch (error) {
+                    // If the document doesn't exist, updateDoc fails. Fallback to setDoc.
+                    if (error.code === 'not-found') {
+                        const newDailyData = { [day]: { [field]: value } };
+                        await setDoc(docRef, { dailyData: newDailyData }, { merge: true });
+                        updateLeaderboard(newDailyData, targetMonthId);
+                    } else {
+                        console.error("Failed to save atomic update:", error);
+                    }
+                }
             };
-            handleSave();
+            saveAtomicUpdate();
         }
     };
 
@@ -2527,5 +2551,6 @@ const App = () => {
 };
 
 export default App;
+
 
 
