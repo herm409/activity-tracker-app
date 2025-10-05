@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef, forwardRef, useContext, createContext } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, forwardRef } from 'react';
 import { initializeApp } from 'firebase/app';
 import { 
     getAuth, 
@@ -12,84 +12,8 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { Sun, ChevronUp, ChevronDown, Plus, X, List, BarChart2, Target, Users, PhoneCall, Trash2, Trophy, LogOut, Share2, Flame, Edit2, Calendar, Minus, Info, Archive, ArchiveRestore, TrendingUp, ChevronsRight, Award, Lightbulb, UserCheck, Dumbbell, BookOpen, User, Video, ArrowRight, CheckCircle, XCircle, ArrowUp, ArrowDown, MessageSquare, ClipboardCopy } from 'lucide-react';
 import html2canvas from 'html2canvas';
 
-// --- Toast Notification System ---
-const ToastContext = createContext(null);
-
-const useToast = () => {
-    const context = useContext(ToastContext);
-    if (!context) {
-        throw new Error('useToast must be used within a ToastProvider');
-    }
-    return context;
-};
-
-const ToastProvider = ({ children }) => {
-    const [toasts, setToasts] = useState([]);
-
-    const addToast = useCallback((message, type = 'success') => {
-        const id = Date.now();
-        setToasts(prevToasts => [...prevToasts, { id, message, type }]);
-    }, []);
-
-    const removeToast = useCallback((id) => {
-        setToasts(prevToasts => prevToasts.filter(toast => toast.id !== id));
-    }, []);
-
-    return (
-        <ToastContext.Provider value={{ addToast }}>
-            {children}
-            <div className="fixed top-5 right-5 z-50 space-y-2">
-                {toasts.map(toast => (
-                    <ToastNotification key={toast.id} {...toast} onDismiss={() => removeToast(toast.id)} />
-                ))}
-            </div>
-        </ToastContext.Provider>
-    );
-};
-
-const ToastNotification = ({ message, type, onDismiss }) => {
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            onDismiss();
-        }, 4000);
-        return () => clearTimeout(timer);
-    }, [onDismiss]);
-    
-    const styleConfig = {
-        success: {
-            icon: CheckCircle,
-            bg: 'bg-green-50',
-            border: 'border-green-400',
-            iconColor: 'text-green-500',
-            textColor: 'text-green-800'
-        },
-        info: {
-            icon: Info,
-            bg: 'bg-blue-50',
-            border: 'border-blue-400',
-            iconColor: 'text-blue-500',
-            textColor: 'text-blue-800'
-        }
-    };
-
-    const config = styleConfig[type] || styleConfig.info;
-    const Icon = config.icon;
-
-    return (
-        <div className={`${config.bg} border-l-4 ${config.border} p-4 rounded-r-lg shadow-lg flex items-start space-x-3 animate-fade-in-right`}>
-            <Icon className={`h-6 w-6 ${config.iconColor} flex-shrink-0`} />
-            <div className="flex-1">
-                <p className={`text-sm font-semibold ${config.textColor}`}>{message}</p>
-            </div>
-            <button onClick={onDismiss} className={`text-gray-400 hover:text-gray-600`}>
-                <X className="h-5 w-5" />
-            </button>
-        </div>
-    );
-};
-
-
 // --- Firebase Configuration ---
+// A placeholder config is provided, but the app will attempt to use the one injected by the environment.
 const firebaseConfig = {
     apiKey: "AIzaSyB3vzQe54l3ajY2LrwF_ZlwImxvhKwvLLw",
     authDomain: "activitytracker-e2b7a.firebaseapp.com",
@@ -281,56 +205,25 @@ const DisciplineCheckbox = ({ label, icon: Icon, isChecked, onChange }) => {
     );
 };
 
-const TODAY_DASHBOARD_METRICS = [
-    { key: 'exposures', label: 'Exposures', icon: Target, color: 'indigo' },
-    { key: 'followUps', label: 'Follow Ups', icon: Users, color: 'green' },
-    { key: 'presentations', label: 'Presentations', icon: BarChart2, color: 'purple', isPresentation: true },
-    { key: 'threeWays', label: '3-Way Calls', icon: PhoneCall, color: 'pink' },
-    { key: 'enrolls', label: 'Memberships Sold', icon: UserCheck, color: 'teal' }
-];
-
-const TODAY_DASHBOARD_DISCIPLINES = [
-    { key: 'exerc', label: 'Exercise', icon: Dumbbell },
-    { key: 'personalDevelopment', label: 'Personal Development', icon: BookOpen },
-];
-
-const EMPTY_DAY_DATA = {};
-
 const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAddPresentation, onShare, isSharing, onLogFollowUp, onLogExposure }) => {
-    const [dismissedStreaks, setDismissedStreaks] = useState({});
     const today = new Date();
-    const todayData = monthlyData[today.getDate()] || EMPTY_DAY_DATA;
+    const todayData = monthlyData[today.getDate()] || {};
 
-    const handleDismissStreak = (metricKey) => {
-        setDismissedStreaks(prev => ({ ...prev, [metricKey]: true }));
-    };
+    const metrics = [
+        { key: 'exposures', label: 'Exposures', icon: Target, color: 'indigo' },
+        { key: 'followUps', label: 'Follow Ups', icon: Users, color: 'green' },
+        { key: 'presentations', label: 'Presentations', icon: BarChart2, color: 'purple', isPresentation: true },
+        { key: 'threeWays', label: '3-Way Calls', icon: PhoneCall, color: 'pink' },
+        { key: 'enrolls', label: 'Memberships Sold', icon: UserCheck, color: 'teal' }
+    ];
 
-    const streaksAtRisk = useMemo(() => TODAY_DASHBOARD_METRICS.filter(metric => {
-        const streakValue = streaks[metric.key] || 0;
-        const todayValue = (metric.isPresentation)
-            ? (todayData.presentations?.length || 0) + (Number(todayData.pbrs) || 0)
-            : Number(todayData[metric.key]) || 0;
-        return streakValue > 1 && todayValue === 0 && !dismissedStreaks[metric.key];
-    }), [streaks, todayData, dismissedStreaks]);
+    const disciplines = [
+        { key: 'exerc', label: 'Exercise', icon: Dumbbell },
+        { key: 'personalDevelopment', label: 'Personal Development', icon: BookOpen },
+    ];
 
     return (
         <div className="space-y-8">
-            {streaksAtRisk.length > 0 && (
-                <div className="space-y-2">
-                    {streaksAtRisk.map(metric => (
-                        <div key={metric.key} className="bg-amber-50 border-l-4 border-amber-400 p-4 rounded-r-lg flex items-start space-x-3 shadow-sm">
-                            <Flame className="h-6 w-6 text-amber-500 flex-shrink-0 mt-0.5" />
-                            <div className="flex-1">
-                                <p className="text-sm font-semibold text-amber-800">Keep your {streaks[metric.key]}-day {metric.label.toLowerCase()} streak alive!</p>
-                                <p className="text-sm text-amber-700 mt-1">Log an activity for today to keep the flame going.</p>
-                            </div>
-                            <button onClick={() => handleDismissStreak(metric.key)} className="text-amber-500 hover:text-amber-700">
-                                <X className="h-5 w-5" />
-                            </button>
-                        </div>
-                    ))}
-                </div>
-            )}
             <div>
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
                     <div>
@@ -346,7 +239,7 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
                     </button>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {TODAY_DASHBOARD_METRICS.map(metric => {
+                    {metrics.map(metric => {
                         if (metric.isPresentation) {
                             const value = (todayData.presentations?.length || 0) + (Number(todayData.pbrs) || 0);
                             return (
@@ -392,7 +285,7 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
                 <h2 className="text-2xl font-semibold text-gray-800 mb-1">Daily Disciplines</h2>
                 <p className="text-gray-500">Check off your personal growth habits for today.</p>
                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
-                    {TODAY_DASHBOARD_DISCIPLINES.map(discipline => {
+                    {disciplines.map(discipline => {
                         let isChecked = !!todayData[discipline.key];
                         if (discipline.key === 'personalDevelopment') {
                             isChecked = !!(todayData.personalDevelopment || todayData.read || todayData.audio);
@@ -947,7 +840,6 @@ const HotList = ({ user, db, onDataChange, monthlyData, hotlist: allProspects })
 
 const ProspectCard = ({ item, onUpdate, onInstantUpdate, onDecide, onDataChange, monthlyData }) => {
     const [isNotesExpanded, setIsNotesExpanded] = useState(false);
-    const { addToast } = useToast();
     const isOverdue = item.nextActionDate && new Date(item.nextActionDate) < new Date();
     const exposureCount = item.exposureCount || 0;
     
@@ -958,7 +850,6 @@ const ProspectCard = ({ item, onUpdate, onInstantUpdate, onDecide, onDataChange,
         const currentFollowUps = Number(monthlyData[day]?.followUps || 0);
         const newFollowUps = currentFollowUps + 1;
         onDataChange(today, 'followUps', newFollowUps);
-        addToast("Follow-up logged! Consistency is key.", 'success');
     };
 
     const getExposureColor = () => {
@@ -1949,7 +1840,7 @@ const TeamPage = ({ user, db, userProfile, setUserProfile }) => {
 
 
 // --- Main App Component ---
-const AppContent = () => {
+const App = () => {
     // --- Set Page Title ---
     useEffect(() => {
         document.title = 'Activity Tracker';
@@ -2076,20 +1967,18 @@ const AppContent = () => {
 
         const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', monthYearId);
         const docSnap = await getDoc(docRef);
+        let currentGoals = { exposures: 0, followUps: 0, presentations: 0, pbrs: 0, threeWays: 0, enrolls: 0 };
         if (docSnap.exists()) {
             const data = docSnap.data();
             setMonthlyData(data.dailyData || {});
-            setMonthlyGoals(data.monthlyGoals || { exposures: 0, followUps: 0, presentations: 0, pbrs: 0, threeWays: 0, enrolls: 0 });
+            currentGoals = data.monthlyGoals || currentGoals;
+            setMonthlyGoals(currentGoals);
         } else {
-             // Only clear data if intentionally switching to a new month that has no data.
-             // This avoids wiping data on a temporary fetch error during a tab switch.
-            if (monthlyData[1] !== undefined) { // Check if there's old data
-                setMonthlyData({});
-                setMonthlyGoals({ exposures: 0, followUps: 0, presentations: 0, pbrs: 0, threeWays: 0, enrolls: 0 });
-            }
+            setMonthlyData({});
+            setMonthlyGoals(currentGoals);
         }
 
-        const allGoalsZero = Object.values(monthlyGoals).every(goal => goal === 0);
+        const allGoalsZero = Object.values(currentGoals).every(goal => goal === 0);
         if (!profileData.hasSeenGoalInstruction && allGoalsZero) {
             setShowGoalInstruction(true);
         }
@@ -2101,7 +1990,7 @@ const AppContent = () => {
         } else {
             setLastMonthData({});
         }
-    }, [user, db, monthYearId, lastMonthYearId, monthlyData, monthlyGoals]);
+    }, [user, db, monthYearId, lastMonthYearId]);
 
     useEffect(() => {
         if (!user || !db) return;
@@ -2173,18 +2062,9 @@ const AppContent = () => {
         }
     }, 1500), [user, db, monthYearId, updateLeaderboard]);
 
-    const { addToast } = useToast();
-
     const handleDataChange = (date, field, value) => {
         const day = date.getDate();
         const targetMonthId = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-
-        if (field === 'exerc' && value) {
-            addToast("Great job staying active!", 'success');
-        }
-        if (field === 'personalDevelopment' && value) {
-            addToast("Investing in yourself pays the best interest.", 'success');
-        }
 
         if (targetMonthId === monthYearId) {
             const updatedData = { ...monthlyData, [day]: { ...monthlyData[day], [field]: value } };
@@ -2217,15 +2097,6 @@ const AppContent = () => {
             alert("Quick add is only available for the current day on the current month's view.");
             return;
         }
-
-        if (amount > 0) {
-            if (metricKey === 'enrolls') {
-                addToast("Congratulations! Celebrate this win!", 'success');
-            } else if (metricKey === 'exposures') {
-                addToast("Great start! Every conversation is a seed planted.", 'success');
-            }
-        }
-
         const todayData = monthlyData[today.getDate()] || {};
         const currentValue = Number(todayData[metricKey]) || 0;
         const newValue = Math.max(0, currentValue + amount);
@@ -2239,7 +2110,6 @@ const AppContent = () => {
             alert("Quick add is only available for the current day on the current month's view.");
             return;
         }
-        addToast("Presentation logged. Awesome work!", 'success');
         const todayData = monthlyData[today.getDate()] || {};
         const currentPresentations = todayData.presentations || [];
         const newPresentations = [...currentPresentations, type];
@@ -2260,7 +2130,6 @@ const AppContent = () => {
         await updateDoc(prospectRef, { exposureCount: (prospect.exposureCount || 0) + 1, lastContacted: new Date().toISOString() });
 
         handleQuickAdd('followUps', 1);
-        addToast(`Follow-up logged for ${prospect.name}.`, 'success');
         setShowFollowUpModal(false);
     };
 
@@ -2281,7 +2150,6 @@ const AppContent = () => {
         };
         await addDoc(hotlistColRef, newItem);
         handleQuickAdd('followUps', 1);
-        addToast(`Added ${name} to your pipeline!`, 'success');
         setShowFollowUpModal(false);
     };
     
@@ -2298,9 +2166,6 @@ const AppContent = () => {
     
         if (prospect.status === 'Cold') {
             updateData.status = 'Warm';
-            addToast(`${prospect.name} is now a Warm prospect!`, 'info');
-        } else {
-            addToast(`Exposure logged for ${prospect.name}.`, 'success');
         }
     
         await updateDoc(prospectRef, updateData);
@@ -2325,7 +2190,6 @@ const AppContent = () => {
         };
         await addDoc(hotlistColRef, newItem);
         handleQuickAdd('exposures', 1);
-        addToast(`Added ${name} as a Warm prospect!`, 'success');
         setShowExposureModal(false);
     };
 
@@ -2491,7 +2355,7 @@ const AppContent = () => {
                 let hasActivity = false;
                 if (dayData) {
                     if (activityKey === 'presentations') hasActivity = (dayData.presentations?.length > 0) || (Number(dayData.pbrs) > 0);
-                    else if (activityKey === 'enrolls') hasActivity = (dayData.enrolls && Number(dayData.enrolls) > 0) || (todayData.sitdowns && todayData.sitdowns.some(s => s === 'E'));
+                    else if (activityKey === 'enrolls') hasActivity = (dayData.enrolls && Number(dayData.enrolls) > 0) || (dayData.sitdowns && dayData.sitdowns.some(s => s === 'E'));
                     else hasActivity = Number(dayData[activityKey]) > 0;
                 }
                 
@@ -2538,7 +2402,8 @@ const AppContent = () => {
             updateProfile();
         }
     }, [streaks, user, db, userProfile.longestStreaks, userProfile.uid]);
-    
+
+
     if (loading) return <div className="flex items-center justify-center h-screen bg-gray-100"><div className="text-xl font-semibold">Loading...</div></div>;
     if (!user) return <AuthPage auth={auth} />;
 
@@ -2609,13 +2474,6 @@ const AppContent = () => {
     );
 };
 
-const App = () => {
-    return (
-        <ToastProvider>
-            <AppContent />
-        </ToastProvider>
-    );
-};
-
 export default App;
+
 
