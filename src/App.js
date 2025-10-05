@@ -2331,20 +2331,6 @@ const App = () => {
             today.setHours(0, 0, 0, 0); // Normalize today to the start of the day
             
             let dayToCheck = new Date(today);
-            
-            // First, check if there was activity yesterday.
-            const yesterday = new Date(today);
-            yesterday.setDate(today.getDate() - 1);
-            
-            const yesterdayMonthData = yesterday.getMonth() === today.getMonth() ? monthlyData : lastMonthData;
-            const yesterdayData = yesterdayMonthData ? yesterdayMonthData[yesterday.getDate()] : null;
-
-            let hasActivityYesterday = false;
-            if (yesterdayData) {
-                if (activityKey === 'presentations') hasActivityYesterday = (yesterdayData.presentations?.length > 0) || (Number(yesterdayData.pbrs) > 0);
-                else if (activityKey === 'enrolls') hasActivityYesterday = (yesterdayData.enrolls && Number(yesterdayData.enrolls) > 0) || (yesterdayData.sitdowns && yesterdayData.sitdowns.some(s => s === 'E'));
-                else hasActivityYesterday = Number(yesterdayData[activityKey]) > 0;
-            }
 
             // If there's no activity today, our starting point for the streak is yesterday.
             const todayData = monthlyData ? monthlyData[today.getDate()] : null;
@@ -2489,4 +2475,5 @@ const App = () => {
 };
 
 export default App;
+
 
