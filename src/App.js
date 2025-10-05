@@ -281,35 +281,35 @@ const DisciplineCheckbox = ({ label, icon: Icon, isChecked, onChange }) => {
     );
 };
 
+const TODAY_DASHBOARD_METRICS = [
+    { key: 'exposures', label: 'Exposures', icon: Target, color: 'indigo' },
+    { key: 'followUps', label: 'Follow Ups', icon: Users, color: 'green' },
+    { key: 'presentations', label: 'Presentations', icon: BarChart2, color: 'purple', isPresentation: true },
+    { key: 'threeWays', label: '3-Way Calls', icon: PhoneCall, color: 'pink' },
+    { key: 'enrolls', label: 'Memberships Sold', icon: UserCheck, color: 'teal' }
+];
+
+const TODAY_DASHBOARD_DISCIPLINES = [
+    { key: 'exerc', label: 'Exercise', icon: Dumbbell },
+    { key: 'personalDevelopment', label: 'Personal Development', icon: BookOpen },
+];
+
 const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAddPresentation, onShare, isSharing, onLogFollowUp, onLogExposure }) => {
     const [dismissedStreaks, setDismissedStreaks] = useState({});
     const today = new Date();
     const todayData = monthlyData[today.getDate()] || {};
 
-    const metrics = [
-        { key: 'exposures', label: 'Exposures', icon: Target, color: 'indigo' },
-        { key: 'followUps', label: 'Follow Ups', icon: Users, color: 'green' },
-        { key: 'presentations', label: 'Presentations', icon: BarChart2, color: 'purple', isPresentation: true },
-        { key: 'threeWays', label: '3-Way Calls', icon: PhoneCall, color: 'pink' },
-        { key: 'enrolls', label: 'Memberships Sold', icon: UserCheck, color: 'teal' }
-    ];
-
-    const disciplines = [
-        { key: 'exerc', label: 'Exercise', icon: Dumbbell },
-        { key: 'personalDevelopment', label: 'Personal Development', icon: BookOpen },
-    ];
-
     const handleDismissStreak = (metricKey) => {
         setDismissedStreaks(prev => ({ ...prev, [metricKey]: true }));
     };
 
-    const streaksAtRisk = useMemo(() => metrics.filter(metric => {
+    const streaksAtRisk = useMemo(() => TODAY_DASHBOARD_METRICS.filter(metric => {
         const streakValue = streaks[metric.key] || 0;
         const todayValue = (metric.isPresentation)
             ? (todayData.presentations?.length || 0) + (Number(todayData.pbrs) || 0)
             : Number(todayData[metric.key]) || 0;
         return streakValue > 1 && todayValue === 0 && !dismissedStreaks[metric.key];
-    }), [streaks, todayData, dismissedStreaks, metrics]);
+    }), [streaks, todayData, dismissedStreaks]);
 
     return (
         <div className="space-y-8">
@@ -344,7 +344,7 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
                     </button>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {metrics.map(metric => {
+                    {TODAY_DASHBOARD_METRICS.map(metric => {
                         if (metric.isPresentation) {
                             const value = (todayData.presentations?.length || 0) + (Number(todayData.pbrs) || 0);
                             return (
@@ -390,7 +390,7 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
                 <h2 className="text-2xl font-semibold text-gray-800 mb-1">Daily Disciplines</h2>
                 <p className="text-gray-500">Check off your personal growth habits for today.</p>
                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
-                    {disciplines.map(discipline => {
+                    {TODAY_DASHBOARD_DISCIPLINES.map(discipline => {
                         let isChecked = !!todayData[discipline.key];
                         if (discipline.key === 'personalDevelopment') {
                             isChecked = !!(todayData.personalDevelopment || todayData.read || todayData.audio);
@@ -2487,7 +2487,7 @@ const AppContent = () => {
                 let hasActivity = false;
                 if (dayData) {
                     if (activityKey === 'presentations') hasActivity = (dayData.presentations?.length > 0) || (Number(dayData.pbrs) > 0);
-                    else if (activityKey === 'enrolls') hasActivity = (dayData.enrolls && Number(dayData.enrolls) > 0) || (dayData.sitdowns && dayData.sitdowns.some(s => s === 'E'));
+                    else if (activityKey === 'enrolls') hasActivity = (dayData.enrolls && Number(dayData.enrolls) > 0) || (todayData.sitdowns && todayData.sitdowns.some(s => s === 'E'));
                     else hasActivity = Number(dayData[activityKey]) > 0;
                 }
                 
