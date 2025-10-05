@@ -24,6 +24,7 @@ const firebaseConfig = {
     appId: "1:242270405649:web:4492617a8bac02d551ddb0",
     measurementId: "G-PJ70LQMDVG"
 };
+
 const finalFirebaseConfig = typeof window.__firebase_config !== 'undefined' ? JSON.parse(window.__firebase_config) : firebaseConfig;
 const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : 'default-app-id';
 
@@ -1871,6 +1872,18 @@ const App = () => {
     const [reportCardData, setReportCardData] = useState(null);
     const reportCardRef = useRef(null);
 
+    // --- Refs for Save-on-Exit Logic ---
+    const isDirtyRef = useRef(false); // Tracks if there are unsaved changes
+    const monthlyDataRef = useRef(monthlyData); // Ref to hold the latest monthlyData state
+    const monthlyGoalsRef = useRef(monthlyGoals); // Ref to hold the latest monthlyGoals state
+    
+    // Keep refs updated with the latest state for access in cleanup effects
+    useEffect(() => {
+        monthlyDataRef.current = monthlyData;
+        monthlyGoalsRef.current = monthlyGoals;
+    }, [monthlyData, monthlyGoals]);
+
+
     const updateTeamMemberStats = useCallback(async (currentMonthlyData, currentLastMonthData, currentProfile) => {
         if (!db || !user || !currentProfile.teamId || !currentProfile.displayName) return;
 
@@ -2053,14 +2066,20 @@ const App = () => {
         });
     }, [user, db, userProfile.displayName]);
 
-    const debouncedSave = useMemo(() => debounce(async (dataToSave, goalsToSave) => {
+    const debouncedSave = useMemo(() => debounce(async (dataToSave, goalsToSave, targetMonthId) => {
         if (!user || !db) return;
-        const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', monthYearId);
-        await setDoc(docRef, { dailyData: dataToSave, monthlyGoals: goalsToSave }, { merge: true });
-        if (dataToSave) {
-            updateLeaderboard(dataToSave, monthYearId);
+        const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', targetMonthId);
+        try {
+            await setDoc(docRef, { dailyData: dataToSave, monthlyGoals: goalsToSave }, { merge: true });
+            isDirtyRef.current = false; // Mark changes as saved
+            if (dataToSave) {
+                updateLeaderboard(dataToSave, targetMonthId);
+            }
+        } catch (error) {
+            console.error("Failed to save data:", error);
+            // Optionally, handle the error in the UI
         }
-    }, 1500), [user, db, monthYearId, updateLeaderboard]);
+    }, 1500), [user, db, updateLeaderboard]);
 
     const handleDataChange = (date, field, value) => {
         const day = date.getDate();
@@ -2069,7 +2088,8 @@ const App = () => {
         if (targetMonthId === monthYearId) {
             const updatedData = { ...monthlyData, [day]: { ...monthlyData[day], [field]: value } };
             setMonthlyData(updatedData);
-            debouncedSave(updatedData, monthlyGoals);
+            isDirtyRef.current = true; // Mark data as dirty
+            debouncedSave(updatedData, monthlyGoals, monthYearId);
         } else {
             const handleSave = async () => {
                 if (!user || !db) return;
@@ -2119,7 +2139,8 @@ const App = () => {
     const handleGoalChange = (goalKey, value) => {
         const newGoals = { ...monthlyGoals, [goalKey]: Number(value) || 0 };
         setMonthlyGoals(newGoals);
-        debouncedSave(null, newGoals);
+        isDirtyRef.current = true; // Mark data as dirty
+        debouncedSave(monthlyData, newGoals, monthYearId);
     };
 
     const handleLogFollowUpForProspect = async (prospectId) => {
@@ -2195,6 +2216,37 @@ const App = () => {
 
 
     const handleSignOut = async () => auth && await signOut(auth);
+
+    // --- Effect for Save-on-Exit ---
+    useEffect(() => {
+        const handleBeforeUnload = (event) => {
+            if (isDirtyRef.current) {
+                console.log("Unsaved changes detected. Attempting to save before unload.");
+                // Note: Most modern browsers do not allow reliable asynchronous operations in 'beforeunload'.
+                // This synchronous-like call is our best effort but may not always succeed.
+                // A better approach for critical data is frequent, small, atomic saves.
+                const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', monthYearId);
+                setDoc(docRef, { dailyData: monthlyDataRef.current, monthlyGoals: monthlyGoalsRef.current }, { merge: true });
+                
+                // This part is to warn the user, but it's often blocked by browsers
+                event.preventDefault();
+                event.returnValue = '';
+            }
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+
+        // Cleanup function
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+            // Also, save one last time when the component unmounts (e.g., on route change in a larger app)
+            if (isDirtyRef.current) {
+                const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', monthYearId);
+                setDoc(docRef, { dailyData: monthlyDataRef.current, monthlyGoals: monthlyGoalsRef.current }, { merge: true });
+            }
+        };
+    }, [db, user, monthYearId]); // Dependencies ensure this effect has access to the correct instances
+
 
     const getWeekDataForReport = useCallback(async () => {
         const today = new Date();
@@ -2355,7 +2407,7 @@ const App = () => {
                 let hasActivity = false;
                 if (dayData) {
                     if (activityKey === 'presentations') hasActivity = (dayData.presentations?.length > 0) || (Number(dayData.pbrs) > 0);
-                    else if (activityKey === 'enrolls') hasActivity = (dayData.enrolls && Number(dayData.enrolls) > 0) || (dayData.sitdowns && dayData.sitdowns.some(s => s === 'E'));
+                    else if (activityKey === 'enrolls') hasActivity = (dayData.enrolls && Number(dayData.enrolls) > 0) || (dayData.sitdowns && todayData.sitdowns.some(s => s === 'E'));
                     else hasActivity = Number(dayData[activityKey]) > 0;
                 }
                 
