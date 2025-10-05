@@ -2076,18 +2076,20 @@ const AppContent = () => {
 
         const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', monthYearId);
         const docSnap = await getDoc(docRef);
-        let currentGoals = { exposures: 0, followUps: 0, presentations: 0, pbrs: 0, threeWays: 0, enrolls: 0 };
         if (docSnap.exists()) {
             const data = docSnap.data();
             setMonthlyData(data.dailyData || {});
-            currentGoals = data.monthlyGoals || currentGoals;
-            setMonthlyGoals(currentGoals);
+            setMonthlyGoals(data.monthlyGoals || { exposures: 0, followUps: 0, presentations: 0, pbrs: 0, threeWays: 0, enrolls: 0 });
         } else {
-            setMonthlyData({});
-            setMonthlyGoals(currentGoals);
+             // Only clear data if intentionally switching to a new month that has no data.
+             // This avoids wiping data on a temporary fetch error during a tab switch.
+            if (monthlyData[1] !== undefined) { // Check if there's old data
+                setMonthlyData({});
+                setMonthlyGoals({ exposures: 0, followUps: 0, presentations: 0, pbrs: 0, threeWays: 0, enrolls: 0 });
+            }
         }
 
-        const allGoalsZero = Object.values(currentGoals).every(goal => goal === 0);
+        const allGoalsZero = Object.values(monthlyGoals).every(goal => goal === 0);
         if (!profileData.hasSeenGoalInstruction && allGoalsZero) {
             setShowGoalInstruction(true);
         }
@@ -2099,7 +2101,7 @@ const AppContent = () => {
         } else {
             setLastMonthData({});
         }
-    }, [user, db, monthYearId, lastMonthYearId]);
+    }, [user, db, monthYearId, lastMonthYearId, monthlyData, monthlyGoals]);
 
     useEffect(() => {
         if (!user || !db) return;
@@ -2616,3 +2618,4 @@ const App = () => {
 };
 
 export default App;
+
