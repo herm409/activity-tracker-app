@@ -354,7 +354,7 @@ const Leaderboard = ({ db, monthYearId, user }) => {
     );
 };
 
-const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChange, onShare, isSharing, user, userProfile, setUserProfile, onQuickAdd, showGoalInstruction, onDismissGoalInstruction, streaks }) => {
+const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChange, onShare, isSharing, user, userProfile, onQuickAdd, showGoalInstruction, onDismissGoalInstruction, streaks }) => {
     const [selectedDay, setSelectedDay] = useState(null);
     const [viewMode, setViewMode] = useState('week');
     const year = date.getFullYear();
@@ -2441,7 +2441,7 @@ const App = () => {
                         onLogFollowUp={() => setShowFollowUpModal(true)}
                         onLogExposure={() => setShowExposureModal(true)}
                     /> }
-                    {activeTab === 'tracker' && <ActivityTracker date={currentDate} setDate={setCurrentDate} goals={monthlyGoals} onGoalChange={handleGoalChange} data={{current: monthlyData, last: lastMonthData}} onDataChange={handleDataChange} onShare={handleShare} isSharing={isSharing} user={user} userProfile={userProfile} setUserProfile={setUserProfile} onQuickAdd={handleQuickAdd} showGoalInstruction={showGoalInstruction} onDismissGoalInstruction={handleDismissGoalInstruction} streaks={streaks} />}
+                    {activeTab === 'tracker' && <ActivityTracker date={currentDate} setDate={setCurrentDate} goals={monthlyGoals} onGoalChange={handleGoalChange} data={{current: monthlyData, last: lastMonthData}} onDataChange={handleDataChange} onShare={handleShare} isSharing={isSharing} user={user} userProfile={userProfile} onQuickAdd={handleQuickAdd} showGoalInstruction={showGoalInstruction} onDismissGoalInstruction={handleDismissGoalInstruction} streaks={streaks} />}
                     {activeTab === 'hotlist' && <HotList user={user} db={db} onDataChange={handleDataChange} monthlyData={monthlyData} hotlist={hotlist} />}
                     {activeTab === 'analytics' && <AnalyticsDashboard db={db} user={user} />}
                     {activeTab === 'team' && <TeamPage user={user} db={db} userProfile={userProfile} setUserProfile={setUserProfile} />}
@@ -2489,6 +2489,4 @@ const App = () => {
 };
 
 export default App;
-
-
 
