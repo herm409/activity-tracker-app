@@ -2519,7 +2519,7 @@ const App = () => {
                 )}
                 {showFollowUpModal && (
                     <FollowUpModal 
-                        prospects={hotlist.filter(p => p.status === 'Hot' || p.status === 'Warm')}
+                        prospects={hotlist.filter(p => (p.status === 'Hot' || p.status === 'Warm') && !p.isArchived)}
                         onClose={() => setShowFollowUpModal(false)}
                         onQuickLog={() => { handleQuickAdd('followUps', 1); setShowFollowUpModal(false); }}
                         onLogForProspect={handleLogFollowUpForProspect}
@@ -2551,6 +2551,7 @@ const App = () => {
 };
 
 export default App;
+
 
 
 
