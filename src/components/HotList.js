@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { collection, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { debounce } from '../utils/helpers';
 import { appId } from '../firebaseConfig';
-import { List, Archive, Plus, Flame, TrendingUp, Users, ChevronDown, ChevronUp, MessageSquare, ArrowRight, ArrowDown, ArrowUp, CheckCircle, XCircle, ArchiveRestore, Trash2, X } from 'lucide-react';
+import { List, Archive, Plus, Flame, TrendingUp, Users, ChevronDown, ChevronUp, MessageSquare, ArrowRight, ArrowDown, ArrowUp, CheckCircle, XCircle, ArchiveRestore, Trash2, X, Zap, Clock, AlertTriangle } from 'lucide-react';
 
 // --- Modals for Hotlist (defined locally or imported if reused) ---
 const AddHotlistItemModal = ({ onClose, onAdd }) => {
@@ -57,76 +57,154 @@ const OutcomeModal = ({ onClose, onDecide }) => {
     );
 };
 
+// --- Visual Components ---
+const VisualExposureMeter = ({ count }) => {
+    return (
+        <div className="flex flex-col items-center">
+            <div className="flex space-x-1 mb-1">
+                {[...Array(12)].map((_, i) => {
+                    const isFilled = i < count;
+                    // Dots 1-4 (index 0-3): Warm up (Blue)
+                    // Dots 5-12 (index 4-11): Closing Zone (Green/Gold)
+                    const isClosingZone = i >= 4;
+
+                    let bgClass = "bg-gray-200";
+                    let effectClass = "";
+
+                    if (isFilled) {
+                        if (isClosingZone) {
+                            bgClass = "bg-green-500";
+                            effectClass = "ring-2 ring-green-200"; // Standard Tailwind ring
+                        } else {
+                            bgClass = "bg-blue-400";
+                        }
+                    }
+
+                    return (
+                        <div
+                            key={i}
+                            className={`h-2 w-2 rounded-full transition-all duration-300 ${bgClass} ${effectClass}`}
+                            title={`Exposure ${i + 1}`}
+                        />
+                    );
+                })}
+            </div>
+            <span className="text-[10px] text-gray-400 font-medium tracking-wide">
+                {count >= 5 ? "CLOSING ZONE" : "BUILDING TRUST"} ({count})
+            </span>
+        </div>
+    );
+};
+
 
 const ProspectCard = ({ item, onUpdate, onInstantUpdate, onDecide, onDataChange, monthlyData }) => {
     const [isNotesExpanded, setIsNotesExpanded] = useState(false);
-    const isOverdue = item.nextActionDate && new Date(item.nextActionDate) < new Date();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Status Checks
+    const nextAction = item.nextActionDate ? new Date(item.nextActionDate) : null;
+    const isOverdue = nextAction && nextAction < today;
+
+    const lastContact = item.lastContacted ? new Date(item.lastContacted) : null;
+    const daysSinceContact = lastContact ? (new Date() - lastContact) / (1000 * 60 * 60 * 24) : 999;
+    const isStagnant = daysSinceContact > 7 && item.status !== 'Cold';
+
     const exposureCount = item.exposureCount || 0;
 
-    // WARNING: This depends on onDataChange being passed down from parent which modifies App state.
-    // In future refactor, better to use Context or specific hooks.
-    const handleLogFollowUp = () => {
-        onInstantUpdate(item.id, { exposureCount: exposureCount + 1 });
-        const today = new Date();
-        const day = today.getDate();
-        // This relies on monthlyData being for current month.
-        const currentFollowUps = Number(monthlyData?.[day]?.followUps || 0);
-        const newFollowUps = currentFollowUps + 1;
-        onDataChange(today, 'followUps', newFollowUps);
+    // --- Speed Actions ---
+    const handleLogExposure = () => {
+        // 1. Update Prospect
+        onInstantUpdate(item.id, {
+            exposureCount: exposureCount + 1,
+            lastContacted: new Date().toISOString()
+        });
+
+        // 2. Update Daily Stats
+        // NOTE: This updates the Dashboard 'exposures' count instantly
+        const day = new Date().getDate();
+        const currentExposures = Number(monthlyData?.[day]?.exposures || 0);
+        onDataChange(new Date(), 'exposures', currentExposures + 1);
     };
 
-    const getExposureColor = () => {
-        if (exposureCount >= 5 && exposureCount <= 12) return 'bg-green-100 text-green-800';
-        if (exposureCount > 12) return 'bg-amber-100 text-amber-800';
-        return 'bg-gray-100 text-gray-800';
+    const handleSnooze = () => {
+        const newDate = new Date();
+        newDate.setDate(newDate.getDate() + 3);
+        onInstantUpdate(item.id, { nextActionDate: newDate.toISOString().split('T')[0] });
+    };
+
+    const handleLogFollowUp = () => {
+        onInstantUpdate(item.id, { exposureCount: exposureCount + 1, lastContacted: new Date().toISOString() });
+        const day = new Date().getDate();
+        const currentFollowUps = Number(monthlyData?.[day]?.followUps || 0);
+        onDataChange(new Date(), 'followUps', currentFollowUps + 1);
     };
 
     return (
-        <div className={`p-4 border rounded-lg bg-white shadow-sm transition-shadow hover:shadow-md ${isOverdue ? 'border-red-500 border-2' : ''}`}>
-            <div className="flex justify-between items-start">
+        <div className={`p-4 border rounded-lg bg-white shadow-sm transition-all hover:shadow-md relative overflow-hidden ${isOverdue ? 'border-l-4 border-l-red-500' : 'border-l-4 border-l-transparent'} ${isStagnant ? 'bg-gray-50' : ''}`}>
+            {/* Context Badges */}
+            <div className="absolute top-2 right-2 flex space-x-1">
+                {isOverdue && <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded text-[10px] font-bold flex items-center"><AlertTriangle className="w-3 h-3 mr-1" /> Overdue</span>}
+                {isStagnant && <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded text-[10px] font-bold flex items-center">Stagnant</span>}
+            </div>
+
+            <div className="flex justify-between items-start mt-2">
                 <input
                     type="text"
                     defaultValue={item.name}
                     onChange={(e) => onUpdate(item.id, 'name', e.target.value)}
-                    className="text-lg font-semibold border-none p-0 w-full focus:ring-0"
+                    className="text-lg font-bold text-gray-800 border-none p-0 w-full focus:ring-0 bg-transparent"
                     placeholder="Enter name..."
                 />
-                <div className={`flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${getExposureColor()}`}>
-                    <span>{exposureCount}</span>
-                    <span className="ml-1.5 hidden sm:inline">Exposures</span>
-                </div>
             </div>
 
-            <div className="mt-3 space-y-3">
+            {/* Visual Exposure Meter */}
+            <div className="mt-2 mb-3">
+                <VisualExposureMeter count={exposureCount} />
+            </div>
+
+            {/* Speed Actions Row */}
+            <div className="flex space-x-2 my-3">
+                <button
+                    onClick={handleLogExposure}
+                    className="flex-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 py-2 rounded-md flex items-center justify-center text-xs font-semibold transition-colors"
+                >
+                    <Zap className="h-4 w-4 mr-1 text-indigo-500" />
+                    Log Exposure
+                </button>
+                <button
+                    onClick={handleSnooze}
+                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-600 py-2 rounded-md flex items-center justify-center text-xs font-semibold transition-colors"
+                >
+                    <Clock className="h-4 w-4 mr-1 text-gray-500" />
+                    Snooze (+3 Days)
+                </button>
+            </div>
+
+            <div className="space-y-3">
                 <div className="relative">
                     <textarea
                         defaultValue={item.notes}
                         onChange={(e) => onUpdate(item.id, 'notes', e.target.value)}
                         placeholder="Add notes..."
-                        className="w-full text-sm text-gray-600 border-gray-200 rounded-md focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                        className="w-full text-sm text-gray-600 border-gray-200 rounded-md focus:ring-indigo-500 focus:border-indigo-500 transition-all bg-white"
                         rows={isNotesExpanded ? 6 : 2}
                     ></textarea>
-                    <button onClick={() => setIsNotesExpanded(!isNotesExpanded)} className="absolute bottom-2 right-2 text-xs flex items-center font-semibold text-indigo-600 hover:text-indigo-800 bg-white/70 backdrop-blur-sm px-2 py-1 rounded-full">
+                    <button onClick={() => setIsNotesExpanded(!isNotesExpanded)} className="absolute bottom-2 right-2 text-xs flex items-center font-semibold text-indigo-600 hover:text-indigo-800 bg-white/80 backdrop-blur-sm px-2 py-1 rounded-full border border-gray-100 shadow-sm">
                         <MessageSquare className="h-3 w-3 mr-1" />
                         {isNotesExpanded ? 'Hide' : 'View'} Notes
                     </button>
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                        <label htmlFor={`next-action-${item.id}`} className="text-xs font-medium text-gray-500">Next Action:</label>
-                        <input
-                            id={`next-action-${item.id}`}
-                            type="date"
-                            defaultValue={item.nextActionDate}
-                            onChange={(e) => onInstantUpdate(item.id, { nextActionDate: e.target.value })}
-                            className={`p-1 border rounded-md text-xs ${isOverdue ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
-                        />
-                    </div>
-                    <button onClick={handleLogFollowUp} className="mt-2 sm:mt-0 flex items-center justify-center space-x-1 px-3 py-1.5 text-xs font-medium rounded-full bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition w-full sm:w-auto">
-                        <Plus className="h-3 w-3" />
-                        <span>Log Follow Up</span>
-                    </button>
+                <div className="flex items-center space-x-2 bg-gray-50 p-2 rounded-md">
+                    <label htmlFor={`next-action-${item.id}`} className="text-xs font-medium text-gray-500 whitespace-nowrap">Next Action:</label>
+                    <input
+                        id={`next-action-${item.id}`}
+                        type="date"
+                        defaultValue={item.nextActionDate}
+                        onChange={(e) => onInstantUpdate(item.id, { nextActionDate: e.target.value })}
+                        className={`p-1 border rounded-md text-xs w-full bg-white ${isOverdue ? 'text-red-600 font-semibold' : ''}`}
+                    />
                 </div>
             </div>
 
@@ -192,7 +270,7 @@ export const HotList = ({ user, db, onDataChange, monthlyData, hotlist: allProsp
     const [showAddModal, setShowAddModal] = useState(false);
     const [itemToDecide, setItemToDecide] = useState(null);
     const [itemToDelete, setItemToDelete] = useState(null);
-    const [collapsedCategories, setCollapsedCategories] = useState({ Warm: true, Cold: true });
+    const [collapsedCategories, setCollapsedCategories] = useState({ Warm: false, Cold: true }); // Warm open by default
 
     const toggleCategory = (category) => {
         setCollapsedCategories(prev => ({ ...prev, [category]: !prev[category] }));
@@ -260,8 +338,31 @@ export const HotList = ({ user, db, onDataChange, monthlyData, hotlist: allProsp
 
     const statusConfig = {
         Hot: { title: 'HOT - Closing Zone', icon: Flame, color: 'red', description: 'Prospects who have seen a presentation. Follow up to close!' },
-        Warm: { title: 'WARM - Building Interest', icon: TrendingUp, color: 'amber', description: "Actively sending tools and having conversations. These prospects haven't seen a full presentation yet." },
+        Warm: { title: 'WARM - Building Interest', icon: TrendingUp, color: 'amber', description: "Actively sending tools and having conversations." },
         Cold: { title: 'COLD - Prospect List', icon: Users, color: 'blue', description: 'New prospects to start conversations with.' },
+    };
+
+    // --- Smart Sorting Logic ---
+    const getPriorityScore = (p) => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        let score = 0;
+
+        const nextAction = p.nextActionDate ? new Date(p.nextActionDate) : null;
+        const lastContact = p.lastContacted ? new Date(p.lastContacted) : null;
+
+        // 1. Critical: Overdue (Highest)
+        if (nextAction && nextAction < today) score += 1000;
+        else if (nextAction && nextAction.getTime() === today.getTime()) score += 500; // Due today
+
+        // 2. Warning: Stagnant (High) - No contact in 7 days
+        const daysSinceContact = lastContact ? (today - lastContact) / (1000 * 60 * 60 * 24) : 999;
+        if (daysSinceContact > 7 && p.status !== 'Cold') score += 200;
+
+        // 3. Active: Recently contacted gets minor bump to keep meaningful order
+        if (daysSinceContact < 3) score += 10;
+
+        return score;
     };
 
     const groupedProspects = useMemo(() => {
@@ -271,6 +372,12 @@ export const HotList = ({ user, db, onDataChange, monthlyData, hotlist: allProsp
                 groups[p.status].push(p);
             }
         });
+
+        // Apply Smart Sort to each group
+        Object.keys(groups).forEach(key => {
+            groups[key].sort((a, b) => getPriorityScore(b) - getPriorityScore(a));
+        });
+
         return groups;
     }, [hotlist]);
 
@@ -317,7 +424,7 @@ export const HotList = ({ user, db, onDataChange, monthlyData, hotlist: allProsp
                                 </button>
                                 {!isCollapsed && (
                                     prospects.length > 0 ? (
-                                        <div className="mt-4 space-y-4">
+                                        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                                             {prospects.map(item => (
                                                 <ProspectCard
                                                     key={item.id}
