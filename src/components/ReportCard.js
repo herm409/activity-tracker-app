@@ -1,4 +1,5 @@
 import React, { forwardRef } from 'react';
+import { Trophy, Calendar, User, TrendingUp, Users, Video, Award } from 'lucide-react';
 
 const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
     // Check if weekData exists before destructuring
@@ -6,75 +7,61 @@ const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
         return <div ref={ref}>Loading data...</div>;
     }
 
-    const { totals, lastWeekTotals, dateRange, activeInPipeline, closingZone, newMembersThisWeek } = weekData;
+    const { totals, lastWeekTotals, dateRange, activeInPipeline, newMembersThisWeek } = weekData;
 
-    const metrics = [
-        { key: 'exposures', label: 'Exposures', value: totals.exposures, lastWeek: lastWeekTotals?.exposures || 0, color: 'indigo' },
-        { key: 'followUps', label: 'Follow Ups', value: totals.followUps, lastWeek: lastWeekTotals?.followUps || 0, color: 'green' },
-        { key: 'presentations', label: 'Presentations', value: totals.presentations, lastWeek: lastWeekTotals?.presentations || 0, color: 'purple' },
-        { key: 'threeWays', label: '3-Way Calls', value: totals.threeWays, lastWeek: lastWeekTotals?.threeWays || 0, color: 'pink' },
-        { key: 'enrolls', label: 'Memberships Sold', value: totals.enrolls, lastWeek: lastWeekTotals?.enrolls || 0, color: 'teal' },
-    ];
-
-    const pipelineMetrics = [
-        { label: 'Active in Pipeline', value: activeInPipeline },
-        { label: 'New Members This Week', value: newMembersThisWeek }
+    // Scoreboard Metrics Configuration
+    const scoreboard = [
+        { label: 'Exposures', value: totals.exposures, icon: Users, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+        { label: 'Presentations', value: totals.presentations, icon: Video, color: 'text-purple-600', bg: 'bg-purple-50' },
+        { label: 'Follow Ups', value: totals.followUps, icon: TrendingUp, color: 'text-blue-600', bg: 'bg-blue-50' },
+        { label: 'New Members', value: totals.enrolls, icon: Award, color: 'text-green-600', bg: 'bg-green-50' }
     ];
 
     return (
-        <div ref={ref} className="bg-white p-6 font-sans border border-gray-200 rounded-lg shadow-md" style={{ width: '450px' }}>
-            <div className="text-center mb-6">
-                <h1 className="text-2xl font-bold text-gray-800">Weekly Activity Report</h1>
-                <p className="text-md text-gray-600">{profile.displayName || 'User'}</p>
-                <p className="text-sm text-gray-500 font-medium">{dateRange}</p>
+        <div ref={ref} className="bg-white p-8 font-sans border border-gray-200 rounded-xl shadow-lg" style={{ width: '400px', height: '750px' }}>
+            {/* Header */}
+            <div className="flex flex-col items-center mb-8">
+                <div className="bg-gradient-to-r from-indigo-500 to-purple-600 p-4 rounded-full shadow-lg mb-4">
+                    <Trophy className="h-10 w-10 text-white" />
+                </div>
+                <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Weekly Scoreboard</h1>
+                <p className="text-indigo-600 font-semibold mt-1">{profile.displayName || 'Top Performer'}</p>
+                <div className="flex items-center text-xs text-gray-400 mt-2 bg-gray-100 px-3 py-1 rounded-full">
+                    <Calendar className="h-3 w-3 mr-1" />
+                    {dateRange}
+                </div>
             </div>
 
-            <div className="space-y-4 mb-6">
-                <h3 className="font-semibold text-gray-700 border-b pb-2">This Week's Activity</h3>
-                {metrics.map(metric => (
-                    <div key={metric.key}>
-                        <div className="flex justify-between items-center mb-1">
-                            <h4 className="font-semibold text-gray-600">{metric.label}</h4>
-                            <div className="text-right">
-                                <p className="font-bold text-xl text-gray-800">{metric.value}</p>
-                                <p className="text-xs text-gray-400">Last Week: {metric.lastWeek}</p>
-                            </div>
-                        </div>
+            {/* Main Scoreboard Grid */}
+            <div className="grid grid-cols-2 gap-4 mb-8">
+                {scoreboard.map((stat, idx) => (
+                    <div key={idx} className={`${stat.bg} p-4 rounded-xl flex flex-col items-center justify-center border border-gray-100 text-center`}>
+                        <stat.icon className={`h-6 w-6 ${stat.color} mb-2`} />
+                        <span className="text-3xl font-black text-gray-800">{stat.value}</span>
+                        <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">{stat.label}</span>
                     </div>
                 ))}
             </div>
 
-            <div className="space-y-4 mb-6">
-                <h3 className="font-semibold text-gray-700 border-b pb-2">Prospect Pipeline</h3>
-                {pipelineMetrics.map(metric => (
-                    <div key={metric.label} className="flex justify-between items-center">
-                        <h4 className="font-semibold text-gray-600">{metric.label}</h4>
-                        <p className="font-bold text-xl text-gray-800">{metric.value}</p>
+            {/* Pipeline Summary */}
+            <div className="bg-gray-50 rounded-xl p-5 mb-6">
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 text-center">Pipeline Health</h3>
+                <div className="flex justify-between items-center px-4">
+                    <div className="text-center">
+                        <p className="text-2xl font-bold text-gray-800">{activeInPipeline}</p>
+                        <p className="text-[10px] text-gray-500">Active Pipeline</p>
                     </div>
-                ))}
+                    <div className="h-8 w-px bg-gray-300"></div>
+                    <div className="text-center">
+                        <p className="text-2xl font-bold text-green-600">{newMembersThisWeek}</p>
+                        <p className="text-[10px] text-gray-500">New Members</p>
+                    </div>
+                </div>
             </div>
 
-            <div>
-                <h3 className="font-semibold text-gray-700 border-b pb-2 mb-3">Closing Zone (Hot Prospects)</h3>
-                {closingZone && closingZone.length > 0 ? (
-                    <ul className="text-sm text-gray-600 space-y-2">
-                        {closingZone.map((item, index) => (
-                            <li key={item.id} className="flex justify-between items-center border-b border-gray-100 py-1">
-                                <span>{index + 1}. {item.name}</span>
-                                <span className="text-xs font-bold bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
-                                    {item.exposureCount || 0} exposures
-                                </span>
-                            </li>
-                        ))}
-                    </ul>
-                ) : (
-                    <p className="text-sm text-gray-500">No prospects in the closing zone.</p>
-                )}
-            </div>
-
-            <div className="mt-6 pt-4 border-t border-gray-200 text-center text-xs text-gray-400">
-                <p>&copy; 2025 Platinum Toolkit. All Rights Reserved.</p>
-                <p>Unauthorized duplication or distribution is strictly prohibited.</p>
+            {/* Footer / Branding */}
+            <div className="mt-auto text-center border-t border-gray-100 pt-6">
+                <p className="text-[10px] text-gray-400 font-medium tracking-wide">POWERED BY PLATINUM TOOLKIT</p>
             </div>
         </div>
     );

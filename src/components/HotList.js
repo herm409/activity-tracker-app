@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { collection, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { debounce } from '../utils/helpers';
 import { appId } from '../firebaseConfig';
-import { List, Archive, Plus, Flame, TrendingUp, Users, ChevronDown, ChevronUp, MessageSquare, ArrowRight, ArrowDown, ArrowUp, CheckCircle, XCircle, ArchiveRestore, Trash2, X, Zap, Clock, AlertTriangle } from 'lucide-react';
+import { List, Archive, Plus, Flame, TrendingUp, Users, ChevronDown, ChevronUp, MessageSquare, ArrowRight, ArrowDown, ArrowUp, CheckCircle, XCircle, ArchiveRestore, Trash2, X, Zap, Clock, AlertTriangle, Send, PlayCircle } from 'lucide-react';
 
 // --- Modals for Hotlist (defined locally or imported if reused) ---
 const AddHotlistItemModal = ({ onClose, onAdd }) => {
@@ -97,7 +97,7 @@ const VisualExposureMeter = ({ count }) => {
 };
 
 
-const ProspectCard = ({ item, onUpdate, onInstantUpdate, onDecide, onDataChange, monthlyData }) => {
+const ProspectCard = ({ item, onUpdate, onInstantUpdate, onDecide, onDataChange, monthlyData, onDelete }) => {
     const [isNotesExpanded, setIsNotesExpanded] = useState(false);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -112,19 +112,40 @@ const ProspectCard = ({ item, onUpdate, onInstantUpdate, onDecide, onDataChange,
 
     const exposureCount = item.exposureCount || 0;
 
-    // --- Speed Actions ---
-    const handleLogExposure = () => {
-        // 1. Update Prospect
+    // --- Action-Based Auto-Pilot Logic ---
+
+    const handleSentTool = () => {
+        // Cold -> Warm
+        onInstantUpdate(item.id, {
+            status: 'Warm',
+            exposureCount: exposureCount + 1,
+            lastContacted: new Date().toISOString()
+        });
+        updateDailyStats('exposures');
+    };
+
+    const handleDidPresentation = () => {
+        // Warm -> Hot
+        onInstantUpdate(item.id, {
+            status: 'Hot',
+            exposureCount: exposureCount + 1, // Presentations usually imply an exposure occurred too
+            lastContacted: new Date().toISOString()
+        });
+        updateDailyStats('presentations');
+    };
+
+    const handleGenericLogExposure = () => {
         onInstantUpdate(item.id, {
             exposureCount: exposureCount + 1,
             lastContacted: new Date().toISOString()
         });
+        updateDailyStats('exposures');
+    };
 
-        // 2. Update Daily Stats
-        // NOTE: This updates the Dashboard 'exposures' count instantly
+    const updateDailyStats = (metric) => {
         const day = new Date().getDate();
-        const currentExposures = Number(monthlyData?.[day]?.exposures || 0);
-        onDataChange(new Date(), 'exposures', currentExposures + 1);
+        const currentCount = Number(monthlyData?.[day]?.[metric] || 0);
+        onDataChange(new Date(), metric, currentCount + 1);
     };
 
     const handleSnooze = () => {
@@ -133,22 +154,24 @@ const ProspectCard = ({ item, onUpdate, onInstantUpdate, onDecide, onDataChange,
         onInstantUpdate(item.id, { nextActionDate: newDate.toISOString().split('T')[0] });
     };
 
-    const handleLogFollowUp = () => {
-        onInstantUpdate(item.id, { exposureCount: exposureCount + 1, lastContacted: new Date().toISOString() });
-        const day = new Date().getDate();
-        const currentFollowUps = Number(monthlyData?.[day]?.followUps || 0);
-        onDataChange(new Date(), 'followUps', currentFollowUps + 1);
-    };
-
     return (
         <div className={`p-4 border rounded-lg bg-white shadow-sm transition-all hover:shadow-md relative overflow-hidden ${isOverdue ? 'border-l-4 border-l-red-500' : 'border-l-4 border-l-transparent'} ${isStagnant ? 'bg-gray-50' : ''}`}>
-            {/* Context Badges */}
-            <div className="absolute top-2 right-2 flex space-x-1">
+            {/* Context Badges & Quick Kill */}
+            <div className="absolute top-2 right-2 flex items-center space-x-2">
                 {isOverdue && <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded text-[10px] font-bold flex items-center"><AlertTriangle className="w-3 h-3 mr-1" /> Overdue</span>}
                 {isStagnant && <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded text-[10px] font-bold flex items-center">Stagnant</span>}
+
+                {/* Quick Kill Button */}
+                <button
+                    onClick={() => onDelete(item.id)}
+                    className="text-gray-300 hover:text-red-500 transition-colors p-1"
+                    title="Quick Kill / Not Interested"
+                >
+                    <Trash2 className="h-4 w-4" />
+                </button>
             </div>
 
-            <div className="flex justify-between items-start mt-2">
+            <div className="flex justify-between items-start mt-2 pr-8">
                 <input
                     type="text"
                     defaultValue={item.name}
@@ -163,21 +186,44 @@ const ProspectCard = ({ item, onUpdate, onInstantUpdate, onDecide, onDataChange,
                 <VisualExposureMeter count={exposureCount} />
             </div>
 
-            {/* Speed Actions Row */}
+            {/* Smart Action-Based Buttons */}
             <div className="flex space-x-2 my-3">
-                <button
-                    onClick={handleLogExposure}
-                    className="flex-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 py-2 rounded-md flex items-center justify-center text-xs font-semibold transition-colors"
-                >
-                    <Zap className="h-4 w-4 mr-1 text-indigo-500" />
-                    Log Exposure
-                </button>
+                {item.status === 'Cold' && (
+                    <button
+                        onClick={handleSentTool}
+                        className="flex-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 py-2 rounded-md flex items-center justify-center text-xs font-semibold transition-colors border border-indigo-200"
+                    >
+                        <Send className="h-4 w-4 mr-1 text-indigo-600" />
+                        Sent Tool (Move Warm)
+                    </button>
+                )}
+
+                {item.status === 'Warm' && (
+                    <button
+                        onClick={handleDidPresentation}
+                        className="flex-1 bg-purple-50 hover:bg-purple-100 text-purple-700 py-2 rounded-md flex items-center justify-center text-xs font-semibold transition-colors border border-purple-200"
+                    >
+                        <PlayCircle className="h-4 w-4 mr-1 text-purple-600" />
+                        Did Pres (Move Hot)
+                    </button>
+                )}
+
+                {item.status === 'Hot' && (
+                    <button
+                        onClick={handleGenericLogExposure}
+                        className="flex-1 bg-green-50 hover:bg-green-100 text-green-700 py-2 rounded-md flex items-center justify-center text-xs font-semibold transition-colors border border-green-200"
+                    >
+                        <Zap className="h-4 w-4 mr-1 text-green-600" />
+                        Log Exposure
+                    </button>
+                )}
+
                 <button
                     onClick={handleSnooze}
                     className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-600 py-2 rounded-md flex items-center justify-center text-xs font-semibold transition-colors"
                 >
                     <Clock className="h-4 w-4 mr-1 text-gray-500" />
-                    Snooze (+3 Days)
+                    Snooze
                 </button>
             </div>
 
@@ -208,16 +254,11 @@ const ProspectCard = ({ item, onUpdate, onInstantUpdate, onDecide, onDataChange,
                 </div>
             </div>
 
-            <div className="mt-3 pt-3 border-t border-gray-100 flex flex-wrap items-center justify-end gap-2">
-                {item.status === 'Cold' && <button onClick={() => onInstantUpdate(item.id, { status: 'Warm' })} className="flex items-center text-xs font-medium text-indigo-600 hover:text-indigo-800"><ArrowRight className="h-4 w-4 mr-1" /> Move to Warm</button>}
-                {item.status === 'Warm' && <>
-                    <button onClick={() => onInstantUpdate(item.id, { status: 'Cold' })} className="flex items-center text-xs font-medium text-gray-500 hover:text-gray-700"><ArrowDown className="h-4 w-4 mr-1" /> Move to Cold</button>
-                    <button onClick={() => onInstantUpdate(item.id, { status: 'Hot' })} className="flex items-center text-xs font-medium text-red-600 hover:text-red-800"><ArrowUp className="h-4 w-4 mr-1" /> Move to Hot</button>
-                </>}
-                {item.status === 'Hot' && <>
-                    <button onClick={() => onInstantUpdate(item.id, { status: 'Warm' })} className="flex items-center text-xs font-medium text-gray-500 hover:text-gray-700"><ArrowDown className="h-4 w-4 mr-1" /> Move to Warm</button>
-                    <button onClick={() => onDecide(item)} className="flex items-center text-xs font-bold text-green-600 hover:text-green-800"><CheckCircle className="h-4 w-4 mr-1" /> Decision Made</button>
-                </>}
+            {/* Manual Override Controls (Small footer) */}
+            <div className="mt-3 pt-3 border-t border-gray-100 flex flex-wrap items-center justify-end gap-2 opacity-60 hover:opacity-100 transition-opacity">
+                {item.status === 'Cold' && <button onClick={() => onInstantUpdate(item.id, { status: 'Warm' })} className="text-[10px] text-gray-400 hover:text-indigo-600">Manual > Warm</button>}
+                {item.status === 'Warm' && <button onClick={() => onInstantUpdate(item.id, { status: 'Hot' })} className="text-[10px] text-gray-400 hover:text-red-600">Manual > Hot</button>}
+                {item.status === 'Hot' && <button onClick={() => onDecide(item)} className="flex items-center text-xs font-bold text-green-600 hover:text-green-800 bg-green-50 px-3 py-1 rounded-full"><CheckCircle className="h-3 w-3 mr-1" /> CLOSE DEAL</button>}
             </div>
         </div>
     );
@@ -337,8 +378,8 @@ export const HotList = ({ user, db, onDataChange, monthlyData, hotlist: allProsp
     };
 
     const statusConfig = {
-        Hot: { title: 'HOT - Closing Zone', icon: Flame, color: 'red', description: 'Prospects who have seen a presentation. Follow up to close!' },
-        Warm: { title: 'WARM - Building Interest', icon: TrendingUp, color: 'amber', description: "Actively sending tools and having conversations." },
+        Hot: { title: 'HOT - Closing Zone', icon: Flame, color: 'red', description: 'Prospects who have seen a presentation.' },
+        Warm: { title: 'WARM - Building Interest', icon: TrendingUp, color: 'amber', description: "Prospects who have been sent a tool/video." },
         Cold: { title: 'COLD - Prospect List', icon: Users, color: 'blue', description: 'New prospects to start conversations with.' },
     };
 
@@ -434,6 +475,7 @@ export const HotList = ({ user, db, onDataChange, monthlyData, hotlist: allProsp
                                                     onDecide={setItemToDecide}
                                                     onDataChange={onDataChange}
                                                     monthlyData={monthlyData}
+                                                    onDelete={() => setItemToDelete(item.id)}
                                                 />
                                             ))}
                                         </div>
