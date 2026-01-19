@@ -145,7 +145,7 @@ const TeamDashboard = ({ teamData, teamMembers, onLeaveTeam, onShareInvite, user
     );
 };
 
-const TeamPage = ({ user, db, userProfile, setUserProfile }) => {
+const TeamPage = ({ user, db, userProfile, setUserProfile, weekId }) => {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showJoinModal, setShowJoinModal] = useState(false);
     const [teamData, setTeamData] = useState(null);
@@ -176,14 +176,24 @@ const TeamPage = ({ user, db, userProfile, setUserProfile }) => {
             const userProfileRef = doc(db, 'artifacts', appId, 'users', user.uid);
             batch.update(userProfileRef, { teamId: newTeamRef.id });
 
-            const statsRef = doc(db, 'artifacts', appId, 'public', 'data', 'teamMemberStats', user.uid);
+            // Initialize stats for current week
+            const currentWeekId = weekId; // Or getWeekId(new Date()) if imported
+            // Since we receive weekId from App which is based on currentDate state, 
+            // and usually people create teams on "Today", using weekId prop is safe enough 
+            // OR ideally import getWeekId. I'll stick to weekId prop for simplicity if it matches current.
+            // But to be robust, let's assume weekId passed is valid for initialization or just use the prop.
+
+            const statsRef = doc(db, 'artifacts', appId, 'leaderboard', weekId, 'entries', user.uid);
             batch.set(statsRef, {
                 displayName: userProfile.displayName,
                 teamId: newTeamRef.id,
+                exposures: 0,
+                presentations: 0,
                 weeklyExposures: 0,
                 weeklyPresentations: 0,
-                lastUpdated: new Date(),
-                uid: user.uid
+                userId: user.uid,
+                weekId: weekId,
+                lastUpdated: new Date()
             }, { merge: true });
 
             await batch.commit();
@@ -206,14 +216,17 @@ const TeamPage = ({ user, db, userProfile, setUserProfile }) => {
             const userProfileRef = doc(db, 'artifacts', appId, 'users', user.uid);
             batch.update(userProfileRef, { teamId });
 
-            const statsRef = doc(db, 'artifacts', appId, 'public', 'data', 'teamMemberStats', user.uid);
+            const statsRef = doc(db, 'artifacts', appId, 'leaderboard', weekId, 'entries', user.uid);
             batch.set(statsRef, {
                 displayName: userProfile.displayName,
                 teamId: teamId,
+                exposures: 0,
+                presentations: 0,
                 weeklyExposures: 0,
                 weeklyPresentations: 0,
-                lastUpdated: new Date(),
-                uid: user.uid
+                userId: user.uid,
+                weekId: weekId,
+                lastUpdated: new Date()
             }, { merge: true });
 
             await batch.commit();
@@ -228,13 +241,22 @@ const TeamPage = ({ user, db, userProfile, setUserProfile }) => {
         const userProfileRef = doc(db, 'artifacts', appId, 'users', user.uid);
         await updateDoc(userProfileRef, { teamId: null });
 
-        const statsRef = doc(db, 'artifacts', appId, 'public', 'data', 'teamMemberStats', user.uid);
-        await updateDoc(statsRef, { teamId: null });
+        // Optionally remove teamId from current week's entry so they disappear from leaderboard immediately
+        if (weekId) {
+            const statsRef = doc(db, 'artifacts', appId, 'leaderboard', weekId, 'entries', user.uid);
+            try {
+                // We update teamId to null or delete the field?
+                // If we set null, they won't appear in the query `where('teamId', '==', ...)`
+                await updateDoc(statsRef, { teamId: null });
+            } catch (e) {
+                // Ignore if doc doesn't exist
+            }
+        }
 
         setUserProfile(prev => ({ ...prev, teamId: null }));
         setTeamData(null);
         setTeamMembers([]);
-    }, [user, db, setUserProfile]);
+    }, [user, db, setUserProfile, weekId]);
 
     const handleShareInvite = () => {
         if (teamData) {
@@ -255,6 +277,7 @@ const TeamPage = ({ user, db, userProfile, setUserProfile }) => {
             }
             setIsLoading(true);
 
+            // Fetch Team Info
             const teamRef = doc(db, 'artifacts', appId, 'public', 'data', 'teams', userProfile.teamId);
             const teamSnap = await getDoc(teamRef);
             if (!teamSnap.exists()) {
@@ -263,7 +286,9 @@ const TeamPage = ({ user, db, userProfile, setUserProfile }) => {
             }
             setTeamData({ id: teamSnap.id, ...teamSnap.data() });
 
-            const statsCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'teamMemberStats');
+            // Fetch Team Stats from Weekly Leaderboard Collection
+            // Use the prop `weekId` to toggle weeks!
+            const statsCollectionRef = collection(db, 'artifacts', appId, 'leaderboard', weekId, 'entries');
             const q = query(statsCollectionRef, where("teamId", "==", userProfile.teamId));
 
             unsubscribe = onSnapshot(q, (snapshot) => {
@@ -276,7 +301,7 @@ const TeamPage = ({ user, db, userProfile, setUserProfile }) => {
             });
         };
 
-        if (db && user && userProfile.uid) {
+        if (db && user && userProfile.uid && weekId) {
             fetchTeamData();
         } else if (!userProfile.teamId) {
             setIsLoading(false);
@@ -284,7 +309,7 @@ const TeamPage = ({ user, db, userProfile, setUserProfile }) => {
 
         return () => unsubscribe();
 
-    }, [user, db, userProfile.uid, userProfile.teamId, handleLeaveTeam]);
+    }, [user, db, userProfile.uid, userProfile.teamId, handleLeaveTeam, weekId]);
 
     if (isLoading) {
         return <div className="text-center p-10">Loading Team...</div>;

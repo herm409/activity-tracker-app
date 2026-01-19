@@ -81,48 +81,6 @@ const AppContent = () => {
     lastMonthDate.setMonth(currentDate.getMonth() - 1);
     const lastMonthYearId = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, '0')}`;
 
-    const updateTeamMemberStats = useCallback(async (currentMonthlyData, currentLastMonthData, currentProfile) => {
-        if (!db || !user || !currentProfile.teamId || !currentProfile.displayName) return;
-
-        const today = new Date();
-        const startOfWeek = new Date(today);
-        startOfWeek.setDate(today.getDate() - today.getDay());
-        startOfWeek.setHours(0, 0, 0, 0);
-
-        let weeklyExposures = 0;
-        let weeklyPresentations = 0;
-
-        let d = new Date(startOfWeek);
-        while (d <= today) {
-            const dataSet = d.getMonth() === today.getMonth() ? currentMonthlyData : currentLastMonthData;
-            const dayData = dataSet?.[d.getDate()];
-            if (dayData) {
-                weeklyExposures += Number(dayData.exposures) || 0;
-                weeklyPresentations += (dayData.presentations?.length || 0) + (Number(dayData.pbrs) || 0);
-            }
-            d.setDate(d.getDate() + 1);
-        }
-
-        const statsRef = doc(db, 'artifacts', appId, 'public', 'data', 'teamMemberStats', user.uid);
-        await setDoc(statsRef, {
-            displayName: currentProfile.displayName,
-            teamId: currentProfile.teamId,
-            weeklyExposures,
-            weeklyPresentations,
-            lastUpdated: new Date(),
-            uid: user.uid
-        }, { merge: true });
-
-    }, [db, user]);
-
-    const debouncedUpdateStats = useMemo(() => debounce(updateTeamMemberStats, 2500), [updateTeamMemberStats]);
-
-    useEffect(() => {
-        if (userProfile.teamId) {
-            debouncedUpdateStats(monthlyData, lastMonthData, userProfile);
-        }
-    }, [monthlyData, lastMonthData, userProfile, debouncedUpdateStats]);
-
     const fetchData = useCallback(async () => {
         if (!user || !db) return;
 
@@ -218,47 +176,52 @@ const AppContent = () => {
         const weekId = getWeekId(dateOfChange);
 
         let weeklyExposures = 0;
+        let weeklyPresentations = 0;
         let d = new Date(start);
 
         while (d <= end) {
             const dMonthId = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
             const day = d.getDate();
 
-            // Determine where to read the data from for this specific day
-            // We prioritize currentMonthData if it matches the targetMonthId (as it's the latest change)
-            // Otherwise, we fall back to what we have in state (monthlyDataRef or lastMonthData)
-
-            let exposures = 0;
+            let dayData = null;
 
             if (dMonthId === targetMonthId && currentMonthData) {
-                // This day falls in the month we are currently saving/updating
-                exposures = Number(currentMonthData[day]?.exposures) || 0;
+                dayData = currentMonthData[day];
             } else {
-                // This day falls in a different month (e.g., cross-month week)
-                // We check if it matches our current view's month
                 if (dMonthId === monthYearId) {
-                    exposures = Number(monthlyDataRef.current?.[day]?.exposures) || 0;
+                    dayData = monthlyDataRef.current?.[day];
                 } else if (dMonthId === lastMonthYearId) {
-                    // We can access lastMonthData from state. 
-                    // Note: lastMonthData might be stale if we just switched rapidly, but acceptable.
-                    exposures = Number(lastMonthData?.[day]?.exposures) || 0;
+                    dayData = lastMonthData?.[day];
                 }
-                // If it's neither, we assume 0 (user would need to load that month to count it)
             }
 
-            weeklyExposures += exposures;
+            if (dayData) {
+                weeklyExposures += Number(dayData.exposures) || 0;
+                weeklyPresentations += (dayData.presentations?.length || 0) + (Number(dayData.pbrs) || 0);
+            }
+
             d.setDate(d.getDate() + 1);
         }
 
         const leaderboardRef = doc(db, 'artifacts', appId, 'leaderboard', weekId, 'entries', user.uid);
-        await setDoc(leaderboardRef, {
+
+        const payload = {
             displayName: userProfile.displayName,
             exposures: weeklyExposures,
+            presentations: weeklyPresentations, // Unified field
+            weeklyExposures, // For backward compatibility / alignment
+            weeklyPresentations, // For backward compatibility / alignment
             userId: user.uid,
             weekId: weekId,
             lastUpdated: new Date()
-        });
-    }, [user, db, userProfile.displayName, monthYearId, lastMonthYearId, lastMonthData]);
+        };
+
+        if (userProfile.teamId) {
+            payload.teamId = userProfile.teamId;
+        }
+
+        await setDoc(leaderboardRef, payload, { merge: true });
+    }, [user, db, userProfile.displayName, userProfile.teamId, monthYearId, lastMonthYearId, lastMonthData]);
 
     const debouncedSave = useMemo(() => debounce(async (dataToSave, goalsToSave, targetMonthId, dateOfChange) => {
         if (!user || !db) return;
@@ -556,7 +519,7 @@ const AppContent = () => {
                             streaks={userProfile.longestStreaks || {}}
                         />}
                         {activeTab === 'leaderboard' && <Leaderboard db={db} weekId={getWeekId(currentDate)} user={user} />}
-                        {activeTab === 'team' && <TeamPage user={user} db={db} userProfile={userProfile} setUserProfile={setUserProfile} />}
+                        {activeTab === 'team' && <TeamPage user={user} db={db} userProfile={userProfile} setUserProfile={setUserProfile} weekId={getWeekId(currentDate)} />}
                         {activeTab === 'hotlist' && <HotList
                             user={user} db={db}
                             onDataChange={(date, field, val) => handleDataChange(date, field, val)}
