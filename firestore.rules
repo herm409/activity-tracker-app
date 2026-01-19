@@ -1,0 +1,54 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Auth Check
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // User Check
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    match /artifacts/{appId} {
+      // User Data
+      match /users/{userId} {
+        allow read, write: if isAuthenticated() && isOwner(userId);
+        
+        match /activities/{activityId} {
+            allow read, write: if isAuthenticated() && isOwner(userId);
+        }
+        
+        match /hotlist/{itemId} {
+            allow read, write: if isAuthenticated() && isOwner(userId);
+        }
+      }
+
+      // Public Data
+      match /public/data/teams/{teamId} {
+        allow read: if isAuthenticated();
+        // Allow write if creating a new team (no constraint for now) or strictly validation 
+        allow write: if isAuthenticated();
+      }
+      
+      match /public/data/inviteCodes/{code} {
+        allow read: if isAuthenticated();
+        allow write: if isAuthenticated(); // Needed to create codes
+      }
+      
+      match /public/data/teamMemberStats/{userId} {
+        allow read: if isAuthenticated();
+        allow write: if isAuthenticated() && isOwner(userId);
+      }
+      
+      // Leaderboard
+      match /leaderboard/{monthId}/entries/{userId} {
+          allow read: if isAuthenticated();
+          allow write: if isAuthenticated() && isOwner(userId);
+      }
+    }
+  }
+}
