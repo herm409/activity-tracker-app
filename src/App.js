@@ -7,7 +7,7 @@ import html2canvas from 'html2canvas';
 // Context
 import { AppProvider, useAppContext } from './context/AppContext';
 import { appId } from './firebaseConfig';
-import { debounce, WEEKS_IN_MONTH } from './utils/helpers';
+import { debounce, WEEKS_IN_MONTH, getWeekId, getWeekRange } from './utils/helpers';
 
 // Components (Eager Load)
 import Header from './components/Header';
@@ -211,25 +211,63 @@ const AppContent = () => {
         setUserProfile(prev => ({ ...prev, hasSeenGoalInstruction: true }));
     };
 
-    const updateLeaderboard = useCallback(async (currentMonthData, targetMonthId) => {
-        if (!user || !db || !userProfile.displayName) return;
-        const totalExposures = Object.values(currentMonthData).reduce((sum, day) => sum + (Number(day.exposures) || 0), 0);
-        const leaderboardRef = doc(db, 'artifacts', appId, 'leaderboard', targetMonthId, 'entries', user.uid);
+    const updateLeaderboard = useCallback(async (currentMonthData, targetMonthId, dateOfChange) => {
+        if (!user || !db || !userProfile.displayName || !dateOfChange) return;
+
+        const { start, end } = getWeekRange(dateOfChange);
+        const weekId = getWeekId(dateOfChange);
+
+        let weeklyExposures = 0;
+        let d = new Date(start);
+
+        while (d <= end) {
+            const dMonthId = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            const day = d.getDate();
+
+            // Determine where to read the data from for this specific day
+            // We prioritize currentMonthData if it matches the targetMonthId (as it's the latest change)
+            // Otherwise, we fall back to what we have in state (monthlyDataRef or lastMonthData)
+
+            let exposures = 0;
+
+            if (dMonthId === targetMonthId && currentMonthData) {
+                // This day falls in the month we are currently saving/updating
+                exposures = Number(currentMonthData[day]?.exposures) || 0;
+            } else {
+                // This day falls in a different month (e.g., cross-month week)
+                // We check if it matches our current view's month
+                if (dMonthId === monthYearId) {
+                    exposures = Number(monthlyDataRef.current?.[day]?.exposures) || 0;
+                } else if (dMonthId === lastMonthYearId) {
+                    // We can access lastMonthData from state. 
+                    // Note: lastMonthData might be stale if we just switched rapidly, but acceptable.
+                    exposures = Number(lastMonthData?.[day]?.exposures) || 0;
+                }
+                // If it's neither, we assume 0 (user would need to load that month to count it)
+            }
+
+            weeklyExposures += exposures;
+            d.setDate(d.getDate() + 1);
+        }
+
+        const leaderboardRef = doc(db, 'artifacts', appId, 'leaderboard', weekId, 'entries', user.uid);
         await setDoc(leaderboardRef, {
             displayName: userProfile.displayName,
-            exposures: totalExposures,
-            userId: user.uid
+            exposures: weeklyExposures,
+            userId: user.uid,
+            weekId: weekId,
+            lastUpdated: new Date()
         });
-    }, [user, db, userProfile.displayName]);
+    }, [user, db, userProfile.displayName, monthYearId, lastMonthYearId, lastMonthData]);
 
-    const debouncedSave = useMemo(() => debounce(async (dataToSave, goalsToSave, targetMonthId) => {
+    const debouncedSave = useMemo(() => debounce(async (dataToSave, goalsToSave, targetMonthId, dateOfChange) => {
         if (!user || !db) return;
         const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', targetMonthId);
         try {
             await setDoc(docRef, { dailyData: dataToSave, monthlyGoals: goalsToSave }, { merge: true });
             isDirtyRef.current = false;
-            if (dataToSave) {
-                updateLeaderboard(dataToSave, targetMonthId);
+            if (dataToSave && dateOfChange) {
+                updateLeaderboard(dataToSave, targetMonthId, dateOfChange);
             }
         } catch (error) {
             console.error("Failed to save data:", error);
@@ -244,7 +282,7 @@ const AppContent = () => {
             const updatedData = { ...monthlyData, [day]: { ...monthlyData[day], [field]: value } };
             setMonthlyData(updatedData);
             isDirtyRef.current = true;
-            debouncedSave(updatedData, monthlyGoals, monthYearId);
+            debouncedSave(updatedData, monthlyGoals, monthYearId, date);
         } else {
             if (targetMonthId === lastMonthYearId) {
                 const updatedLastMonthData = { ...lastMonthData, [day]: { ...lastMonthData[day], [field]: value } };
@@ -517,7 +555,7 @@ const AppContent = () => {
                             showGoalInstruction={showGoalInstruction} onDismissGoalInstruction={handleDismissGoalInstruction}
                             streaks={userProfile.longestStreaks || {}}
                         />}
-                        {activeTab === 'leaderboard' && <Leaderboard db={db} monthYearId={monthYearId} user={user} />}
+                        {activeTab === 'leaderboard' && <Leaderboard db={db} weekId={getWeekId(currentDate)} user={user} />}
                         {activeTab === 'team' && <TeamPage user={user} db={db} userProfile={userProfile} setUserProfile={setUserProfile} />}
                         {activeTab === 'hotlist' && <HotList
                             user={user} db={db}

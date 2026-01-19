@@ -1,69 +1,98 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, orderBy, limit, getDocs, where, getCountFromServer } from 'firebase/firestore';
+import { collection, query, orderBy, limit, getDocs, where, getCountFromServer, doc, getDoc } from 'firebase/firestore';
 import { appId } from '../firebaseConfig';
+import { Trophy } from 'lucide-react';
 
-const Leaderboard = ({ db, monthYearId, user }) => {
+const Leaderboard = ({ db, weekId, user }) => {
     const [scores, setScores] = useState([]);
     const [userRank, setUserRank] = useState(null);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const fetchLeaderboard = async () => {
-            if (!db) return;
-            // Lazy load - in a real implementation we might want to check if this component is visible or active
-            // But since it's mounting when the tab is clicked, it's fine.
-            const leaderboardColRef = collection(db, 'artifacts', appId, 'leaderboard', monthYearId, 'entries');
-            const q = query(leaderboardColRef, orderBy('exposures', 'desc'), limit(20));
-            const snapshot = await getDocs(q);
-            const leaderboardData = snapshot.docs.map(d => ({ ...d.data(), id: d.id }));
-            setScores(leaderboardData);
+        if (!db || !weekId) return;
 
-            const userEntry = leaderboardData.find(entry => entry.userId === user.uid);
-            if (userEntry) {
-                // Optimization: Only count if user is not in top 20 or we want exact rank.
-                // Ideally if user is in top 20, we know the rank from index.
-                // If not in top 20, we query. 
-                // But wait, "index + 1" is the rank for the top 20 list. 
-                // If the user isn't in the list, we need to query.
-                // The original code queried *whenever* userEntry was found in the *local data*? No, wait.
-                // "userEntry = leaderboardData.find...". This only finds if user is in top 20.
-                // So if user is in top 20, why query again? 
-                // Ah, the original code did: "if (userEntry) { rankQuery... }"
-                // That seems redundant if we have the index. But strict rank might differ if there are ties? 
-                // Firestore orderBy is deterministic with document ID tie-breaking if not specified, but here it's just exposures.
-                // Let's optimize: use index if in top 20. Query only if NOT in top 20? 
-                // Original logic: If user is in top 20, it queried for rank. This is safer for ties but expensive.
-                // Let's stick to the original logic for now to ensure correctness, or optimize if simpler.
-                // Actually, counting documents > userScore is the standard way.
-                const rankQuery = query(leaderboardColRef, where('exposures', '>', userEntry.exposures));
-                const higherScoresSnap = await getCountFromServer(rankQuery);
-                setUserRank(higherScoresSnap.data().count + 1);
-            } else {
-                // If user is NOT in top 20, we should probably still find their rank?
-                // The original code just set null if not in top 20. 
-                // That's a UX gap we can fix later. For now, keep parity.
-                setUserRank(null);
+        const fetchLeaderboard = async () => {
+            setLoading(true);
+            try {
+                // Fetch top 20
+                const leaderboardColRef = collection(db, 'artifacts', appId, 'leaderboard', weekId, 'entries');
+                const q = query(leaderboardColRef, orderBy('exposures', 'desc'), limit(20));
+                const snapshot = await getDocs(q);
+                const leaderboardData = snapshot.docs.map(d => ({ ...d.data(), id: d.id }));
+                setScores(leaderboardData);
+
+                // Find user rank
+                if (user) {
+                    const userEntry = leaderboardData.find(e => e.userId === user.uid);
+                    if (userEntry) {
+                        // If in top 20, just use the index + 1
+                        const rank = leaderboardData.indexOf(userEntry) + 1;
+                        setUserRank(rank);
+                    } else {
+                        // If not in top 20, check if we have an entry at all
+                        const userDocRef = doc(db, 'artifacts', appId, 'leaderboard', weekId, 'entries', user.uid);
+                        const userDocSnap = await getDoc(userDocRef);
+
+                        if (userDocSnap.exists()) {
+                            // If user has a score, count how many are strictly better
+                            const userExposures = userDocSnap.data().exposures || 0;
+                            const qCount = query(leaderboardColRef, where('exposures', '>', userExposures));
+                            const countSnap = await getCountFromServer(qCount);
+                            setUserRank(countSnap.data().count + 1);
+                        } else {
+                            setUserRank(null);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error("Error fetching leaderboard:", error);
+            } finally {
+                setLoading(false);
             }
         };
+
         fetchLeaderboard();
-    }, [db, monthYearId, user.uid]);
+    }, [db, weekId, user]);
 
     return (
-        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
-            <h2 className="text-2xl font-semibold mb-4">Top 20 Leaderboard</h2>
-            <div className="space-y-3">
-                {scores.map((entry, index) => (
-                    <div key={entry.id} className={`p-3 rounded-lg flex items-center justify-between ${entry.userId === user.uid ? 'bg-indigo-100 border-2 border-indigo-500' : 'bg-gray-50'}`}>
-                        <div className="flex items-center">
-                            <span className="font-bold text-lg w-8">{index + 1}</span>
-                            <span className="font-medium">{entry.displayName}</span>
-                        </div>
-                        <span className="font-bold text-lg text-indigo-600">{entry.exposures}</span>
-                    </div>
-                ))}
-            </div>
-            {userRank && (
-                <div className="mt-4 text-center p-3 bg-amber-100 text-amber-800 font-semibold rounded-lg">
-                    Your Rank: {userRank}
+        <div className="p-4 bg-white rounded-xl shadow-sm border border-gray-100">
+            <h2 className="text-xl font-bold mb-4 flex items-center text-gray-800">
+                <Trophy className="mr-2 text-yellow-500 h-6 w-6" /> Weekly Leaderboard
+            </h2>
+            <p className="text-xs text-gray-500 mb-4">Week of {weekId} (Sun-Sat)</p>
+
+            {loading ? (
+                <div className="text-center py-10 text-gray-400">Loading scores...</div>
+            ) : (
+                <div className="space-y-2">
+                    {scores.length === 0 ? (
+                        <div className="text-center py-8 text-gray-400">No activity yet this week. Be the first!</div>
+                    ) : (
+                        scores.map((entry, index) => (
+                            <div key={entry.id} className={`flex items-center justify-between p-3 rounded-lg ${entry.userId === user?.uid ? 'bg-indigo-50 border border-indigo-100 ring-1 ring-indigo-200' : 'bg-gray-50 border border-gray-100'}`}>
+                                <div className="flex items-center">
+                                    <span className={`font-bold w-8 text-center ${index < 3 ? 'text-yellow-600 text-lg' : 'text-gray-500'}`}>
+                                        #{index + 1}
+                                    </span>
+                                    <div>
+                                        <p className={`font-semibold ${entry.userId === user?.uid ? 'text-indigo-900' : 'text-gray-800'}`}>
+                                            {entry.displayName} {entry.userId === user?.uid && '(You)'}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center">
+                                    <span className="font-bold text-lg text-indigo-600">{entry.exposures}</span>
+                                    <span className="text-xs text-gray-400 ml-1">exp</span>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            )}
+
+            {!loading && userRank && userRank > 20 && (
+                <div className="mt-4 pt-4 border-t border-gray-100 text-center text-sm text-gray-600">
+                    You are currently ranked <strong>#{userRank}</strong>
                 </div>
             )}
         </div>
