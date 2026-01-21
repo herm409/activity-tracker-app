@@ -53,21 +53,35 @@ export const ActivityCard = ({ label, value, streak, icon: Icon, color, onIncrem
                 <Icon className={`h-7 w-7 text-${color}-400`} />
             </div>
 
-            <div className="flex items-center justify-center space-x-4 my-2 z-10">
-                <button onClick={onDecrement} className="p-3 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50" disabled={value <= 0}>
+            <div
+                className="flex items-center justify-center space-x-4 my-2 z-10"
+                onClick={(e) => {
+                    // Allow tapping anywhere in the center area to toggle tooltip on mobile
+                    if (tooltip) {
+                        e.stopPropagation();
+                        setIsHovered(!isHovered);
+                    }
+                }}
+            >
+                <button onClick={(e) => { e.stopPropagation(); onDecrement(); }} className="p-3 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50" disabled={value <= 0}>
                     <Minus className="h-5 w-5" />
                 </button>
-                <div className="flex flex-col items-center w-24">
+                <div className="flex flex-col items-center w-24 cursor-pointer">
                     <span className={`text-5xl font-bold ${valueColor} transition-colors duration-300`}>
                         {formatScore(score)}
                     </span>
                     {isDeficitMode && (
-                        <span className={`text-xs font-bold uppercase tracking-wider ${isDebt ? 'text-red-500' : (isEven ? 'text-blue-500' : 'text-green-500')}`}>
-                            {isDebt ? 'DEBT' : (isEven ? 'EVEN' : 'SURPLUS')}
-                        </span>
+                        <>
+                            <span className={`text-xs font-bold uppercase tracking-wider ${isDebt ? 'text-red-500' : (isEven ? 'text-blue-500' : 'text-green-500')}`}>
+                                {isDebt ? 'DEBT' : (isEven ? 'EVEN' : 'SURPLUS')}
+                            </span>
+                            <span className="text-[10px] text-gray-400 mt-1 font-medium hover:text-indigo-500 flex items-center">
+                                <span className="mr-1">Tap for details</span>
+                            </span>
+                        </>
                     )}
                 </div>
-                <button onClick={onIncrement} className="p-3 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <button onClick={(e) => { e.stopPropagation(); onIncrement(); }} className="p-3 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500">
                     <Plus className="h-5 w-5" />
                 </button>
             </div>

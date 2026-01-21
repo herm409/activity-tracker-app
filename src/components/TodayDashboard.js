@@ -29,7 +29,11 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
                     <div>
                         <div className="flex items-center space-x-2">
                             <h2 className="text-2xl font-semibold text-gray-800 mb-1">Today's Focus</h2>
-                            {onShowLegend && <button onClick={onShowLegend} className="text-gray-400 hover:text-indigo-600 mb-1"><HelpCircle className="h-5 w-5" /></button>}
+                            {onShowLegend && (
+                                <button onClick={onShowLegend} className="flex items-center text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded-full ml-2 transition-colors">
+                                    <HelpCircle className="h-3 w-3 mr-1" /> Rules
+                                </button>
+                            )}
                         </div>
                         <p className="text-gray-500">Log your key business activities for {today.toLocaleDateString('default', { weekday: 'long', month: 'long', day: 'numeric' })}.</p>
                     </div>

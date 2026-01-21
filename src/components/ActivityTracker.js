@@ -21,9 +21,12 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
 
     const weekDisplayDays = useMemo(() => {
         const today = new Date();
+        today.setHours(0, 0, 0, 0); // Normalize to midnight for accurate comparison
+
         const startOfWeek = new Date(date);
         startOfWeek.setDate(date.getDate() - date.getDay());
         startOfWeek.setHours(0, 0, 0, 0);
+
         const days = [];
         for (let i = 0; i < 7; i++) {
             const currentDay = new Date(startOfWeek);
@@ -31,12 +34,15 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
             const dataSet = currentDay.getMonth() === date.getMonth() ? data.current : data.last;
             const dayData = dataSet ? (dataSet[currentDay.getDate()] || {}) : {};
 
-            const isPast = currentDay < today && today.toDateString() !== currentDay.toDateString();
+            // Accurate Day Comparisons
+            const isToday = today.getTime() === currentDay.getTime();
+            const isPast = currentDay < today;
+            const isFuture = currentDay > today;
+
             const noActivity = !dayData || ((Number(dayData.exposures || 0) === 0) && (Number(dayData.followUps || 0) === 0) && ((dayData.presentations?.length || 0) + (Number(dayData.pbrs) || 0) === 0));
-            const isToday = today.toDateString() === currentDay.toDateString();
             const isWeekend = currentDay.getDay() === 0 || currentDay.getDay() === 6;
 
-            days.push({ date: currentDay, day: currentDay.getDate(), data: dayData, hasNoActivity: isPast && noActivity, isBlank: false, isToday, isWeekend });
+            days.push({ date: currentDay, day: currentDay.getDate(), data: dayData, hasNoActivity: isPast && noActivity, isBlank: false, isToday, isFuture, isWeekend });
         }
         return days;
     }, [date, data]);
