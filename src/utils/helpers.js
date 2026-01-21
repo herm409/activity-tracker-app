@@ -47,3 +47,71 @@ export const getWeekRange = (date = new Date()) => {
 
     return { start: startOfWeek, end: endOfWeek };
 };
+
+export const calculateCurrentStreaks = (monthlyData, lastMonthData, today = new Date()) => {
+    const metrics = ['exposures', 'followUps', 'presentations', 'threeWays', 'enrolls'];
+    const streaks = {};
+
+    metrics.forEach(metric => {
+        let streak = 0;
+        let d = new Date(today);
+
+        // Normalize today
+        d.setHours(0, 0, 0, 0);
+
+        // Check Today
+        const isTodayDone = checkActivity(d, metric, monthlyData, lastMonthData, today);
+        if (isTodayDone) streak++;
+
+        // Check Yesterday backwards
+        d.setDate(d.getDate() - 1);
+        while (true) {
+            const hasActivity = checkActivity(d, metric, monthlyData, lastMonthData, today);
+            if (hasActivity) {
+                streak++;
+                d.setDate(d.getDate() - 1);
+            } else {
+                break;
+            }
+        }
+        streaks[metric] = streak;
+    });
+    return streaks;
+};
+
+const checkActivity = (dateObj, metric, monthlyData, lastMonthData, referenceDate) => {
+    const day = dateObj.getDate();
+    const month = dateObj.getMonth();
+    const year = dateObj.getFullYear();
+
+    // Compare with referenceDate (today) to determine which data object to use
+    // monthlyData is for the Current Month (of referenceDate)
+    // lastMonthData is for the Previous Month
+
+    const currentMonth = referenceDate.getMonth();
+    const currentYear = referenceDate.getFullYear();
+
+    let dataSource = null;
+
+    if (month === currentMonth && year === currentYear) {
+        dataSource = monthlyData;
+    } else {
+        // Check if it's the previous month
+        const prevDate = new Date(referenceDate);
+        prevDate.setMonth(prevDate.getMonth() - 1);
+
+        if (month === prevDate.getMonth() && year === prevDate.getFullYear()) {
+            dataSource = lastMonthData;
+        }
+    }
+
+    if (!dataSource) return false; // Out of range (older than 2 months)
+
+    const dayData = dataSource[day];
+    if (!dayData) return false;
+
+    // Check metric value
+    const val = dayData[metric];
+    if (Array.isArray(val)) return val.length > 0;
+    return Number(val) > 0;
+};

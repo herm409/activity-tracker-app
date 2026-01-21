@@ -8,7 +8,7 @@ import html2canvas from 'html2canvas';
 // Context
 import { AppProvider, useAppContext } from './context/AppContext';
 import { appId } from './firebaseConfig';
-import { debounce, WEEKS_IN_MONTH, getWeekId, getWeekRange } from './utils/helpers';
+import { debounce, WEEKS_IN_MONTH, getWeekId, getWeekRange, calculateCurrentStreaks } from './utils/helpers';
 
 // Components (Eager Load)
 import Header from './components/Header';
@@ -44,16 +44,12 @@ const AppContent = () => {
     const [showEditNameModal, setShowEditNameModal] = useState(false);
     const [showOnboarding, setShowOnboarding] = useState(false);
     const [showGoalInstruction, setShowGoalInstruction] = useState(false);
-    // These modals were specific to HotList/Dashboard quick adds? 
-    // In original App.js, these were used for the "Log Follow Up" modal triggered from HotList? 
-    // Yes: handleLogFollowUpForProspect, handleAddNewProspectAndLogFollowUp...
-    // I need to check where these Modals are. `FollowUpModal` and `LogExposureModal` were in App.js but I didn't extract them to a separate file, I might have missed them or put them in HotList?
-    // I put HotList-specific modals in HotList.js. 
-    // BUT `TodayDashboard` has `onLogFollowUp` and `onLogExposure` which opened these modals.
-    // So I need these modals at the App level to be accessible from Dashboard and HotList.
-    // Let's re-add them here or import them if I extracted them.
-    // I forgot to extract `FollowUpModal` and `LogExposureModal`. I'll define them here or creating a new file is better.
-    // For now, I'll import them from a new file `components/ActionModals.js` which I will create next, to keep App.js clean.
+
+    // Calculated State (Must be before conditional returns)
+    const currentStreaks = useMemo(() => {
+        return calculateCurrentStreaks(monthlyData, lastMonthData, new Date());
+    }, [monthlyData, lastMonthData]);
+
     const [showFollowUpModal, setShowFollowUpModal] = useState(false);
     const [showExposureModal, setShowExposureModal] = useState(false);
 
@@ -408,6 +404,7 @@ const AppContent = () => {
 
     // Report Generation
     const getWeekDataForReport = useCallback(async () => {
+        if (!db) return { totals: {}, lastWeekTotals: {}, dateRange: '', activeInPipeline: 0, closingZone: [], newMembersThisWeek: 0 };
         const today = new Date();
         const dayOfWeek = today.getDay();
         const startOfWeek = new Date(today);
@@ -606,7 +603,7 @@ const AppContent = () => {
                     <Suspense fallback={<div className="text-center p-10">Loading...</div>}>
                         {activeTab === 'today' && <TodayDashboard
                             monthlyData={monthlyData}
-                            streaks={userProfile.longestStreaks || {}}
+                            streaks={currentStreaks}
                             onQuickAdd={handleQuickAdd}
                             onHabitChange={handleDataChange}
                             onAddPresentation={handleAddPresentation}
@@ -625,7 +622,7 @@ const AppContent = () => {
                             user={user} userProfile={userProfile}
                             onQuickAdd={handleQuickAdd}
                             showGoalInstruction={showGoalInstruction} onDismissGoalInstruction={handleDismissGoalInstruction}
-                            streaks={userProfile.longestStreaks || {}}
+                            streaks={currentStreaks}
                             dailyPar={userProfile.dailyPar}
                             onShowLegend={() => setShowScoringLegend(true)}
                         />}

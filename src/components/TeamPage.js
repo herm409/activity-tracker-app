@@ -331,6 +331,7 @@ const TeamPage = ({ user, db, userProfile, setUserProfile, weekId }) => {
         let unsubscribe = () => { };
 
         const fetchTeamData = async () => {
+            if (!db) return;
             if (!userProfile.teamId) {
                 setIsLoading(false);
                 setTeamData(null);
