@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { doc, getDoc, collection, query, where, onSnapshot, writeBatch, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, onSnapshot, writeBatch, updateDoc, deleteField } from 'firebase/firestore';
 import { appId } from '../firebaseConfig';
-import { Users, Share2, LogOut, ClipboardCopy, CheckCircle, Settings } from 'lucide-react';
+import { Users, Share2, LogOut, ClipboardCopy, CheckCircle, Settings, Trash2 } from 'lucide-react';
 import { generateInviteCode as genCode } from '../utils/helpers';
 
 const CreateTeamModal = ({ onClose, onCreateTeam }) => {
@@ -111,12 +111,11 @@ const TeamSettingsModal = ({ teamData, onClose, onUpdateTeam }) => {
     );
 };
 
-// ... (JoinTeamModal, CreateTeamModal remain same) ...
-
-const TeamDashboard = ({ teamData, teamMembers, onLeaveTeam, onShareInvite, user, onUpdateTeam }) => {
+const TeamDashboard = ({ teamData, teamMembers, onLeaveTeam, onShareInvite, user, onUpdateTeam, onRemoveMember }) => {
     const [showConfirmLeave, setShowConfirmLeave] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [memberToRemove, setMemberToRemove] = useState(null);
 
     const teamTotals = useMemo(() => {
         return teamMembers.reduce((acc, member) => {
@@ -130,9 +129,6 @@ const TeamDashboard = ({ teamData, teamMembers, onLeaveTeam, onShareInvite, user
 
     // Calculate Par To Date
     const getDaysElapsed = () => {
-        // If we had weekId we could check if it's past. 
-        // For now, assuming current week/today logic as primary use case.
-        // Or better: Pass weekId to TeamDashboard.
         const d = new Date();
         const currentDay = d.getDay(); // 0-6
         return currentDay + 1;
@@ -154,6 +150,13 @@ const TeamDashboard = ({ teamData, teamMembers, onLeaveTeam, onShareInvite, user
 
     const isCreator = user.uid === teamData.creatorId;
 
+    const confirmRemoveMember = async () => {
+        if (memberToRemove) {
+            await onRemoveMember(memberToRemove.id || memberToRemove.uid);
+            setMemberToRemove(null);
+        }
+    };
+
     return (
         <div className="space-y-6">
             {showSettings && <TeamSettingsModal teamData={teamData} onClose={() => setShowSettings(false)} onUpdateTeam={onUpdateTeam} />}
@@ -168,6 +171,21 @@ const TeamDashboard = ({ teamData, teamMembers, onLeaveTeam, onShareInvite, user
                     </div>
                 </div>
             )}
+            {memberToRemove && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
+                        <div className="p-6">
+                            <h3 className="text-xl font-semibold text-red-600">Remove Member?</h3>
+                            <p className="mt-2 text-gray-600">Are you sure you want to remove <span className="font-bold">{memberToRemove.displayName || "this member"}</span> from the team?</p>
+                        </div>
+                        <div className="p-4 bg-gray-50 flex justify-end space-x-2">
+                            <button onClick={() => setMemberToRemove(null)} className="bg-gray-200 px-4 py-2 rounded-md">Cancel</button>
+                            <button onClick={confirmRemoveMember} className="bg-red-600 text-white px-4 py-2 rounded-md">Remove</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
                     <div>
@@ -203,20 +221,28 @@ const TeamDashboard = ({ teamData, teamMembers, onLeaveTeam, onShareInvite, user
             </div>
 
             <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
-                <h3 className="text-xl font-semibold mb-4 text-gray-800">Weekly Team Leaderboard (by Weighted Score)</h3>
+                <h3 className="text-xl font-semibold mb-4 text-gray-800">Team Roster (Weekly Stats)</h3>
                 <div className="space-y-3">
                     {teamMembers.sort((a, b) => (b.rankingScore || 0) - (a.rankingScore || 0)).map((member, index) => (
-                        <div key={member.uid} className={`p-3 rounded-lg flex items-center justify-between ${member.uid === user.uid ? 'bg-indigo-100 border-2 border-indigo-500' : 'bg-gray-50'}`}>
+                        <div key={member.uid || member.userId || member.id} className={`p-3 rounded-lg flex items-center justify-between ${member.uid === user.uid || member.userId === user.uid ? 'bg-indigo-100 border-2 border-indigo-500' : 'bg-gray-50'}`}>
                             <div className="flex items-center">
                                 <span className="font-bold text-lg w-8">{index + 1}</span>
                                 <span className="font-medium flex flex-col">
-                                    {member.displayName}
+                                    {member.displayName || "Unknown User"}
                                     <span className="text-xs text-gray-500 font-normal">Exposures: {member.weeklyExposures || member.exposures || 0}</span>
                                 </span>
                             </div>
-                            <span className="font-bold text-lg text-indigo-600">{member.rankingScore || 0} pts</span>
+                            <div className="flex items-center space-x-3">
+                                <span className="font-bold text-lg text-indigo-600">{member.rankingScore || 0} pts</span>
+                                {isCreator && (member.uid !== user.uid && member.userId !== user.uid && member.id !== user.uid) && (
+                                    <button onClick={() => setMemberToRemove(member)} className="text-gray-400 hover:text-red-600 p-1" title="Remove Member">
+                                        <Trash2 className="h-5 w-5" />
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     ))}
+                    {teamMembers.length === 0 && <p className="text-center text-gray-500 py-4">No team members found.</p>}
                 </div>
             </div>
         </div>
@@ -227,7 +253,7 @@ const TeamPage = ({ user, db, userProfile, setUserProfile, weekId }) => {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showJoinModal, setShowJoinModal] = useState(false);
     const [teamData, setTeamData] = useState(null);
-    const [teamMembers, setTeamMembers] = useState([]);
+    const [stats, setStats] = useState({});
     const [isLoading, setIsLoading] = useState(true);
 
     const handleCreateTeam = async (teamName) => {
@@ -248,19 +274,23 @@ const TeamPage = ({ user, db, userProfile, setUserProfile, weekId }) => {
             const newTeamRef = doc(teamColRef);
 
             const batch = writeBatch(db);
-            batch.set(newTeamRef, { name: teamName, inviteCode: newCode, creatorId: user.uid, createdAt: new Date() });
+            const teamPayload = {
+                name: teamName,
+                inviteCode: newCode,
+                creatorId: user.uid,
+                createdAt: new Date(),
+                roster: {
+                    [user.uid]: { displayName: userProfile.displayName, joinedAt: new Date() }
+                }
+            };
+
+            batch.set(newTeamRef, teamPayload);
             const codeRef = doc(db, 'artifacts', appId, 'public', 'data', 'inviteCodes', newCode);
             batch.set(codeRef, { teamId: newTeamRef.id });
             const userProfileRef = doc(db, 'artifacts', appId, 'users', user.uid);
             batch.update(userProfileRef, { teamId: newTeamRef.id });
 
-            // Initialize stats for current week
-            const currentWeekId = weekId; // Or getWeekId(new Date()) if imported
-            // Since we receive weekId from App which is based on currentDate state, 
-            // and usually people create teams on "Today", using weekId prop is safe enough 
-            // OR ideally import getWeekId. I'll stick to weekId prop for simplicity if it matches current.
-            // But to be robust, let's assume weekId passed is valid for initialization or just use the prop.
-
+            // Initialize stats
             const statsRef = doc(db, 'artifacts', appId, 'leaderboard', weekId, 'entries', user.uid);
             batch.set(statsRef, {
                 displayName: userProfile.displayName,
@@ -294,6 +324,11 @@ const TeamPage = ({ user, db, userProfile, setUserProfile, weekId }) => {
             const userProfileRef = doc(db, 'artifacts', appId, 'users', user.uid);
             batch.update(userProfileRef, { teamId });
 
+            const teamRef = doc(db, 'artifacts', appId, 'public', 'data', 'teams', teamId);
+            batch.update(teamRef, {
+                [`roster.${user.uid}`]: { displayName: userProfile.displayName, joinedAt: new Date() }
+            });
+
             const statsRef = doc(db, 'artifacts', appId, 'leaderboard', weekId, 'entries', user.uid);
             batch.set(statsRef, {
                 displayName: userProfile.displayName,
@@ -316,25 +351,32 @@ const TeamPage = ({ user, db, userProfile, setUserProfile, weekId }) => {
 
     const handleLeaveTeam = useCallback(async () => {
         if (!user || !db) return;
+        const CurrentTeamId = userProfile.teamId; // Capture current ID
+
         const userProfileRef = doc(db, 'artifacts', appId, 'users', user.uid);
         await updateDoc(userProfileRef, { teamId: null });
 
-        // Optionally remove teamId from current week's entry so they disappear from leaderboard immediately
+        if (CurrentTeamId) {
+            try {
+                const teamRef = doc(db, 'artifacts', appId, 'public', 'data', 'teams', CurrentTeamId);
+                // Remove self from roster
+                await updateDoc(teamRef, { [`roster.${user.uid}`]: deleteField() });
+            } catch (e) {
+                console.error("Error removing from roster", e);
+            }
+        }
+
         if (weekId) {
             const statsRef = doc(db, 'artifacts', appId, 'leaderboard', weekId, 'entries', user.uid);
             try {
-                // We update teamId to null or delete the field?
-                // If we set null, they won't appear in the query `where('teamId', '==', ...)`
                 await updateDoc(statsRef, { teamId: null });
-            } catch (e) {
-                // Ignore if doc doesn't exist
-            }
+            } catch (e) { }
         }
 
         setUserProfile(prev => ({ ...prev, teamId: null }));
         setTeamData(null);
-        setTeamMembers([]);
-    }, [user, db, setUserProfile, weekId]);
+        setStats({});
+    }, [user, db, setUserProfile, weekId, userProfile.teamId, user.uid]);
 
     const handleShareInvite = () => {
         if (teamData) {
@@ -343,52 +385,155 @@ const TeamPage = ({ user, db, userProfile, setUserProfile, weekId }) => {
         }
     };
 
+    // 1. Fetch Team Data
     useEffect(() => {
         let unsubscribe = () => { };
 
         const fetchTeamData = async () => {
-            if (!db) return;
-            if (!userProfile.teamId) {
+            if (!db || !userProfile.teamId) {
                 setIsLoading(false);
                 setTeamData(null);
-                setTeamMembers([]);
                 return;
             }
             setIsLoading(true);
 
-            // Fetch Team Info
             const teamRef = doc(db, 'artifacts', appId, 'public', 'data', 'teams', userProfile.teamId);
-            const teamSnap = await getDoc(teamRef);
-            if (!teamSnap.exists()) {
-                handleLeaveTeam();
-                return;
-            }
-            setTeamData({ id: teamSnap.id, ...teamSnap.data() });
-
-            // Fetch Team Stats from Weekly Leaderboard Collection
-            // Use the prop `weekId` to toggle weeks!
-            const statsCollectionRef = collection(db, 'artifacts', appId, 'leaderboard', weekId, 'entries');
-            const q = query(statsCollectionRef, where("teamId", "==", userProfile.teamId));
-
-            unsubscribe = onSnapshot(q, (snapshot) => {
-                const members = snapshot.docs.map(d => d.data());
-                setTeamMembers(members);
+            unsubscribe = onSnapshot(teamRef, async (docSnap) => {
+                if (!docSnap.exists()) {
+                    handleLeaveTeam();
+                    return;
+                }
+                const data = docSnap.data();
+                setTeamData({ id: docSnap.id, ...data });
                 setIsLoading(false);
+
+                // Self-Healing
+                try {
+                    const myId = userProfile.uid;
+                    if (data.roster && !data.roster[myId]) {
+                        console.log("Self-healing roster: Adding myself...");
+                        await updateDoc(teamRef, {
+                            [`roster.${myId}`]: { displayName: userProfile.displayName, joinedAt: new Date() }
+                        });
+                    } else if (!data.roster) {
+                        console.log("Creating missing roster...");
+                        await updateDoc(teamRef, {
+                            roster: { [myId]: { displayName: userProfile.displayName, joinedAt: new Date() } }
+                        });
+                    }
+                } catch (err) {
+                    console.error("Self-healing failed:", err);
+                }
             }, (error) => {
-                console.error("Error fetching team members in real-time:", error);
+                console.error("Error fetching Team Data:", error);
                 setIsLoading(false);
+                // If it's a permission error, maybe we should just clear data?
+                // setTeamData(null); 
             });
         };
 
-        if (db && user && userProfile.uid && weekId) {
+        if (db && userProfile.uid && userProfile.teamId) {
             fetchTeamData();
         } else if (!userProfile.teamId) {
             setIsLoading(false);
         }
 
         return () => unsubscribe();
+    }, [db, userProfile.uid, userProfile.teamId, userProfile.displayName, handleLeaveTeam]);
 
-    }, [user, db, userProfile.uid, userProfile.teamId, handleLeaveTeam, weekId]);
+    // 2. Fetch Weekly Stats
+    useEffect(() => {
+        if (!db || !weekId || !userProfile.teamId) {
+            setStats({});
+            return;
+        }
+
+        const statsCollectionRef = collection(db, 'artifacts', appId, 'leaderboard', weekId, 'entries');
+        const qStats = query(statsCollectionRef, where("teamId", "==", userProfile.teamId));
+
+        const unsubscribeStats = onSnapshot(qStats, (snapshot) => {
+            const statMap = {};
+            snapshot.docs.forEach(d => {
+                const data = d.data();
+                const uid = data.userId || d.id;
+                statMap[uid] = data;
+            });
+            setStats(statMap);
+        }, (error) => {
+            console.error("Error fetching team stats:", error);
+        });
+
+        return () => unsubscribeStats();
+    }, [db, weekId, userProfile.teamId]);
+
+    // 3. Merge Roster and Stats
+    const teamMembers = useMemo(() => {
+        const roster = teamData?.roster || {};
+
+        const rosterIds = Object.keys(roster);
+        const statsIds = Object.keys(stats);
+        const allIds = new Set([...rosterIds, ...statsIds]);
+
+        return Array.from(allIds).map(uid => {
+            const rosterUser = roster[uid] || {};
+            const userStats = stats[uid] || {};
+
+            const displayName = rosterUser.displayName || userStats.displayName || "Unknown Member";
+
+            return {
+                ...rosterUser,
+                ...userStats,
+                displayName,
+                uid,
+                userId: uid,
+                id: uid,
+                weeklyExposures: userStats.weeklyExposures || userStats.exposures || 0,
+                exposures: userStats.weeklyExposures || userStats.exposures || 0,
+                weeklyPresentations: userStats.weeklyPresentations || userStats.presentations || 0,
+                presentations: userStats.weeklyPresentations || userStats.presentations || 0,
+                rankingScore: userStats.rankingScore || 0,
+                dailyPar: userStats.dailyPar || 2
+            };
+        });
+    }, [teamData, stats]);
+
+
+    const handleUpdateTeam = async (updates) => {
+        if (!user || !db || !teamData) return;
+        const teamRef = doc(db, 'artifacts', appId, 'public', 'data', 'teams', teamData.id);
+        await updateDoc(teamRef, updates);
+        setTeamData(prev => ({ ...prev, ...updates }));
+    };
+
+    const handleRemoveMember = async (memberId) => {
+        if (!user || !db || !teamData) return;
+        if (user.uid !== teamData.creatorId) return;
+
+        try {
+            const batch = writeBatch(db);
+            const userRef = doc(db, 'artifacts', appId, 'users', memberId);
+            batch.update(userRef, { teamId: null });
+
+            if (weekId) {
+                const statsRef = doc(db, 'artifacts', appId, 'leaderboard', weekId, 'entries', memberId);
+                batch.update(statsRef, { teamId: null });
+            }
+
+            // Remove from Team Roster on Team Doc
+            const teamRef = doc(db, 'artifacts', appId, 'public', 'data', 'teams', teamData.id);
+            // batch.update does not support deleteField inside dot notation easily in this SDK version context sometimes,
+            // but updateDoc does. We will do a separate await for roster removal to be safe.
+            // Actually batch can do it too, but let's prioritize the batch commit first.
+            await batch.commit();
+
+            await updateDoc(teamRef, {
+                [`roster.${memberId}`]: deleteField()
+            });
+
+        } catch (error) {
+            console.error("Error removing member:", error);
+        }
+    };
 
     if (isLoading) {
         return <div className="text-center p-10">Loading Team...</div>;
@@ -410,18 +555,11 @@ const TeamPage = ({ user, db, userProfile, setUserProfile, weekId }) => {
         );
     }
 
-    const handleUpdateTeam = async (updates) => {
-        if (!user || !db || !teamData) return;
-        const teamRef = doc(db, 'artifacts', appId, 'public', 'data', 'teams', teamData.id);
-        await updateDoc(teamRef, updates);
-        setTeamData(prev => ({ ...prev, ...updates }));
-    };
-
     if (!teamData) {
         return <div className="text-center p-10 text-gray-500">Loading Team Data...</div>;
     }
 
-    return <TeamDashboard teamData={teamData} teamMembers={teamMembers} onLeaveTeam={handleLeaveTeam} onShareInvite={handleShareInvite} user={user} onUpdateTeam={handleUpdateTeam} />;
+    return <TeamDashboard teamData={teamData} teamMembers={teamMembers} onLeaveTeam={handleLeaveTeam} onShareInvite={handleShareInvite} user={user} onUpdateTeam={handleUpdateTeam} onRemoveMember={handleRemoveMember} />;
 };
 
 export default TeamPage;
