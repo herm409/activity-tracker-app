@@ -123,12 +123,28 @@ const TeamDashboard = ({ teamData, teamMembers, onLeaveTeam, onShareInvite, user
             acc.exposures += member.weeklyExposures || member.exposures || 0;
             acc.presentations += member.weeklyPresentations || member.presentations || 0;
             acc.score += member.rankingScore || 0;
+            acc.totalPar += (member.dailyPar || 2); // Sum of daily pars for one day
             return acc;
-        }, { exposures: 0, presentations: 0, score: 0 });
+        }, { exposures: 0, presentations: 0, score: 0, totalPar: 0 });
     }, [teamMembers]);
 
+    // Calculate Par To Date
+    const getDaysElapsed = () => {
+        // If we had weekId we could check if it's past. 
+        // For now, assuming current week/today logic as primary use case.
+        // Or better: Pass weekId to TeamDashboard.
+        const d = new Date();
+        const currentDay = d.getDay(); // 0-6
+        return currentDay + 1;
+    };
+
+    const daysElapsed = getDaysElapsed();
+    const teamParToDate = teamTotals.totalPar * daysElapsed;
     const handicap = teamData.handicap || 0;
-    const totalTeamScore = teamTotals.score + handicap;
+    const teamGrossScore = teamTotals.score + handicap;
+
+    // Net Score: Par - Points (Golf Style. Positive = Behind/Over Par. Negative = Ahead/Under Par)
+    const totalTeamScore = teamParToDate - teamGrossScore;
 
     const copyToClipboard = () => {
         navigator.clipboard.writeText(teamData.inviteCode);
