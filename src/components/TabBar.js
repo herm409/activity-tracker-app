@@ -1,7 +1,7 @@
 import React from 'react';
 import { Sun, Calendar, Users, Trophy, List, BarChart2 } from 'lucide-react';
 
-const TabBar = ({ activeTab, setActiveTab }) => {
+const TabBar = ({ activeTab, setActiveTab, badges = {} }) => {
     const tabs = [
         { id: 'today', name: 'Today', icon: Sun },
         { id: 'tracker', name: 'Calendar', icon: Calendar },
@@ -17,9 +17,14 @@ const TabBar = ({ activeTab, setActiveTab }) => {
                     <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
-                        className={`${activeTab === tab.id ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-3 px-1 sm:py-4 border-b-2 font-medium text-sm flex items-center`}
+                        className={`${activeTab === tab.id ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-3 px-1 sm:py-4 border-b-2 font-medium text-sm flex items-center relative`}
                     >
-                        <tab.icon className="mr-2 h-5 w-5" />
+                        <div className="relative">
+                            <tab.icon className="mr-2 h-5 w-5" />
+                            {badges[tab.id] && (
+                                <span className="absolute -top-1 -right-1 block h-2.5 w-2.5 rounded-full ring-2 ring-white bg-red-500" />
+                            )}
+                        </div>
                         {tab.name}
                         {tab.isBeta && <span className="ml-2 text-xs font-semibold bg-amber-200 text-amber-800 px-2 py-0.5 rounded-full">BETA</span>}
                     </button>

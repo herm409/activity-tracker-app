@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { doc, getDoc, collection, query, where, onSnapshot, writeBatch, updateDoc } from 'firebase/firestore';
 import { appId } from '../firebaseConfig';
-import { Users, Share2, LogOut, ClipboardCopy, CheckCircle } from 'lucide-react';
+import { Users, Share2, LogOut, ClipboardCopy, CheckCircle, Settings } from 'lucide-react';
 import { generateInviteCode as genCode } from '../utils/helpers';
 
 const CreateTeamModal = ({ onClose, onCreateTeam }) => {
@@ -73,17 +73,62 @@ const JoinTeamModal = ({ onClose, onJoinTeam }) => {
     );
 };
 
-const TeamDashboard = ({ teamData, teamMembers, onLeaveTeam, onShareInvite, user }) => {
+const TeamSettingsModal = ({ teamData, onClose, onUpdateTeam }) => {
+    const [name, setName] = useState(teamData.name);
+    const [handicap, setHandicap] = useState(teamData.handicap || 0);
+    const [isLoading, setIsLoading] = useState(false);
+
+    const handleSave = async () => {
+        setIsLoading(true);
+        await onUpdateTeam({ name, handicap: Number(handicap) });
+        setIsLoading(false);
+        onClose();
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
+                <div className="p-6 border-b"><h3 className="text-xl font-semibold">Team Settings</h3></div>
+                <div className="p-6 space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700">Team Name</label>
+                        <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="mt-1 block w-full p-2 border border-gray-300 rounded-md" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700">Weekly Handicap (Points)</label>
+                        <p className="text-xs text-gray-500 mb-1">Founding members or small teams can get a point boost.</p>
+                        <input type="number" value={handicap} onChange={(e) => setHandicap(e.target.value)} className="mt-1 block w-full p-2 border border-gray-300 rounded-md" />
+                    </div>
+                </div>
+                <div className="p-4 bg-gray-50 flex justify-end space-x-2">
+                    <button onClick={onClose} className="bg-gray-200 px-4 py-2 rounded-md">Cancel</button>
+                    <button onClick={handleSave} disabled={isLoading} className="bg-indigo-600 text-white px-4 py-2 rounded-md disabled:bg-indigo-400">
+                        {isLoading ? 'Saving...' : 'Save Changes'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ... (JoinTeamModal, CreateTeamModal remain same) ...
+
+const TeamDashboard = ({ teamData, teamMembers, onLeaveTeam, onShareInvite, user, onUpdateTeam }) => {
     const [showConfirmLeave, setShowConfirmLeave] = useState(false);
+    const [showSettings, setShowSettings] = useState(false);
     const [copied, setCopied] = useState(false);
 
     const teamTotals = useMemo(() => {
         return teamMembers.reduce((acc, member) => {
-            acc.exposures += member.weeklyExposures || 0;
-            acc.presentations += member.weeklyPresentations || 0;
+            acc.exposures += member.weeklyExposures || member.exposures || 0;
+            acc.presentations += member.weeklyPresentations || member.presentations || 0;
+            acc.score += member.rankingScore || 0;
             return acc;
-        }, { exposures: 0, presentations: 0 });
+        }, { exposures: 0, presentations: 0, score: 0 });
     }, [teamMembers]);
+
+    const handicap = teamData.handicap || 0;
+    const totalTeamScore = teamTotals.score + handicap;
 
     const copyToClipboard = () => {
         navigator.clipboard.writeText(teamData.inviteCode);
@@ -91,8 +136,11 @@ const TeamDashboard = ({ teamData, teamMembers, onLeaveTeam, onShareInvite, user
         setTimeout(() => setCopied(false), 2000);
     };
 
+    const isCreator = user.uid === teamData.creatorId;
+
     return (
         <div className="space-y-6">
+            {showSettings && <TeamSettingsModal teamData={teamData} onClose={() => setShowSettings(false)} onUpdateTeam={onUpdateTeam} />}
             {showConfirmLeave && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
@@ -107,7 +155,10 @@ const TeamDashboard = ({ teamData, teamMembers, onLeaveTeam, onShareInvite, user
             <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
                     <div>
-                        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">{teamData.name}</h2>
+                        <div className="flex items-center space-x-2">
+                            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">{teamData.name}</h2>
+                            {isCreator && <button onClick={() => setShowSettings(true)} className="text-gray-400 hover:text-indigo-600"><Settings className="h-5 w-5" /></button>}
+                        </div>
                         <div className="mt-2 flex items-center space-x-2 bg-gray-100 p-2 rounded-lg">
                             <span className="text-sm font-medium text-gray-500">INVITE CODE:</span>
                             <span className="text-lg font-bold text-indigo-600 tracking-widest">{teamData.inviteCode}</span>
@@ -121,22 +172,33 @@ const TeamDashboard = ({ teamData, teamMembers, onLeaveTeam, onShareInvite, user
                         <button onClick={() => setShowConfirmLeave(true)} className="flex items-center bg-red-100 text-red-700 px-4 py-2 rounded-md hover:bg-red-200 text-sm"><LogOut className="h-4 w-4 mr-2" /> Leave</button>
                     </div>
                 </div>
-                <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4 text-center">
-                    <div className="bg-indigo-50 p-4 rounded-lg"><p className="text-sm font-medium text-indigo-700">Team Exposures This Week</p><p className="text-4xl font-bold text-indigo-900">{teamTotals.exposures}</p></div>
-                    <div className="bg-purple-50 p-4 rounded-lg"><p className="text-sm font-medium text-purple-700">Team Presentations This Week</p><p className="text-4xl font-bold text-purple-900">{teamTotals.presentations}</p></div>
+                <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
+                    <div className="bg-indigo-50 p-4 rounded-lg"><p className="text-sm font-medium text-indigo-700">Team Exposures</p><p className="text-4xl font-bold text-indigo-900">{teamTotals.exposures}</p></div>
+                    <div className="bg-purple-50 p-4 rounded-lg"><p className="text-sm font-medium text-purple-700">Team Presentations</p><p className="text-4xl font-bold text-purple-900">{teamTotals.presentations}</p></div>
+                    <div className={`p-4 rounded-lg ${totalTeamScore > 0 ? 'bg-red-50' : (totalTeamScore < 0 ? 'bg-green-50' : 'bg-gray-100')}`}>
+                        <p className={`text-sm font-medium ${totalTeamScore > 0 ? 'text-red-700' : (totalTeamScore < 0 ? 'text-green-700' : 'text-gray-700')}`}>
+                            Team Score {handicap !== 0 && <span className="text-xs">(HCP: {handicap})</span>}
+                        </p>
+                        <p className={`text-4xl font-bold ${totalTeamScore > 0 ? 'text-red-900' : (totalTeamScore < 0 ? 'text-green-900' : 'text-gray-900')}`}>
+                            {totalTeamScore > 0 ? `+${totalTeamScore}` : totalTeamScore}
+                        </p>
+                    </div>
                 </div>
             </div>
 
             <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
-                <h3 className="text-xl font-semibold mb-4 text-gray-800">Weekly Team Leaderboard (by Exposures)</h3>
+                <h3 className="text-xl font-semibold mb-4 text-gray-800">Weekly Team Leaderboard (by Weighted Score)</h3>
                 <div className="space-y-3">
-                    {teamMembers.sort((a, b) => b.weeklyExposures - a.weeklyExposures).map((member, index) => (
+                    {teamMembers.sort((a, b) => (b.rankingScore || 0) - (a.rankingScore || 0)).map((member, index) => (
                         <div key={member.uid} className={`p-3 rounded-lg flex items-center justify-between ${member.uid === user.uid ? 'bg-indigo-100 border-2 border-indigo-500' : 'bg-gray-50'}`}>
                             <div className="flex items-center">
                                 <span className="font-bold text-lg w-8">{index + 1}</span>
-                                <span className="font-medium">{member.displayName}</span>
+                                <span className="font-medium flex flex-col">
+                                    {member.displayName}
+                                    <span className="text-xs text-gray-500 font-normal">Exposures: {member.weeklyExposures || member.exposures || 0}</span>
+                                </span>
                             </div>
-                            <span className="font-bold text-lg text-indigo-600">{member.weeklyExposures}</span>
+                            <span className="font-bold text-lg text-indigo-600">{member.rankingScore || 0} pts</span>
                         </div>
                     ))}
                 </div>
@@ -331,7 +393,14 @@ const TeamPage = ({ user, db, userProfile, setUserProfile, weekId }) => {
         );
     }
 
-    return <TeamDashboard teamData={teamData} teamMembers={teamMembers} onLeaveTeam={handleLeaveTeam} onShareInvite={handleShareInvite} user={user} />;
+    const handleUpdateTeam = async (updates) => {
+        if (!user || !db || !teamData) return;
+        const teamRef = doc(db, 'artifacts', appId, 'public', 'data', 'teams', teamData.id);
+        await updateDoc(teamRef, updates);
+        setTeamData(prev => ({ ...prev, ...updates }));
+    };
+
+    return <TeamDashboard teamData={teamData} teamMembers={teamMembers} onLeaveTeam={handleLeaveTeam} onShareInvite={handleShareInvite} user={user} onUpdateTeam={handleUpdateTeam} />;
 };
 
 export default TeamPage;

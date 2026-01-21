@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, Suspense, useMemo } from 'react';
+import { calculatePoints } from './utils/scoring';
 import * as ActionModals from './components/ActionModals';
 import { doc, setDoc, getDoc, updateDoc, collection, query, orderBy, onSnapshot, addDoc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth'; // Ensure this is imported if used directly, or use context
@@ -15,7 +16,7 @@ import TabBar from './components/TabBar';
 import AuthPage from './components/AuthPage';
 import TodayDashboard from './components/TodayDashboard';
 import ActivityTracker from './components/ActivityTracker';
-import { DisplayNameModal, OnboardingModal } from './components/GlobalModals'; // Assuming these are exported from GlobalModals
+import { DisplayNameModal, OnboardingModal, CutReportModal, ScoringLegendModal } from './components/GlobalModals'; // Assuming these are exported from GlobalModals
 import ReportCard from './components/ReportCard';
 
 // Components (Lazy Load)
@@ -63,7 +64,10 @@ const AppContent = () => {
     const [reportCardData, setReportCardData] = useState(null);
     const reportCardRef = useRef(null);
 
-    // --- Refs for Save-on-Exit Logic ---
+
+
+    // --- Monday Cut Report Logic ---
+
     const isDirtyRef = useRef(false);
     const monthlyDataRef = useRef(monthlyData);
     const monthlyGoalsRef = useRef(monthlyGoals);
@@ -144,10 +148,11 @@ const AppContent = () => {
 
 
     // --- Actions ---
-    const handleSetDisplayName = async (name) => {
+    const handleSetDisplayName = async (name, parValue) => {
         if (!user || !db || !name.trim()) return;
         const trimmedName = name.trim();
-        const newProfile = { ...userProfile, displayName: trimmedName };
+        const dailyPar = Number(parValue) || 2;
+        const newProfile = { ...userProfile, displayName: trimmedName, dailyPar };
         const profileRef = doc(db, 'artifacts', appId, 'users', user.uid);
         await setDoc(profileRef, newProfile, { merge: true });
         setUserProfile(newProfile);
@@ -169,6 +174,12 @@ const AppContent = () => {
         setUserProfile(prev => ({ ...prev, hasSeenGoalInstruction: true }));
     };
 
+
+
+    // ... (existing imports)
+
+    // ... inside AppContent ...
+
     const updateLeaderboard = useCallback(async (currentMonthData, targetMonthId, dateOfChange) => {
         if (!user || !db || !userProfile.displayName || !dateOfChange) return;
 
@@ -176,7 +187,11 @@ const AppContent = () => {
         const weekId = getWeekId(dateOfChange);
 
         let weeklyExposures = 0;
+        let weeklyFollowUps = 0;
         let weeklyPresentations = 0;
+        let weeklyThreeWays = 0;
+        let weeklyEnrolls = 0;
+
         let d = new Date(start);
 
         while (d <= end) {
@@ -197,18 +212,46 @@ const AppContent = () => {
 
             if (dayData) {
                 weeklyExposures += Number(dayData.exposures) || 0;
-                weeklyPresentations += (dayData.presentations?.length || 0) + (Number(dayData.pbrs) || 0);
+                weeklyFollowUps += Number(dayData.followUps) || 0;
+                // Presentations
+                if (Array.isArray(dayData.presentations)) {
+                    weeklyPresentations += dayData.presentations.length;
+                } else {
+                    weeklyPresentations += Number(dayData.presentations) || 0;
+                }
+                weeklyPresentations += (Number(dayData.pbrs) || 0);
+
+                weeklyThreeWays += Number(dayData.threeWays) || 0;
+
+                // Enrolls
+                weeklyEnrolls += Number(dayData.enrolls) || 0;
+                if (Array.isArray(dayData.sitdowns)) {
+                    weeklyEnrolls += dayData.sitdowns.filter(s => s === 'E').length;
+                }
             }
 
             d.setDate(d.getDate() + 1);
         }
 
+        const rankingScore = calculatePoints({
+            exposures: weeklyExposures,
+            followUps: weeklyFollowUps,
+            presentations: weeklyPresentations,
+            threeWays: weeklyThreeWays,
+            enrolls: weeklyEnrolls
+        });
+
         const leaderboardRef = doc(db, 'artifacts', appId, 'leaderboard', weekId, 'entries', user.uid);
 
         const payload = {
             displayName: userProfile.displayName,
+            dailyPar: userProfile.dailyPar || 2,
             exposures: weeklyExposures,
-            presentations: weeklyPresentations, // Unified field
+            followUps: weeklyFollowUps,
+            presentations: weeklyPresentations,
+            threeWays: weeklyThreeWays,
+            enrolls: weeklyEnrolls,
+            rankingScore, // Store the weighted score for sorting/display
             weeklyExposures, // For backward compatibility / alignment
             weeklyPresentations, // For backward compatibility / alignment
             userId: user.uid,
@@ -258,7 +301,6 @@ const AppContent = () => {
                 const fieldPath = `dailyData.${day}.${field}`;
                 try {
                     await updateDoc(docRef, { [fieldPath]: value });
-                    // Update header for leaderboard if needed - simplistic approach here
                 } catch (error) {
                     if (error.code === 'not-found') {
                         const newDailyData = { [day]: { [field]: value } };
@@ -402,9 +444,7 @@ const AppContent = () => {
         const dateRange = `${startOfWeek.toLocaleDateString('default', { month: 'short', day: 'numeric' })} - ${endOfWeek.toLocaleDateString('default', { month: 'short', day: 'numeric' })}`;
 
         const hotlistColRef = collection(db, 'artifacts', appId, 'users', user.uid, 'hotlist');
-        // Note: fetch again strictly for report to be sure, or use local hotlist state? 
-        // Using local hotlist state is faster.
-        const allItems = hotlist; // Optimized
+        const allItems = hotlist;
 
         const activeInPipeline = allItems.filter(item => item.isArchived !== true && (item.status === 'Hot' || item.status === 'Warm')).length;
         const closingZone = allItems.filter(item => item.isArchived !== true && item.status === 'Hot');
@@ -460,6 +500,68 @@ const AppContent = () => {
     }, [reportCardData, handleShareReportAsText]);
 
 
+
+
+
+    // --- Monday Cut Report Logic ---
+    const [showCutReport, setShowCutReport] = useState(false);
+    const [cutReportScore, setCutReportScore] = useState(0);
+
+    const [showScoringLegend, setShowScoringLegend] = useState(false);
+
+
+    useEffect(() => {
+        if (loading || !monthlyData || Object.keys(monthlyData).length === 0) return;
+
+        const checkMondayCut = () => {
+            const today = new Date();
+            // Production: Check if Monday
+            const isMonday = today.getDay() === 1;
+
+            if (!isMonday) return;
+
+            const lastReportDate = localStorage.getItem('lastCutReportDate');
+            const todayStr = today.toDateString();
+
+            if (lastReportDate === todayStr) return;
+
+            // Calculate Last Week's Score (Sunday - Saturday)
+            // Since today is Monday:
+            // i=2: Saturday (2 days ago)
+            // ...
+            // i=8: Sunday (8 days ago)
+            let totalScore = 0;
+            const parVal = userProfile.dailyPar || 2;
+
+            for (let i = 2; i <= 8; i++) {
+                const d = new Date(today);
+                d.setDate(today.getDate() - i);
+
+                const monthId = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                let dayData = {};
+
+                if (monthId === monthYearId) {
+                    dayData = monthlyData[d.getDate()] || {};
+                } else if (monthId === lastMonthYearId) {
+                    dayData = lastMonthData[d.getDate()] || {};
+                }
+
+                const p = calculatePoints(dayData);
+                totalScore += (parVal - p);
+            }
+
+            setCutReportScore(totalScore);
+            setShowCutReport(true);
+        };
+
+        checkMondayCut();
+    }, [loading, monthlyData, lastMonthData, userProfile.dailyPar, monthYearId, lastMonthYearId]);
+
+    const handleCloseCutReport = () => {
+        setShowCutReport(false);
+        localStorage.setItem('lastCutReportDate', new Date().toDateString());
+    };
+
     // --- Save on Exit ---
     useEffect(() => {
         const handleBeforeUnload = (event) => {
@@ -480,20 +582,25 @@ const AppContent = () => {
         };
     }, [db, user, monthYearId]);
 
-    // Handle imports of ActionModals - I will define them here for now to avoid creating another file if user doesn't want too many
-    // Wait, I planned to extract them. Let's assume I'll add `ActionModals.js`.
-    // I will lazily load them if possible, but they are used in `App.js`. 
-    // Actually, I'll inline them or import them. Since I haven't created `ActionModals.js` yet, I'll stick to lazy loading a "ActionModals" component or just create it. 
-    // I'll assume `import { FollowUpModal, LogExposureModal } from './components/ActionModals';` and create that file right after this.
-
     if (loading) return <div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div></div>;
     if (!user) return <AuthPage auth={auth} />;
+
+    // Par Protocol: Calculate Badge State
+    const today = new Date();
+    const isSameMonth = today.getFullYear() === year && today.getMonth() === month;
+    const todayData = isSameMonth ? (monthlyData[today.getDate()] || {}) : {};
+
+    // Weighted Par Calculation for Badge
+    const todayPoints = calculatePoints(todayData);
+    const dailyPar = userProfile.dailyPar || 2; // Dynamic Par
+    const todayScore = dailyPar - todayPoints;
+    const showTodayBadge = todayScore > 0;
 
     return (
         <div className="min-h-screen bg-gray-50 text-gray-900 font-sans pb-20">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
                 <Header displayName={userProfile.displayName} onSignOut={() => auth.signOut()} onEditName={() => setShowNameModal(true)} />
-                <TabBar activeTab={activeTab} setActiveTab={setActiveTab} />
+                <TabBar activeTab={activeTab} setActiveTab={setActiveTab} badges={{ today: showTodayBadge }} />
 
                 <main className="mt-6">
                     <Suspense fallback={<div className="text-center p-10">Loading...</div>}>
@@ -507,6 +614,8 @@ const AppContent = () => {
                             isSharing={isSharing}
                             onLogFollowUp={() => setShowFollowUpModal(true)}
                             onLogExposure={() => setShowExposureModal(true)}
+                            dailyPar={userProfile.dailyPar}
+                            onShowLegend={() => setShowScoringLegend(true)}
                         />}
                         {activeTab === 'tracker' && <ActivityTracker
                             date={currentDate} setDate={setCurrentDate}
@@ -517,6 +626,8 @@ const AppContent = () => {
                             onQuickAdd={handleQuickAdd}
                             showGoalInstruction={showGoalInstruction} onDismissGoalInstruction={handleDismissGoalInstruction}
                             streaks={userProfile.longestStreaks || {}}
+                            dailyPar={userProfile.dailyPar}
+                            onShowLegend={() => setShowScoringLegend(true)}
                         />}
                         {activeTab === 'leaderboard' && <Leaderboard db={db} weekId={getWeekId(currentDate)} user={user} />}
                         {activeTab === 'team' && <TeamPage user={user} db={db} userProfile={userProfile} setUserProfile={setUserProfile} weekId={getWeekId(currentDate)} />}
@@ -531,9 +642,11 @@ const AppContent = () => {
                 </main>
             </div>
 
-            {showNameModal && <DisplayNameModal currentName={userProfile.displayName} onSave={handleSetDisplayName} onClose={!userProfile.displayName ? null : () => setShowNameModal(false)} />}
-            {showEditNameModal && <DisplayNameModal currentName={userProfile.displayName} onSave={handleSetDisplayName} onClose={() => setShowEditNameModal(false)} />}
+            {showNameModal && <DisplayNameModal currentName={userProfile.displayName} currentPar={userProfile.dailyPar} onSave={handleSetDisplayName} onClose={!userProfile.displayName ? null : () => setShowNameModal(false)} />}
+            {showEditNameModal && <DisplayNameModal currentName={userProfile.displayName} currentPar={userProfile.dailyPar} onSave={handleSetDisplayName} onClose={() => setShowEditNameModal(false)} />}
             {showOnboarding && <OnboardingModal onDismiss={handleDismissOnboarding} />}
+            {showCutReport && <CutReportModal score={cutReportScore} onClose={handleCloseCutReport} />}
+            {showScoringLegend && <ScoringLegendModal onClose={() => setShowScoringLegend(false)} />}
 
             {/* These should be imported from ActionModals.js which I will create */}
             {showFollowUpModal && <ActionModals.FollowUpModal

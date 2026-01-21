@@ -1,8 +1,9 @@
 import React from 'react';
-import { Target, Users, BarChart2, PhoneCall, UserCheck, Dumbbell, BookOpen, Share2 } from 'lucide-react';
+import { Target, Users, BarChart2, PhoneCall, UserCheck, Dumbbell, BookOpen, Share2, HelpCircle } from 'lucide-react';
 import { ActivityCard, PresentationActivityCard, DisciplineCheckbox } from './ActivityCards';
+import { calculatePoints } from '../utils/scoring';
 
-const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAddPresentation, onShare, isSharing, onLogFollowUp, onLogExposure }) => {
+const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAddPresentation, onShare, isSharing, onLogFollowUp, onLogExposure, dailyPar, onShowLegend }) => {
     const today = new Date();
     const todayData = monthlyData[today.getDate()] || {};
 
@@ -19,12 +20,17 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
         { key: 'personalDevelopment', label: 'Personal Development', icon: BookOpen },
     ];
 
+    const currentPar = dailyPar || 2;
+
     return (
         <div className="space-y-8">
             <div>
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
                     <div>
-                        <h2 className="text-2xl font-semibold text-gray-800 mb-1">Today's Focus</h2>
+                        <div className="flex items-center space-x-2">
+                            <h2 className="text-2xl font-semibold text-gray-800 mb-1">Today's Focus</h2>
+                            {onShowLegend && <button onClick={onShowLegend} className="text-gray-400 hover:text-indigo-600 mb-1"><HelpCircle className="h-5 w-5" /></button>}
+                        </div>
                         <p className="text-gray-500">Log your key business activities for {today.toLocaleDateString('default', { weekday: 'long', month: 'long', day: 'numeric' })}.</p>
                     </div>
                     <button
@@ -51,7 +57,9 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
                                 />
                             );
                         }
-                        const value = Number(todayData[metric.key]) || 0;
+
+                        const rawValue = Number(todayData[metric.key]) || 0;
+                        let displayValue = rawValue;
 
                         let onIncrement;
                         if (metric.key === 'followUps') {
@@ -62,16 +70,47 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
                             onIncrement = () => onQuickAdd(metric.key, 1);
                         }
 
+                        // Par Protocol: Exposures Card becomes "Daily Par Status"
+                        const isDeficitMode = metric.key === 'exposures';
+                        let tooltipContent = null;
+
+                        if (isDeficitMode) {
+                            // Use Weighted Points for the "Score" display
+                            displayValue = calculatePoints(todayData);
+
+                            // Calculate breakdown for tooltip
+                            const ptsEnrolls = ((Number(todayData.enrolls) || 0) + (Array.isArray(todayData.sitdowns) ? todayData.sitdowns.filter(s => s === 'E').length : 0)) * 5;
+                            const ptsPres = ((todayData.presentations?.length || 0) + (Number(todayData.pbrs) || 0)) * 3 + (Number(todayData.threeWays) || 0) * 3;
+                            const ptsActivity = (Number(todayData.exposures) || 0) * 1 + (Number(todayData.followUps) || 0) * 1;
+
+                            tooltipContent = (
+                                <div className="space-y-1">
+                                    <div className="font-bold border-b border-gray-700 pb-1 mb-1">Score Breakdown</div>
+                                    <div className="flex justify-between"><span>Start Debt:</span> <span>{currentPar}</span></div>
+                                    <div className="flex justify-between text-green-400"><span>- Enrolls:</span> <span>{ptsEnrolls}</span></div>
+                                    <div className="flex justify-between text-purple-400"><span>- Pres/3Way:</span> <span>{ptsPres}</span></div>
+                                    <div className="flex justify-between text-blue-400"><span>- Exp/Follow:</span> <span>{ptsActivity}</span></div>
+                                    <div className="border-t border-gray-700 pt-1 mt-1 font-bold flex justify-between">
+                                        <span>Current:</span>
+                                        <span>{currentPar - displayValue > 0 ? `+${currentPar - displayValue}` : (currentPar - displayValue)}</span>
+                                    </div>
+                                </div>
+                            );
+                        }
+
                         return (
                             <ActivityCard
                                 key={metric.key}
-                                label={metric.label}
-                                value={value}
+                                label={isDeficitMode ? "Daily Par Status" : metric.label} // Rename card
+                                value={displayValue}
                                 streak={streaks[metric.key] || 0}
                                 icon={metric.icon}
                                 color={metric.color}
                                 onIncrement={onIncrement}
                                 onDecrement={() => onQuickAdd(metric.key, -1)}
+                                isDeficitMode={isDeficitMode}
+                                par={currentPar}
+                                tooltip={tooltipContent}
                             />
                         );
                     })}
