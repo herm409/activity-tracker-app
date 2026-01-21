@@ -46,15 +46,10 @@ const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
             {/* Pipeline Summary */}
             <div className="bg-gray-50 rounded-xl p-5 mb-6">
                 <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 text-center">Pipeline Health</h3>
-                <div className="flex justify-between items-center px-4">
+                <div className="flex justify-center items-center px-4">
                     <div className="text-center">
                         <p className="text-2xl font-bold text-gray-800">{activeInPipeline}</p>
                         <p className="text-[10px] text-gray-500">Active Pipeline</p>
-                    </div>
-                    <div className="h-8 w-px bg-gray-300"></div>
-                    <div className="text-center">
-                        <p className="text-2xl font-bold text-green-600">{newMembersThisWeek}</p>
-                        <p className="text-[10px] text-gray-500">New Members</p>
                     </div>
                 </div>
             </div>

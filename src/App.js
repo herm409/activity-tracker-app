@@ -404,7 +404,7 @@ const AppContent = () => {
 
     // Report Generation
     const getWeekDataForReport = useCallback(async () => {
-        if (!db) return { totals: {}, lastWeekTotals: {}, dateRange: '', activeInPipeline: 0, closingZone: [], newMembersThisWeek: 0 };
+        if (!db) return { totals: {}, lastWeekTotals: {}, dateRange: '', activeInPipeline: 0, closingZone: [] };
         const today = new Date();
         const dayOfWeek = today.getDay();
         const startOfWeek = new Date(today);
@@ -445,23 +445,16 @@ const AppContent = () => {
 
         const activeInPipeline = allItems.filter(item => item.isArchived !== true && (item.status === 'Hot' || item.status === 'Warm')).length;
         const closingZone = allItems.filter(item => item.isArchived !== true && item.status === 'Hot');
-        const newMembersThisWeek = allItems.filter(item => {
-            if (item.outcome === 'Member' && item.decisionDate) {
-                const decisionDate = new Date(item.decisionDate);
-                return decisionDate >= startOfWeek && decisionDate <= endOfWeek;
-            }
-            return false;
-        }).length;
 
-        return { totals: thisWeekTotals, lastWeekTotals, dateRange, activeInPipeline, closingZone, newMembersThisWeek };
+        return { totals: thisWeekTotals, lastWeekTotals, dateRange, activeInPipeline, closingZone };
     }, [monthlyData, lastMonthData, user, db, hotlist]);
 
 
     const handleShareReportAsText = useCallback(async () => {
-        const { totals, dateRange, activeInPipeline, closingZone, newMembersThisWeek } = await getWeekDataForReport();
+        const { totals, dateRange, activeInPipeline, closingZone } = await getWeekDataForReport();
         let shareText = `My Activity Tracker Report\nFrom: ${userProfile.displayName}\nWeek of: ${dateRange}\n\n`;
         shareText += `**This Week's Numbers:**\n- Exposures: ${totals.exposures}\n- Follow Ups: ${totals.followUps}\n- Presentations: ${totals.presentations}\n- 3-Way Calls: ${totals.threeWays}\n- Memberships Sold: ${totals.enrolls}\n\n`;
-        shareText += `**Prospect Pipeline:**\n- Active Prospects: ${activeInPipeline}\n- New Members This Week: ${newMembersThisWeek}\n\n`;
+        shareText += `**Prospect Pipeline:**\n- Active Prospects: ${activeInPipeline}\n\n`;
         shareText += "--------------------\n\n";
         shareText += `My "Closing Zone" Prospects\n\n`;
         closingZone.forEach((item, index) => { shareText += `${index + 1}. ${item.name} (${item.exposureCount || 0} exposures)\n`; });
