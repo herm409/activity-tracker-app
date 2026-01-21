@@ -401,6 +401,10 @@ const TeamPage = ({ user, db, userProfile, setUserProfile, weekId }) => {
         setTeamData(prev => ({ ...prev, ...updates }));
     };
 
+    if (!teamData) {
+        return <div className="text-center p-10 text-gray-500">Loading Team Data...</div>;
+    }
+
     return <TeamDashboard teamData={teamData} teamMembers={teamMembers} onLeaveTeam={handleLeaveTeam} onShareInvite={handleShareInvite} user={user} onUpdateTeam={handleUpdateTeam} />;
 };
 
