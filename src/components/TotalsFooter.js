@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Target, Users, BarChart2, PhoneCall, UserCheck, Info, Edit2, X, Share2, Minus, Plus, Flame, Trophy } from 'lucide-react';
 import { WEEKS_IN_MONTH } from '../utils/helpers';
 
-const TotalsFooter = ({ totals, onShare, isSharing, streaks, goals, onGoalChange, userProfile, onQuickAdd, showGoalInstruction, onDismissGoalInstruction }) => {
+const TotalsFooter = ({ totals, onShare, onShareMonthly, isSharing, streaks, goals, onGoalChange, userProfile, onQuickAdd, showGoalInstruction, onDismissGoalInstruction }) => {
     const [editingGoal, setEditingGoal] = useState(null);
     const longestStreaks = userProfile.longestStreaks || {};
     const metrics = [
@@ -45,8 +45,11 @@ const TotalsFooter = ({ totals, onShare, isSharing, streaks, goals, onGoalChange
                 </div>
             )}
             <div className="flex justify-end mb-4">
+                <button onClick={onShareMonthly} disabled={isSharing} className="flex items-center bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition text-sm disabled:bg-green-400 disabled:cursor-wait mr-2">
+                    <Share2 className="h-4 w-4 mr-2" /> {isSharing ? '...' : 'Share Monthly'}
+                </button>
                 <button onClick={onShare} disabled={isSharing} className="flex items-center bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition text-sm disabled:bg-indigo-400 disabled:cursor-wait">
-                    <Share2 className="h-4 w-4 mr-2" /> {isSharing ? 'Generating...' : 'Share Weekly Report'}
+                    <Share2 className="h-4 w-4 mr-2" /> {isSharing ? 'Generating...' : 'Share Weekly'}
                 </button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

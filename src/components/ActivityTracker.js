@@ -5,7 +5,7 @@ import { ChevronUp, ChevronDown, HelpCircle } from 'lucide-react';
 import { DayEntryModal } from './GlobalModals';
 import TotalsFooter from './TotalsFooter';
 
-const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChange, onShare, isSharing, user, userProfile, onQuickAdd, showGoalInstruction, onDismissGoalInstruction, streaks, dailyPar, onShowLegend }) => {
+const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChange, onShare, onShareMonthly, isSharing, user, userProfile, onQuickAdd, showGoalInstruction, onDismissGoalInstruction, streaks, dailyPar, onShowLegend }) => {
     const [selectedDay, setSelectedDay] = useState(null);
     const [viewMode, setViewMode] = useState('week');
     const year = date.getFullYear();
@@ -31,7 +31,16 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
         for (let i = 0; i < 7; i++) {
             const currentDay = new Date(startOfWeek);
             currentDay.setDate(startOfWeek.getDate() + i);
-            const dataSet = currentDay.getMonth() === date.getMonth() ? data.current : data.last;
+
+            // Determine dataset but verify ID matches to facilitate stale data prevention
+            const targetId = `${currentDay.getFullYear()}-${String(currentDay.getMonth() + 1).padStart(2, '0')}`;
+            let dataSet = {};
+            if (targetId === monthYearId && data.current && (!data.current.id || data.current.id === targetId)) {
+                dataSet = data.current;
+            } else if (targetId === lastMonthYearId && data.last && (!data.last.id || data.last.id === targetId)) {
+                dataSet = data.last;
+            }
+
             const dayData = dataSet ? (dataSet[currentDay.getDate()] || {}) : {};
 
             // Accurate Day Comparisons
@@ -45,7 +54,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
             days.push({ date: currentDay, day: currentDay.getDate(), data: dayData, hasNoActivity: isPast && noActivity, isBlank: false, isToday, isFuture, isWeekend });
         }
         return days;
-    }, [date, data]);
+    }, [date, data, monthYearId, lastMonthYearId]);
 
     const calendarDays = useMemo(() => {
         const today = new Date();
@@ -57,7 +66,12 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
 
         for (let day = 1; day <= daysInMonth; day++) {
             const currentDateObj = new Date(year, month, day);
-            const dayData = data.current[day] || {};
+
+            // Validate data current ID
+            let dayData = {};
+            if (data.current && (!data.current.id || data.current.id === monthYearId)) {
+                dayData = data.current[day] || {};
+            }
             const isTodayFlag = today.toDateString() === currentDateObj.toDateString();
             const isPast = currentDateObj < today && !isTodayFlag;
             const noActivity = Object.keys(dayData).filter(k => k !== 'exerc' && k !== 'read' && k !== 'pbrs').length === 0 || (Number(dayData.exposures || 0) === 0 && Number(dayData.followUps || 0) === 0 && (dayData.presentations || []).length === 0 && (Number(dayData.pbrs) || 0) === 0);
@@ -67,9 +81,12 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
             days.push({ day, date: currentDateObj, isBlank: false, data: dayData, hasNoActivity: isPast && noActivity, isToday: isTodayFlag, isWeekend });
         }
         return days;
-    }, [year, month, data]);
+    }, [year, month, data, monthYearId]);
 
     const monthlyTotals = useMemo(() => {
+        // Only sum if data.current matches the view
+        if (data.current.id && data.current.id !== monthYearId) return { exposures: 0, followUps: 0, presentations: 0, threeWays: 0, enrolls: 0 };
+
         return Object.values(data.current).reduce((acc, dayData) => {
             acc.exposures += Number(dayData.exposures) || 0;
             acc.followUps += Number(dayData.followUps) || 0;
@@ -115,7 +132,17 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
     let modalData = {};
     if (selectedDay) {
         const targetMonthId = `${selectedDay.getFullYear()}-${String(selectedDay.getMonth() + 1).padStart(2, '0')}`;
-        const dataSet = targetMonthId === monthYearId ? data.current : (targetMonthId === lastMonthYearId ? data.last : {});
+
+        let dataSet = {};
+        if (targetMonthId === monthYearId) {
+            if (data.current && (!data.current.id || data.current.id === targetMonthId)) {
+                dataSet = data.current;
+            }
+        } else if (targetMonthId === lastMonthYearId) {
+            if (data.last && (!data.last.id || data.last.id === targetMonthId)) {
+                dataSet = data.last;
+            }
+        }
         modalData = dataSet[selectedDay.getDate()] || {};
     }
 
@@ -276,7 +303,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
                     </div>
                 )
             }
-            <TotalsFooter totals={monthlyTotals} onShare={onShare} isSharing={isSharing} streaks={streaks} goals={goals} onGoalChange={onGoalChange} userProfile={userProfile} onQuickAdd={onQuickAdd} showGoalInstruction={showGoalInstruction} onDismissGoalInstruction={onDismissGoalInstruction} />
+            <TotalsFooter totals={monthlyTotals} onShare={onShare} onShareMonthly={onShareMonthly} isSharing={isSharing} streaks={streaks} goals={goals} onGoalChange={onGoalChange} userProfile={userProfile} onQuickAdd={onQuickAdd} showGoalInstruction={showGoalInstruction} onDismissGoalInstruction={onDismissGoalInstruction} />
             {selectedDay && <DayEntryModal day={selectedDay.getDate()} data={modalData} onClose={closeModal} onChange={handleModalDataChange} />}
         </div >
     );

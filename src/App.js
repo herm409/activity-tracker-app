@@ -450,6 +450,33 @@ const AppContent = () => {
     }, [monthlyData, lastMonthData, user, db, hotlist]);
 
 
+    const getMonthDataForReport = useCallback(async () => {
+        const totals = { exposures: 0, followUps: 0, presentations: 0, threeWays: 0, enrolls: 0 };
+        Object.values(monthlyData).forEach(dayData => {
+            totals.exposures += Number(dayData.exposures) || 0;
+            totals.followUps += Number(dayData.followUps) || 0;
+            totals.presentations += (dayData.presentations?.length || 0) + (Number(dayData.pbrs) || 0);
+            totals.threeWays += Number(dayData.threeWays) || 0;
+            totals.enrolls += (Number(dayData.enrolls) || 0) + (Array.isArray(dayData.sitdowns) ? dayData.sitdowns.filter(s => s === 'E').length : 0);
+        });
+
+        const dateRange = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+        const allItems = hotlist;
+        const activeInPipeline = allItems.filter(item => item.isArchived !== true && (item.status === 'Hot' || item.status === 'Warm')).length;
+
+        // Validating data integrity - if monthlyData is empty, we might return zeros, which is fine.
+        return { totals, lastWeekTotals: {}, dateRange, activeInPipeline, reportTitle: 'Monthly Scoreboard' };
+    }, [monthlyData, currentDate, hotlist]);
+
+
+    const handleShareMonthly = async () => {
+        setIsSharing(true);
+        const monthData = await getMonthDataForReport();
+        setReportCardData(monthData);
+    };
+
+
     const handleShareReportAsText = useCallback(async () => {
         const { totals, dateRange, activeInPipeline, closingZone } = await getWeekDataForReport();
         let shareText = `My Activity Tracker Report\nFrom: ${userProfile.displayName}\nWeek of: ${dateRange}\n\n`;
@@ -459,7 +486,23 @@ const AppContent = () => {
         shareText += `My "Closing Zone" Prospects\n\n`;
         closingZone.forEach((item, index) => { shareText += `${index + 1}. ${item.name} (${item.exposureCount || 0} exposures)\n`; });
         shareText += "\nSent from my Activity Tracker App";
-        try { await navigator.share({ title: 'My Weekly Activity Report', text: shareText }); } catch (error) { console.error('Error sharing text:', error); }
+        shareText += "\nSent from my Activity Tracker App";
+        try {
+            if (navigator.share && navigator.canShare && navigator.canShare({ title: 'My Weekly Activity Report', text: shareText })) {
+                await navigator.share({ title: 'My Weekly Activity Report', text: shareText });
+            } else {
+                throw new Error("Sharing not supported");
+            }
+        } catch (error) {
+            console.log("Share API failed, falling back to clipboard:", error);
+            try {
+                await navigator.clipboard.writeText(shareText);
+                alert("Report copied to clipboard!");
+            } catch (clipboardError) {
+                console.error("Clipboard copy failed:", clipboardError);
+                alert("Could not share report or copy to clipboard.");
+            }
+        }
     }, [getWeekDataForReport, userProfile.displayName]);
 
     const handleShare = async () => {
@@ -478,8 +521,20 @@ const AppContent = () => {
                 if (!blob) throw new Error("Canvas to Blob conversion failed.");
                 const file = new File([blob], 'activity-report.png', { type: 'image/png' });
                 const shareData = { files: [file], title: 'My Weekly Activity Report', text: `Here's my activity report for the week of ${reportCardData.dateRange}.` };
-                if (navigator.canShare && navigator.canShare(shareData)) { await navigator.share(shareData); }
-                else { await handleShareReportAsText(); }
+
+                if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+                    await navigator.share(shareData);
+                } else {
+                    // Fallback: Download the image
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    link.download = `ActivityReport-${reportCardData.dateRange}.png`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    // Also try to copy text summary as a bonus fallback
+                    await handleShareReportAsText();
+                }
             } catch (error) {
                 console.error('Error generating report:', error);
                 await handleShareReportAsText();
@@ -601,6 +656,7 @@ const AppContent = () => {
                             onHabitChange={handleDataChange}
                             onAddPresentation={handleAddPresentation}
                             onShare={handleShare}
+                            onShareMonthly={handleShareMonthly}
                             isSharing={isSharing}
                             onLogFollowUp={() => setShowFollowUpModal(true)}
                             onLogExposure={() => setShowExposureModal(true)}
@@ -610,8 +666,8 @@ const AppContent = () => {
                         {activeTab === 'tracker' && <ActivityTracker
                             date={currentDate} setDate={setCurrentDate}
                             goals={monthlyGoals} onGoalChange={handleGoalChange}
-                            data={{ current: monthlyData, last: lastMonthData }} onDataChange={handleDataChange}
-                            onShare={handleShare} isSharing={isSharing}
+                            data={{ current: { ...monthlyData, id: monthYearId }, last: { ...lastMonthData, id: lastMonthYearId } }} onDataChange={handleDataChange}
+                            onShare={handleShare} onShareMonthly={handleShareMonthly} isSharing={isSharing}
                             user={user} userProfile={userProfile}
                             onQuickAdd={handleQuickAdd}
                             showGoalInstruction={showGoalInstruction} onDismissGoalInstruction={handleDismissGoalInstruction}

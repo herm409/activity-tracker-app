@@ -7,7 +7,7 @@ const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
         return <div ref={ref}>Loading data...</div>;
     }
 
-    const { totals, lastWeekTotals, dateRange, activeInPipeline, newMembersThisWeek } = weekData;
+    const { totals, lastWeekTotals, dateRange, activeInPipeline, newMembersThisWeek, reportTitle } = weekData;
 
     // Scoreboard Metrics Configuration
     const scoreboard = [
@@ -24,7 +24,7 @@ const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
                 <div className="bg-gradient-to-r from-indigo-500 to-purple-600 p-4 rounded-full shadow-lg mb-4">
                     <Trophy className="h-10 w-10 text-white" />
                 </div>
-                <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Weekly Scoreboard</h1>
+                <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">{reportTitle || 'Weekly Scoreboard'}</h1>
                 <p className="text-indigo-600 font-semibold mt-1">{profile.displayName || 'Top Performer'}</p>
                 <div className="flex items-center text-xs text-gray-400 mt-2 bg-gray-100 px-3 py-1 rounded-full">
                     <Calendar className="h-3 w-3 mr-1" />
