@@ -405,10 +405,12 @@ const AppContent = () => {
     // Report Generation
     const getWeekDataForReport = useCallback(async () => {
         if (!db) return { totals: {}, lastWeekTotals: {}, dateRange: '', activeInPipeline: 0, closingZone: [] };
-        const today = new Date();
-        const dayOfWeek = today.getDay();
-        const startOfWeek = new Date(today);
-        startOfWeek.setDate(today.getDate() - dayOfWeek);
+
+        // Use currentDate (view date) instead of real-time today to allow backdated reports
+        const targetDate = new Date(currentDate);
+        const dayOfWeek = targetDate.getDay();
+        const startOfWeek = new Date(targetDate);
+        startOfWeek.setDate(targetDate.getDate() - dayOfWeek);
         startOfWeek.setHours(0, 0, 0, 0);
         const endOfWeek = new Date(startOfWeek);
         endOfWeek.setDate(startOfWeek.getDate() + 6);
@@ -422,7 +424,7 @@ const AppContent = () => {
             const totals = { exposures: 0, followUps: 0, presentations: 0, threeWays: 0, enrolls: 0 };
             let current = new Date(startDate);
             while (current <= endDate) {
-                const dataSet = current.getMonth() === today.getMonth() ? monthlyData : lastMonthData;
+                const dataSet = current.getMonth() === targetDate.getMonth() ? monthlyData : lastMonthData;
                 const dayData = dataSet[current.getDate()];
                 if (dayData) {
                     totals.exposures += Number(dayData.exposures) || 0;
@@ -446,8 +448,8 @@ const AppContent = () => {
         const activeInPipeline = allItems.filter(item => item.isArchived !== true && (item.status === 'Hot' || item.status === 'Warm')).length;
         const closingZone = allItems.filter(item => item.isArchived !== true && item.status === 'Hot');
 
-        return { totals: thisWeekTotals, lastWeekTotals, dateRange, activeInPipeline, closingZone };
-    }, [monthlyData, lastMonthData, user, db, hotlist]);
+        return { totals: thisWeekTotals, lastWeekTotals, dateRange, activeInPipeline, closingZone, reportTitle: 'Weekly Scoreboard' };
+    }, [monthlyData, lastMonthData, user, db, hotlist, currentDate]);
 
 
     const getMonthDataForReport = useCallback(async () => {
@@ -477,19 +479,29 @@ const AppContent = () => {
     };
 
 
-    const handleShareReportAsText = useCallback(async () => {
-        const { totals, dateRange, activeInPipeline, closingZone } = await getWeekDataForReport();
-        let shareText = `My Activity Tracker Report\nFrom: ${userProfile.displayName}\nWeek of: ${dateRange}\n\n`;
-        shareText += `**This Week's Numbers:**\n- Exposures: ${totals.exposures}\n- Follow Ups: ${totals.followUps}\n- Presentations: ${totals.presentations}\n- 3-Way Calls: ${totals.threeWays}\n- Memberships Sold: ${totals.enrolls}\n\n`;
+    const handleShareReportAsText = useCallback(async (dataToShare) => {
+        // Use passed data or fetch week data as fallback
+        const data = dataToShare || await getWeekDataForReport();
+        const { totals, dateRange, activeInPipeline, closingZone, reportTitle } = data;
+
+        const isMonthly = reportTitle === 'Monthly Scoreboard';
+        const dateLabel = isMonthly ? 'Month of' : 'Week of';
+        const titleLabel = reportTitle || 'Activity Report';
+
+        let shareText = `My ${titleLabel}\nFrom: ${userProfile.displayName}\n${dateLabel}: ${dateRange}\n\n`;
+        shareText += `**${isMonthly ? "This Month's" : "This Week's"} Numbers:**\n- Exposures: ${totals.exposures}\n- Follow Ups: ${totals.followUps}\n- Presentations: ${totals.presentations}\n- 3-Way Calls: ${totals.threeWays}\n- Memberships Sold: ${totals.enrolls}\n\n`;
         shareText += `**Prospect Pipeline:**\n- Active Prospects: ${activeInPipeline}\n\n`;
         shareText += "--------------------\n\n";
-        shareText += `My "Closing Zone" Prospects\n\n`;
-        closingZone.forEach((item, index) => { shareText += `${index + 1}. ${item.name} (${item.exposureCount || 0} exposures)\n`; });
-        shareText += "\nSent from my Activity Tracker App";
+
+        if (closingZone && closingZone.length > 0) {
+            shareText += `My "Closing Zone" Prospects\n\n`;
+            closingZone.forEach((item, index) => { shareText += `${index + 1}. ${item.name} (${item.exposureCount || 0} exposures)\n`; });
+        }
+
         shareText += "\nSent from my Activity Tracker App";
         try {
-            if (navigator.share && navigator.canShare && navigator.canShare({ title: 'My Weekly Activity Report', text: shareText })) {
-                await navigator.share({ title: 'My Weekly Activity Report', text: shareText });
+            if (navigator.share && navigator.canShare && navigator.canShare({ title: `My ${titleLabel}`, text: shareText })) {
+                await navigator.share({ title: `My ${titleLabel}`, text: shareText });
             } else {
                 throw new Error("Sharing not supported");
             }
@@ -520,7 +532,12 @@ const AppContent = () => {
                 const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
                 if (!blob) throw new Error("Canvas to Blob conversion failed.");
                 const file = new File([blob], 'activity-report.png', { type: 'image/png' });
-                const shareData = { files: [file], title: 'My Weekly Activity Report', text: `Here's my activity report for the week of ${reportCardData.dateRange}.` };
+
+                const isMonthly = reportCardData.reportTitle === 'Monthly Scoreboard';
+                const dateLabel = isMonthly ? 'Month' : 'Week';
+                const baseText = `Here's my activity report for the ${dateLabel.toLowerCase()} of ${reportCardData.dateRange}.`;
+
+                const shareData = { files: [file], title: reportCardData.reportTitle || 'My Activity Report', text: baseText };
 
                 if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
                     await navigator.share(shareData);
@@ -532,12 +549,12 @@ const AppContent = () => {
                     document.body.appendChild(link);
                     link.click();
                     document.body.removeChild(link);
-                    // Also try to copy text summary as a bonus fallback
-                    await handleShareReportAsText();
+                    // Also try to copy text summary as a bonus fallback, using the existing data
+                    await handleShareReportAsText(reportCardData);
                 }
             } catch (error) {
                 console.error('Error generating report:', error);
-                await handleShareReportAsText();
+                await handleShareReportAsText(reportCardData);
             } finally { setIsSharing(false); setReportCardData(null); }
         };
         const timer = setTimeout(generateAndShareImage, 100);
