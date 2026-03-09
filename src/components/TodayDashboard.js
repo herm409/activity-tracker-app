@@ -1,5 +1,5 @@
 import React from 'react';
-import { Target, Users, BarChart2, PhoneCall, UserCheck, Dumbbell, BookOpen, Share2, HelpCircle, XCircle, Flame } from 'lucide-react';
+import { Target, Users, BarChart2, PhoneCall, UserCheck, Dumbbell, BookOpen, Share2, HelpCircle, XCircle, Flame, Lightbulb } from 'lucide-react';
 import { ActivityCard, PresentationActivityCard, DisciplineCheckbox } from './ActivityCards';
 import { calculatePoints } from '../utils/scoring';
 
@@ -28,13 +28,40 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
         { label: 'Exposures', done: (Number(todayData.exposures) || 0) > 0 },
         { label: 'Follow Ups', done: ((Number(todayData.followUps) || 0) + (Number(todayData.tenacityFollowUps) || 0)) > 0 },
         { label: 'No\'s', done: (Number(todayData.nos) || 0) > 0 },
-        { label: 'Presentations', done: ((todayData.presentations?.length || 0) + (Number(todayData.pbrs) || 0)) > 0 },
         { label: '3-Ways', done: (Number(todayData.threeWays) || 0) > 0 },
         { label: 'Exercise', done: !!todayData.exerc },
         { label: 'Personal Dev', done: !!(todayData.personalDevelopment || todayData.read || todayData.audio) },
     ];
     const ironmanCompleted = ironmanProgress.filter(i => i.done).length;
-    const isIronman = ironmanCompleted === 7;
+    const isIronman = ironmanCompleted === 6;
+
+    // --- Coaching Feedback Logic (Phase 6) ---
+    const getCoachingAdvice = () => {
+        const E = Number(todayData.exposures) || 0;
+        const F = (Number(todayData.followUps) || 0) + (Number(todayData.tenacityFollowUps) || 0);
+        const N = Number(todayData.nos) || 0;
+        const T = Number(todayData.threeWays) || 0;
+        const A = E + F + T; // total core prospecting activity
+
+        if (A < 3) return null; // Not enough activity to evaluate yet
+
+        if (E > 3 && F < E) {
+            return "You're making great new contacts! Make sure your follow-ups keep pace so prospects don't fall through the cracks.";
+        }
+        if (F > 3 && T === 0) {
+            return "You're doing a lot of follow-ups! Consider using a 3-way call to provide third-party validation and help move prospects to a decision.";
+        }
+        if (F > 3 && E === 0) {
+            return "Great job following up today! Remember to also plant new seeds with fresh exposures so your pipeline stays full.";
+        }
+        if (A >= 5 && N === 0) {
+            return "You're putting in a lot of activity today! Are you asking the tough questions? Don't be afraid to push for a definitive No.";
+        }
+
+        return null;
+    };
+
+    const coachingAdvice = getCoachingAdvice();
 
     return (
         <div className="space-y-8">
@@ -81,7 +108,7 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
                                 {isIronman && <span className="ml-2 bg-orange-500 text-white text-[10px] uppercase px-2 py-0.5 rounded-full font-bold animate-pulse">+15 PTS</span>}
                             </h3>
                             <p className="text-sm text-gray-500">
-                                {isIronman ? "You crushed it! Full cycle complete." : `Complete all 7 core activities for a +15 pt bonus. (${ironmanCompleted}/7)`}
+                                {isIronman ? "You crushed it! Full cycle complete." : `Complete all 6 core activities for a +15 pt bonus. (${ironmanCompleted}/6)`}
                             </p>
                         </div>
                     </div>
@@ -97,6 +124,21 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
                         ))}
                     </div>
                 </div>
+
+                {/* Coach's Insight */}
+                {coachingAdvice && (
+                    <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg mb-6 shadow-sm">
+                        <div className="flex">
+                            <div className="flex-shrink-0">
+                                <Lightbulb className="h-5 w-5 text-blue-500" />
+                            </div>
+                            <div className="ml-3">
+                                <h3 className="text-sm font-bold text-blue-800">Coach's Insight (Activity Balance)</h3>
+                                <p className="text-sm text-blue-700 mt-1">{coachingAdvice}</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {metrics.map(metric => {

@@ -19,18 +19,10 @@ export const isIronmanDay = (data) => {
     const nos = Number(data.nos) || 0;
     const threeWays = Number(data.threeWays) || 0;
 
-    let presentations = 0;
-    if (Array.isArray(data.presentations)) {
-        presentations = data.presentations.length;
-    } else {
-        presentations = Number(data.presentations) || 0;
-    }
-    presentations += (Number(data.pbrs) || 0);
-
     const exerc = !!data.exerc;
     const pd = !!data.personalDevelopment;
 
-    return exposures > 0 && followUps > 0 && nos > 0 && threeWays > 0 && presentations > 0 && exerc && pd;
+    return exposures > 0 && followUps > 0 && nos > 0 && threeWays > 0 && exerc && pd;
 };
 
 export const calculatePoints = (data) => {
