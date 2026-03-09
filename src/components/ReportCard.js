@@ -1,5 +1,5 @@
 import React, { forwardRef } from 'react';
-import { Trophy, Calendar, User, TrendingUp, Users, Video, Award } from 'lucide-react';
+import { Trophy, Calendar, User, TrendingUp, Users, Video, Award, XCircle, PhoneCall } from 'lucide-react';
 
 const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
     // Check if weekData exists before destructuring
@@ -14,11 +14,13 @@ const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
         { label: 'Exposures', value: totals.exposures, icon: Users, color: 'text-indigo-600', bg: 'bg-indigo-50' },
         { label: 'Presentations', value: totals.presentations, icon: Video, color: 'text-purple-600', bg: 'bg-purple-50' },
         { label: 'Follow Ups', value: totals.followUps, icon: TrendingUp, color: 'text-blue-600', bg: 'bg-blue-50' },
+        { label: '3-Way Calls', value: totals.threeWays, icon: PhoneCall, color: 'text-pink-600', bg: 'bg-pink-50' },
+        { label: 'Definitive No\'s', value: totals.nos, icon: XCircle, color: 'text-red-600', bg: 'bg-red-50' },
         { label: 'New Members', value: totals.enrolls, icon: Award, color: 'text-green-600', bg: 'bg-green-50' }
     ];
 
     return (
-        <div ref={ref} className="bg-white p-8 font-sans border border-gray-200 rounded-xl shadow-lg" style={{ width: '400px', height: '750px' }}>
+        <div ref={ref} className="bg-white p-8 font-sans border border-gray-200 rounded-xl shadow-lg" style={{ width: '400px', height: '800px' }}>
             {/* Header */}
             <div className="flex flex-col items-center mb-8">
                 <div className="bg-gradient-to-r from-indigo-500 to-purple-600 p-4 rounded-full shadow-lg mb-4">

@@ -421,7 +421,7 @@ const AppContent = () => {
         endOfLastWeek.setDate(startOfWeek.getDate() - 1);
 
         const getWeekTotals = (startDate, endDate) => {
-            const totals = { exposures: 0, followUps: 0, presentations: 0, threeWays: 0, enrolls: 0 };
+            const totals = { exposures: 0, followUps: 0, nos: 0, presentations: 0, threeWays: 0, enrolls: 0 };
             let current = new Date(startDate);
             while (current <= endDate) {
                 const dataSet = current.getMonth() === targetDate.getMonth() ? monthlyData : lastMonthData;
@@ -429,6 +429,7 @@ const AppContent = () => {
                 if (dayData) {
                     totals.exposures += Number(dayData.exposures) || 0;
                     totals.followUps += Number(dayData.followUps) || 0;
+                    totals.nos += Number(dayData.nos) || 0;
                     totals.presentations += (dayData.presentations?.length || 0) + (Number(dayData.pbrs) || 0);
                     totals.threeWays += Number(dayData.threeWays) || 0;
                     totals.enrolls += (Number(dayData.enrolls) || 0) + (Array.isArray(dayData.sitdowns) ? dayData.sitdowns.filter(s => s === 'E').length : 0);
@@ -452,10 +453,11 @@ const AppContent = () => {
 
 
     const getMonthDataForReport = useCallback(async () => {
-        const totals = { exposures: 0, followUps: 0, presentations: 0, threeWays: 0, enrolls: 0 };
+        const totals = { exposures: 0, followUps: 0, nos: 0, presentations: 0, threeWays: 0, enrolls: 0 };
         Object.values(monthlyData).forEach(dayData => {
             totals.exposures += Number(dayData.exposures) || 0;
             totals.followUps += Number(dayData.followUps) || 0;
+            totals.nos += Number(dayData.nos) || 0;
             totals.presentations += (dayData.presentations?.length || 0) + (Number(dayData.pbrs) || 0);
             totals.threeWays += Number(dayData.threeWays) || 0;
             totals.enrolls += (Number(dayData.enrolls) || 0) + (Array.isArray(dayData.sitdowns) ? dayData.sitdowns.filter(s => s === 'E').length : 0);
@@ -488,7 +490,7 @@ const AppContent = () => {
         const titleLabel = reportTitle || 'Activity Report';
 
         let shareText = `My ${titleLabel}\nFrom: ${userProfile.displayName}\n${dateLabel}: ${dateRange}\n\n`;
-        shareText += `**${isMonthly ? "This Month's" : "This Week's"} Numbers:**\n- Exposures: ${totals.exposures}\n- Follow Ups: ${totals.followUps}\n- Presentations: ${totals.presentations}\n- 3-Way Calls: ${totals.threeWays}\n- Memberships Sold: ${totals.enrolls}\n\n`;
+        shareText += `**${isMonthly ? "This Month's" : "This Week's"} Numbers:**\n- Exposures: ${totals.exposures}\n- Follow Ups: ${totals.followUps}\n- Definitive No's: ${totals.nos}\n- Presentations: ${totals.presentations}\n- 3-Way Calls: ${totals.threeWays}\n- Memberships Sold: ${totals.enrolls}\n\n`;
         shareText += `**Prospect Pipeline:**\n- Active Prospects: ${activeInPipeline}\n\n`;
         shareText += "--------------------\n\n";
 

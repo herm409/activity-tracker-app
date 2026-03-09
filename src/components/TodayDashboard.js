@@ -129,7 +129,7 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
                         return (
                             <ActivityCard
                                 key={metric.key}
-                                label={isDeficitMode ? "Daily Par Status" : metric.label} // Rename card
+                                label={isDeficitMode ? "Exposures (Par Status)" : metric.label} // Rename card
                                 value={displayValue}
                                 streak={streaks[metric.key] || 0}
                                 icon={metric.icon}
