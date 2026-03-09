@@ -4,7 +4,7 @@ import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswor
 const AuthPage = ({ auth }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [isSignUp, setIsSignUp] = useState(false);
+    const [isSignUp, setIsSignUp] = useState(true);
     const [error, setError] = useState('');
     const [infoMessage, setInfoMessage] = useState('');
 
@@ -19,7 +19,22 @@ const AuthPage = ({ auth }) => {
                 await signInWithEmailAndPassword(auth, email, password);
             }
         } catch (err) {
-            setError(err.message);
+            let userFriendlyError = err.message;
+
+            // Handle Firebase Auth error codes 
+            if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
+                if (!isSignUp) {
+                    userFriendlyError = "We couldn't find an account with that email and password. Are you trying to create a new account? Click 'Sign Up' below.";
+                } else {
+                    userFriendlyError = "Invalid email or weak password. Please check your details.";
+                }
+            } else if (err.code === 'auth/email-already-in-use') {
+                userFriendlyError = "An account with this email already exists. Click 'Sign In' below to access your account.";
+            } else if (err.code === 'auth/weak-password') {
+                userFriendlyError = "Password should be at least 6 characters long.";
+            }
+
+            setError(userFriendlyError);
         }
     };
 
