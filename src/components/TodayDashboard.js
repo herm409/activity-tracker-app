@@ -193,6 +193,27 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
                     </div>
                 )}
 
+                {/* Pre-Action Text Wizard Banner */}
+                <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-lg mb-6 shadow-sm flex flex-col sm:flex-row items-center justify-between">
+                    <div className="flex items-center mb-3 sm:mb-0">
+                        <div className="bg-indigo-200 p-2 rounded-full mr-3 shrink-0">
+                            <BookOpen className="h-6 w-6 text-indigo-700" />
+                        </div>
+                        <div>
+                            <h3 className="text-sm font-bold text-indigo-900">Not sure what to say?</h3>
+                            <p className="text-xs text-indigo-700 mt-0.5">Open Text Wizard to snag proven scripts before reaching out.</p>
+                        </div>
+                    </div>
+                    <a
+                        href="https://text.wearetnv.com/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full sm:w-auto text-center shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2 px-4 rounded transition-colors"
+                    >
+                        Open Text Wizard
+                    </a>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {metrics.map(metric => {
                         if (metric.isPresentation) {
