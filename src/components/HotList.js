@@ -1,8 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { collection, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { debounce } from '../utils/helpers';
-import { appId } from '../firebaseConfig';
-import { List, Archive, Plus, Flame, TrendingUp, Users, ChevronDown, ChevronUp, MessageSquare, ArrowRight, ArrowDown, ArrowUp, CheckCircle, XCircle, ArchiveRestore, Trash2, X, Zap, Clock, AlertTriangle, Send, PlayCircle, Search, Filter, SortAsc } from 'lucide-react';
+import { appId, db } from '../firebaseConfig';
+import { calculatePoints } from '../utils/scoring';
+import confetti from 'canvas-confetti';
+import { Calendar, User, AlignLeft, AlertTriangle, MessageCircle, PlayCircle, Zap, Send, PhoneCall, CheckCircle, Target, TrendingUp, XCircle, Trash2 } from 'lucide-react';
 
 // --- Modals for Hotlist ---
 const AddHotlistItemModal = ({ onClose, onAdd }) => {
@@ -123,6 +125,15 @@ const ProspectCard = ({ item, onUpdate, onInstantUpdate, onDecide, onDataChange,
             alert("Warning: A true 'No' only counts after they've seen the information. Please educate the prospect first!");
             return;
         }
+
+        // Micro-Celebration out of the top/right when logging a No
+        confetti({
+            particleCount: 80,
+            spread: 60,
+            origin: { x: 0.8, y: 0.2 },
+            colors: ['#EF4444', '#F87171', '#FCA5A5'] // Red-ish themed confetti for No's
+        });
+
         onInstantUpdate(item.id, { isArchived: true, outcome: 'Not Interested', decisionDate: new Date().toISOString() });
         updateDailyStats('nos');
     };

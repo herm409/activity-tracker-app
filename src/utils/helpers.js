@@ -49,7 +49,7 @@ export const getWeekRange = (date = new Date()) => {
 };
 
 export const calculateCurrentStreaks = (monthlyData, lastMonthData, today = new Date()) => {
-    const metrics = ['exposures', 'followUps', 'presentations', 'threeWays', 'enrolls'];
+    const metrics = ['exposures', 'followUps', 'nos', 'presentations', 'threeWays', 'enrolls'];
     const streaks = {};
 
     metrics.forEach(metric => {

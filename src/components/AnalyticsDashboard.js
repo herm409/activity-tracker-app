@@ -12,6 +12,7 @@ const AnalyticsDashboard = ({ db, user }) => {
         expToPresentationRatio: 0,
         presentationToEnrollRatio: 0,
         noToEnrollRatio: 0,
+        lifetimeNos: 0
     });
     const [loading, setLoading] = useState(true);
     const [historicalData, setHistoricalData] = useState([]);
@@ -68,6 +69,7 @@ const AnalyticsDashboard = ({ db, user }) => {
                 expToPresentationRatio,
                 presentationToEnrollRatio,
                 noToEnrollRatio,
+                lifetimeNos
             });
 
             const monthLabels = [];
@@ -194,6 +196,43 @@ const AnalyticsDashboard = ({ db, user }) => {
                         detail="Presentations needed for one membership"
                         icon={Award}
                     />
+                </div>
+            </div>
+
+            {/* 100 No's Jar */}
+            <div className="bg-white p-6 rounded-lg shadow-sm border-2 border-red-100 flex flex-col md:flex-row items-center justify-between">
+                <div className="md:w-1/2 mb-4 md:mb-0 md:pr-6">
+                    <h3 className="text-xl font-bold text-gray-900 flex items-center">
+                        <XCircle className="h-6 w-6 text-red-500 mr-2" />
+                        The 100 No's Jar
+                    </h3>
+                    <p className="text-sm text-gray-600 mt-2">
+                        Your goal isn't to get a "Yes". Your daily goal is to collect "No's" and fill this jar. Every "No" is a required step towards a "Yes".
+                    </p>
+                    <div className="mt-4">
+                        <span className="text-3xl font-black text-red-600">{stats.lifetimeNos % 100}</span>
+                        <span className="text-lg text-gray-500 font-semibold"> / 100</span>
+                        <p className="text-xs text-red-400 font-medium uppercase tracking-widest mt-1">
+                            Current Jar
+                        </p>
+                    </div>
+                </div>
+
+                <div className="md:w-1/2 flex justify-center">
+                    {/* Visual Jar CSS */}
+                    <div className="relative w-40 h-48 border-4 border-gray-300 rounded-b-3xl rounded-t-lg overflow-hidden flex flex-col justify-end bg-gray-50">
+                        <div className="absolute top-0 w-full h-4 bg-gray-200 border-b-4 border-gray-300"></div>
+                        <div
+                            className="bg-red-400 w-full transition-all duration-1000 ease-in-out flex items-center justify-center relative overflow-hidden"
+                            style={{ height: `${Math.max((stats.lifetimeNos % 100), 5)}%` }} // Minimum 5% to show something
+                        >
+                            {/* Bubbles / Fill effect */}
+                            <div className="absolute inset-0 opacity-20 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4IiBoZWlnaHQ9IjgiPgo8cmVjdCB3aWR0aD0iOCIgaGVpZ2h0PSI4IiBmaWxsPSIjZmZmIj48L3JlY3Q+CjxwYXRoIGQ9Ik0wIDBMOCA4Wk04IDBMMCA4WiIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjEiPjwvcGF0aD4KPC9zdmc+')]"></div>
+                            {stats.lifetimeNos % 100 === 0 && stats.lifetimeNos > 0 ? (
+                                <span className="text-white font-bold animate-bounce z-10">FULL!</span>
+                            ) : null}
+                        </div>
+                    </div>
                 </div>
             </div>
 

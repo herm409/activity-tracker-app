@@ -116,6 +116,7 @@ const TeamDashboard = ({ teamData, teamMembers, onLeaveTeam, onShareInvite, user
     const [showSettings, setShowSettings] = useState(false);
     const [copied, setCopied] = useState(false);
     const [memberToRemove, setMemberToRemove] = useState(null);
+    const [sortBy, setSortBy] = useState('score');
 
     const teamTotals = useMemo(() => {
         return teamMembers.reduce((acc, member) => {
@@ -156,6 +157,13 @@ const TeamDashboard = ({ teamData, teamMembers, onLeaveTeam, onShareInvite, user
             setMemberToRemove(null);
         }
     };
+
+    const sortedMembers = [...teamMembers].sort((a, b) => {
+        if (sortBy === 'hustle') {
+            return (b.nos || 0) - (a.nos || 0);
+        }
+        return (b.rankingScore || 0) - (a.rankingScore || 0);
+    });
 
     return (
         <div className="space-y-6">
@@ -221,9 +229,25 @@ const TeamDashboard = ({ teamData, teamMembers, onLeaveTeam, onShareInvite, user
             </div>
 
             <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm">
-                <h3 className="text-xl font-semibold mb-4 text-gray-800">Team Roster (Weekly Stats)</h3>
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xl font-semibold text-gray-800">Team Roster (Weekly Stats)</h3>
+                    <div className="flex bg-gray-100 rounded-lg p-1">
+                        <button
+                            onClick={() => setSortBy('score')}
+                            className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${sortBy === 'score' ? 'bg-white shadow text-indigo-700' : 'text-gray-500 hover:text-gray-700'}`}
+                        >
+                            Score
+                        </button>
+                        <button
+                            onClick={() => setSortBy('hustle')}
+                            className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${sortBy === 'hustle' ? 'bg-white shadow text-red-600' : 'text-gray-500 hover:text-gray-700'}`}
+                        >
+                            Hustle (No's)
+                        </button>
+                    </div>
+                </div>
                 <div className="space-y-3">
-                    {teamMembers.sort((a, b) => (b.rankingScore || 0) - (a.rankingScore || 0)).map((member, index) => (
+                    {sortedMembers.map((member, index) => (
                         <div key={member.uid || member.userId || member.id} className={`p-3 rounded-lg flex items-center justify-between ${member.uid === user.uid || member.userId === user.uid ? 'bg-indigo-100 border-2 border-indigo-500' : 'bg-gray-50'}`}>
                             <div className="flex items-center">
                                 <span className="font-bold text-lg w-8">{index + 1}</span>
@@ -233,7 +257,11 @@ const TeamDashboard = ({ teamData, teamMembers, onLeaveTeam, onShareInvite, user
                                 </span>
                             </div>
                             <div className="flex items-center space-x-3">
-                                <span className="font-bold text-lg text-indigo-600">{member.rankingScore || 0} pts</span>
+                                {sortBy === 'score' ? (
+                                    <span className="font-bold text-lg text-indigo-600">{member.rankingScore || 0} pts</span>
+                                ) : (
+                                    <span className="font-bold text-lg text-red-600">{member.nos || 0} No's</span>
+                                )}
                                 {isCreator && (member.uid !== user.uid && member.userId !== user.uid && member.id !== user.uid) && (
                                     <button onClick={() => setMemberToRemove(member)} className="text-gray-400 hover:text-red-600 p-1" title="Remove Member">
                                         <Trash2 className="h-5 w-5" />
@@ -491,6 +519,7 @@ const TeamPage = ({ user, db, userProfile, setUserProfile, weekId }) => {
                 exposures: userStats.weeklyExposures || userStats.exposures || 0,
                 weeklyPresentations: userStats.weeklyPresentations || userStats.presentations || 0,
                 presentations: userStats.weeklyPresentations || userStats.presentations || 0,
+                nos: userStats.nos || 0,
                 rankingScore: userStats.rankingScore || 0,
                 dailyPar: userStats.dailyPar || 2
             };

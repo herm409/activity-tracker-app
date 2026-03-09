@@ -187,6 +187,7 @@ const AppContent = () => {
         let weeklyPresentations = 0;
         let weeklyThreeWays = 0;
         let weeklyEnrolls = 0;
+        let weeklyNos = 0;
 
         let d = new Date(start);
 
@@ -209,6 +210,7 @@ const AppContent = () => {
             if (dayData) {
                 weeklyExposures += Number(dayData.exposures) || 0;
                 weeklyFollowUps += Number(dayData.followUps) || 0;
+                weeklyNos += Number(dayData.nos) || 0;
                 // Presentations
                 if (Array.isArray(dayData.presentations)) {
                     weeklyPresentations += dayData.presentations.length;
@@ -247,6 +249,7 @@ const AppContent = () => {
             presentations: weeklyPresentations,
             threeWays: weeklyThreeWays,
             enrolls: weeklyEnrolls,
+            nos: weeklyNos,
             rankingScore, // Store the weighted score for sorting/display
             weeklyExposures, // For backward compatibility / alignment
             weeklyPresentations, // For backward compatibility / alignment
