@@ -83,6 +83,11 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
                             onIncrement = onLogFollowUp;
                         } else if (metric.key === 'exposures') {
                             onIncrement = onLogExposure;
+                        } else if (metric.key === 'nos') {
+                            onIncrement = () => {
+                                const confirm = window.confirm("A true 'No' only counts after they've seen the information. Did this prospect evaluate a presentation or video?");
+                                if (confirm) onQuickAdd(metric.key, 1);
+                            };
                         } else {
                             onIncrement = () => onQuickAdd(metric.key, 1);
                         }
