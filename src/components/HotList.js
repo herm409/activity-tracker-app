@@ -1,10 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { collection, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { debounce } from '../utils/helpers';
-import { appId, db } from '../firebaseConfig';
-import { calculatePoints } from '../utils/scoring';
+import { appId } from '../firebaseConfig';
 import confetti from 'canvas-confetti';
-import { Calendar, User, AlignLeft, AlertTriangle, MessageCircle, PlayCircle, Zap, Send, PhoneCall, CheckCircle, Target, TrendingUp, XCircle, Trash2, Clock, MessageSquare, Archive, ArchiveRestore, Flame, Users, List, Plus, Search, SortAsc, ChevronDown, ChevronUp } from 'lucide-react';
+import { AlertTriangle, PlayCircle, Zap, Send, CheckCircle, TrendingUp, XCircle, Trash2, Clock, MessageSquare, Archive, ArchiveRestore, Flame, Users, List, Plus, Search, SortAsc, ChevronDown, ChevronUp } from 'lucide-react';
 
 // --- Modals for Hotlist ---
 const AddHotlistItemModal = ({ onClose, onAdd }) => {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { doc, getDoc, collection, query, where, onSnapshot, writeBatch, updateDoc, deleteField } from 'firebase/firestore';
 import { appId } from '../firebaseConfig';
-import { Users, Share2, LogOut, ClipboardCopy, CheckCircle, Settings, Trash2 } from 'lucide-react';
+import { Share2, Settings, LogOut, Trash2, Flame, Award, Medal, CheckCircle, ClipboardCopy, Users } from 'lucide-react';
 import { generateInviteCode as genCode } from '../utils/helpers';
 
 const CreateTeamModal = ({ onClose, onCreateTeam }) => {
@@ -165,6 +165,36 @@ const TeamDashboard = ({ teamData, teamMembers, onLeaveTeam, onShareInvite, user
         return (b.rankingScore || 0) - (a.rankingScore || 0);
     });
 
+    const renderIronmanBadge = (streak) => {
+        if (!streak || streak < 3) return null;
+        let Icon = Medal;
+        let color = "text-amber-600";
+        let bg = "bg-amber-100";
+        let title = `${streak} Day Ironman Streak (Bronze)`;
+
+        if (streak >= 30) {
+            Icon = Flame;
+            color = "text-orange-500";
+            bg = "bg-orange-100";
+            title = `${streak} Day Ironman Streak (Diamond/Fire)`;
+        } else if (streak >= 14) {
+            Icon = Award;
+            color = "text-yellow-500";
+            bg = "bg-yellow-100";
+            title = `${streak} Day Ironman Streak (Gold)`;
+        } else if (streak >= 7) {
+            color = "text-gray-400";
+            bg = "bg-gray-100";
+            title = `${streak} Day Ironman Streak (Silver)`;
+        }
+
+        return (
+            <div className={`p-1 rounded-full ${bg} ml-2`} title={title}>
+                <Icon className={`h-4 w-4 ${color}`} />
+            </div>
+        );
+    };
+
     return (
         <div className="space-y-6">
             {showSettings && <TeamSettingsModal teamData={teamData} onClose={() => setShowSettings(false)} onUpdateTeam={onUpdateTeam} />}
@@ -252,7 +282,10 @@ const TeamDashboard = ({ teamData, teamMembers, onLeaveTeam, onShareInvite, user
                             <div className="flex items-center">
                                 <span className="font-bold text-lg w-8">{index + 1}</span>
                                 <span className="font-medium flex flex-col">
-                                    {member.displayName || "Unknown User"}
+                                    <div className="flex items-center">
+                                        {member.displayName || "Unknown User"}
+                                        {renderIronmanBadge(member.ironmanStreak)}
+                                    </div>
                                     <span className="text-xs text-gray-500 font-normal">Exposures: {member.weeklyExposures || member.exposures || 0}</span>
                                 </span>
                             </div>
@@ -404,7 +437,7 @@ const TeamPage = ({ user, db, userProfile, setUserProfile, weekId }) => {
         setUserProfile(prev => ({ ...prev, teamId: null }));
         setTeamData(null);
         setStats({});
-    }, [user, db, setUserProfile, weekId, userProfile.teamId, user.uid]);
+    }, [user, db, setUserProfile, weekId, userProfile.teamId]);
 
     const handleShareInvite = () => {
         if (teamData) {
@@ -520,6 +553,7 @@ const TeamPage = ({ user, db, userProfile, setUserProfile, weekId }) => {
                 weeklyPresentations: userStats.weeklyPresentations || userStats.presentations || 0,
                 presentations: userStats.weeklyPresentations || userStats.presentations || 0,
                 nos: userStats.nos || 0,
+                ironmanStreak: userStats.ironmanStreak || 0,
                 rankingScore: userStats.rankingScore || 0,
                 dailyPar: userStats.dailyPar || 2
             };

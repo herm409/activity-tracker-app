@@ -1,5 +1,5 @@
 import React, { forwardRef } from 'react';
-import { Trophy, Calendar, User, TrendingUp, Users, Video, Award, XCircle, PhoneCall } from 'lucide-react';
+import { Trophy, Calendar, TrendingUp, Users, Video, Award, XCircle, PhoneCall } from 'lucide-react';
 
 const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
     // Check if weekData exists before destructuring
@@ -7,7 +7,7 @@ const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
         return <div ref={ref}>Loading data...</div>;
     }
 
-    const { totals, lastWeekTotals, dateRange, activeInPipeline, newMembersThisWeek, reportTitle } = weekData;
+    const { totals, dateRange, activeInPipeline, reportTitle } = weekData;
 
     // Scoreboard Metrics Configuration
     const scoreboard = [

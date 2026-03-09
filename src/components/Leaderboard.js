@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { calculatePoints } from '../utils/scoring';
-import { collection, query, orderBy, getDocs, where, getCountFromServer, doc, getDoc } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs } from 'firebase/firestore';
 import { appId } from '../firebaseConfig';
-import { Trophy, Users } from 'lucide-react';
+import { Trophy, Users, Flame, Award, Medal } from 'lucide-react';
 
 const Leaderboard = ({ db, weekId, user }) => {
     const [scores, setScores] = useState([]);
@@ -109,6 +109,36 @@ const Leaderboard = ({ db, weekId, user }) => {
         return parToDate - totalPoints;
     };
 
+    const renderIronmanBadge = (streak) => {
+        if (!streak || streak < 3) return null;
+        let Icon = Medal;
+        let color = "text-amber-600";
+        let bg = "bg-amber-100";
+        let title = `${streak} Day Ironman Streak (Bronze)`;
+
+        if (streak >= 30) {
+            Icon = Flame;
+            color = "text-orange-500";
+            bg = "bg-orange-100";
+            title = `${streak} Day Ironman Streak (Diamond/Fire)`;
+        } else if (streak >= 14) {
+            Icon = Award;
+            color = "text-yellow-500";
+            bg = "bg-yellow-100";
+            title = `${streak} Day Ironman Streak (Gold)`;
+        } else if (streak >= 7) {
+            color = "text-gray-400";
+            bg = "bg-gray-100";
+            title = `${streak} Day Ironman Streak (Silver)`;
+        }
+
+        return (
+            <div className={`p-1 rounded-full ${bg} ml-2`} title={title}>
+                <Icon className={`h-4 w-4 ${color}`} />
+            </div>
+        );
+    };
+
     return (
         <div className="space-y-8">
             {/* Individual Leaderboard */}
@@ -137,8 +167,9 @@ const Leaderboard = ({ db, weekId, user }) => {
                                                 #{index + 1}
                                             </span>
                                             <div>
-                                                <p className={`font-semibold ${entry.userId === user?.uid ? 'text-indigo-900' : 'text-gray-800'}`}>
+                                                <p className={`font-semibold flex items-center ${entry.userId === user?.uid ? 'text-indigo-900' : 'text-gray-800'}`}>
                                                     {entry.displayName} {entry.userId === user?.uid && '(You)'}
+                                                    {renderIronmanBadge(entry.ironmanStreak)}
                                                 </p>
                                                 {/* Optional: Show individual team name? */}
                                             </div>

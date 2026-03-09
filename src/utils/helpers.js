@@ -1,3 +1,5 @@
+import { isIronmanDay } from './scoring';
+
 export const debounce = (func, wait) => {
     let timeout;
     return function executedFunction(...args) {
@@ -49,7 +51,7 @@ export const getWeekRange = (date = new Date()) => {
 };
 
 export const calculateCurrentStreaks = (monthlyData, lastMonthData, today = new Date()) => {
-    const metrics = ['exposures', 'followUps', 'nos', 'presentations', 'threeWays', 'enrolls'];
+    const metrics = ['exposures', 'followUps', 'nos', 'presentations', 'threeWays', 'enrolls', 'ironman'];
     const streaks = {};
 
     metrics.forEach(metric => {
@@ -109,6 +111,10 @@ const checkActivity = (dateObj, metric, monthlyData, lastMonthData, referenceDat
 
     const dayData = dataSource[day];
     if (!dayData) return false;
+
+    if (metric === 'ironman') {
+        return isIronmanDay(dayData);
+    }
 
     // Check metric value
     const val = dayData[metric];

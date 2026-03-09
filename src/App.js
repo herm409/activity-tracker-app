@@ -2,13 +2,12 @@ import React, { useState, useEffect, useCallback, useRef, Suspense, useMemo } fr
 import { calculatePoints } from './utils/scoring';
 import * as ActionModals from './components/ActionModals';
 import { doc, setDoc, getDoc, updateDoc, collection, query, orderBy, onSnapshot, addDoc } from 'firebase/firestore';
-import { signOut } from 'firebase/auth'; // Ensure this is imported if used directly, or use context
 import html2canvas from 'html2canvas';
 
 // Context
 import { AppProvider, useAppContext } from './context/AppContext';
 import { appId } from './firebaseConfig';
-import { debounce, WEEKS_IN_MONTH, getWeekId, getWeekRange, calculateCurrentStreaks } from './utils/helpers';
+import { debounce, getWeekId, getWeekRange, calculateCurrentStreaks } from './utils/helpers';
 
 // Components (Eager Load)
 import Header from './components/Header';
@@ -31,8 +30,6 @@ const AppContent = () => {
 
     // --- State Management ---
     const [currentDate, setCurrentDate] = useState(new Date());
-    const [viewMode, setViewMode] = useState('week'); // This was inside ActivityTracker, but used here if needed? No, ActivityTracker had its own state. 
-    // ActivityTracker had its own viewMode. App.js doesn't need it unless lifted.
 
     const [monthlyData, setMonthlyData] = useState({});
     const [lastMonthData, setLastMonthData] = useState({});
@@ -239,6 +236,14 @@ const AppContent = () => {
             enrolls: weeklyEnrolls
         });
 
+        // Calculate current ironman streak to save to leaderboard
+        const streaks = calculateCurrentStreaks(
+            targetMonthId === monthYearId ? currentMonthData : monthlyDataRef.current,
+            targetMonthId === lastMonthYearId ? currentMonthData : lastMonthData,
+            new Date()
+        );
+        const ironmanStreak = streaks.ironman || 0;
+
         const leaderboardRef = doc(db, 'artifacts', appId, 'leaderboard', weekId, 'entries', user.uid);
 
         const payload = {
@@ -250,6 +255,7 @@ const AppContent = () => {
             threeWays: weeklyThreeWays,
             enrolls: weeklyEnrolls,
             nos: weeklyNos,
+            ironmanStreak,
             rankingScore, // Store the weighted score for sorting/display
             weeklyExposures, // For backward compatibility / alignment
             weeklyPresentations, // For backward compatibility / alignment
@@ -263,7 +269,7 @@ const AppContent = () => {
         }
 
         await setDoc(leaderboardRef, payload, { merge: true });
-    }, [user, db, userProfile.displayName, userProfile.teamId, monthYearId, lastMonthYearId, lastMonthData]);
+    }, [user, db, userProfile.displayName, userProfile.dailyPar, userProfile.teamId, monthYearId, lastMonthYearId, lastMonthData]);
 
     const debouncedSave = useMemo(() => debounce(async (dataToSave, goalsToSave, targetMonthId, dateOfChange) => {
         if (!user || !db) return;
@@ -452,7 +458,7 @@ const AppContent = () => {
         const closingZone = allItems.filter(item => item.isArchived !== true && item.status === 'Hot');
 
         return { totals: thisWeekTotals, lastWeekTotals, dateRange, activeInPipeline, closingZone, reportTitle: 'Weekly Scoreboard' };
-    }, [monthlyData, lastMonthData, user, db, hotlist, currentDate]);
+    }, [monthlyData, lastMonthData, db, hotlist, currentDate]);
 
 
     const getMonthDataForReport = useCallback(async () => {

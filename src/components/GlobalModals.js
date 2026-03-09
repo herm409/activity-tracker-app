@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Minus, Plus, Trophy, X } from 'lucide-react';
+import { X, Trophy, Plus } from 'lucide-react';
 import { CheckboxInput, NumberInput, PresentationTracker } from './FormInputs';
 
 export const DisplayNameModal = ({ onSave, onClose, currentName, currentPar }) => {

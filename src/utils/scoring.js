@@ -8,7 +8,29 @@ export const WEIGHTS = {
     tenacityFollowUps: 2,
     presentations: 3,
     threeWays: 3,
-    enrolls: 5
+    enrolls: 5,
+    ironman: 15
+};
+
+export const isIronmanDay = (data) => {
+    if (!data) return false;
+    const exposures = Number(data.exposures) || 0;
+    const followUps = Number(data.followUps) || 0;
+    const nos = Number(data.nos) || 0;
+    const threeWays = Number(data.threeWays) || 0;
+
+    let presentations = 0;
+    if (Array.isArray(data.presentations)) {
+        presentations = data.presentations.length;
+    } else {
+        presentations = Number(data.presentations) || 0;
+    }
+    presentations += (Number(data.pbrs) || 0);
+
+    const exerc = !!data.exerc;
+    const pd = !!data.personalDevelopment;
+
+    return exposures > 0 && followUps > 0 && nos > 0 && threeWays > 0 && presentations > 0 && exerc && pd;
 };
 
 export const calculatePoints = (data) => {
@@ -40,6 +62,8 @@ export const calculatePoints = (data) => {
     const nos = Number(data.nos) || 0;
     const tenacityFollowUps = Number(data.tenacityFollowUps) || 0;
 
+    const ironmanBonus = isIronmanDay(data) ? WEIGHTS.ironman : 0;
+
     // Weighted Sum
     return (exposures * WEIGHTS.exposures) +
         (followUps * WEIGHTS.followUps) +
@@ -47,5 +71,6 @@ export const calculatePoints = (data) => {
         (tenacityFollowUps * WEIGHTS.tenacityFollowUps) +
         (presentations * WEIGHTS.presentations) +
         (threeWays * WEIGHTS.threeWays) +
-        (enrolls * WEIGHTS.enrolls);
+        (enrolls * WEIGHTS.enrolls) +
+        ironmanBonus;
 };

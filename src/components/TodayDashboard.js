@@ -1,5 +1,5 @@
 import React from 'react';
-import { Target, Users, BarChart2, PhoneCall, UserCheck, Dumbbell, BookOpen, Share2, HelpCircle, XCircle } from 'lucide-react';
+import { Target, Users, BarChart2, PhoneCall, UserCheck, Dumbbell, BookOpen, Share2, HelpCircle, XCircle, Flame } from 'lucide-react';
 import { ActivityCard, PresentationActivityCard, DisciplineCheckbox } from './ActivityCards';
 import { calculatePoints } from '../utils/scoring';
 
@@ -22,6 +22,19 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
     ];
 
     const currentPar = dailyPar || 2;
+
+    // Calculate Ironman Progress
+    const ironmanProgress = [
+        { label: 'Exposures', done: (Number(todayData.exposures) || 0) > 0 },
+        { label: 'Follow Ups', done: ((Number(todayData.followUps) || 0) + (Number(todayData.tenacityFollowUps) || 0)) > 0 },
+        { label: 'No\'s', done: (Number(todayData.nos) || 0) > 0 },
+        { label: 'Presentations', done: ((todayData.presentations?.length || 0) + (Number(todayData.pbrs) || 0)) > 0 },
+        { label: '3-Ways', done: (Number(todayData.threeWays) || 0) > 0 },
+        { label: 'Exercise', done: !!todayData.exerc },
+        { label: 'Personal Dev', done: !!(todayData.personalDevelopment || todayData.read || todayData.audio) },
+    ];
+    const ironmanCompleted = ironmanProgress.filter(i => i.done).length;
+    const isIronman = ironmanCompleted === 7;
 
     return (
         <div className="space-y-8">
@@ -55,6 +68,36 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
                         </button>
                     </div>
                 </div>
+
+                {/* Ironman Tracker */}
+                <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-orange-100 flex flex-col md:flex-row items-center justify-between mb-6">
+                    <div className="flex items-center mb-3 md:mb-0 w-full md:w-auto">
+                        <div className={`p-3 rounded-full mr-4 ${isIronman ? 'bg-orange-100' : 'bg-gray-100'}`}>
+                            <Flame className={`h-8 w-8 ${isIronman ? 'text-orange-500' : 'text-gray-400'}`} />
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-gray-800 text-lg flex items-center">
+                                The Daily Cycle
+                                {isIronman && <span className="ml-2 bg-orange-500 text-white text-[10px] uppercase px-2 py-0.5 rounded-full font-bold animate-pulse">+15 PTS</span>}
+                            </h3>
+                            <p className="text-sm text-gray-500">
+                                {isIronman ? "You crushed it! Full cycle complete." : `Complete all 7 core activities for a +15 pt bonus. (${ironmanCompleted}/7)`}
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex space-x-2 w-full md:w-auto justify-center">
+                        {ironmanProgress.map((item, idx) => (
+                            <div
+                                key={idx}
+                                className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all cursor-help ${item.done ? 'bg-green-500 border-green-500 text-white shadow-sm' : 'bg-white border-gray-200 text-gray-400'}`}
+                                title={item.label}
+                            >
+                                {item.label.charAt(0)}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {metrics.map(metric => {
                         if (metric.isPresentation) {

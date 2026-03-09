@@ -95,7 +95,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
             acc.enrolls += (Number(dayData.enrolls) || 0) + (Array.isArray(dayData.sitdowns) ? dayData.sitdowns.filter(s => s === 'E').length : 0);
             return acc;
         }, { exposures: 0, followUps: 0, presentations: 0, threeWays: 0, enrolls: 0 });
-    }, [data]);
+    }, [data, monthYearId]);
 
     const handleDayClick = (dayObj) => {
         if (dayObj.isBlank) return;
