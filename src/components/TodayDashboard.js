@@ -1,5 +1,5 @@
 import React from 'react';
-import { Target, Users, BarChart2, PhoneCall, UserCheck, Dumbbell, BookOpen, Share2, HelpCircle } from 'lucide-react';
+import { Target, Users, BarChart2, PhoneCall, UserCheck, Dumbbell, BookOpen, Share2, HelpCircle, XCircle } from 'lucide-react';
 import { ActivityCard, PresentationActivityCard, DisciplineCheckbox } from './ActivityCards';
 import { calculatePoints } from '../utils/scoring';
 
@@ -10,6 +10,7 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
     const metrics = [
         { key: 'exposures', label: 'Exposures', icon: Target, color: 'indigo' },
         { key: 'followUps', label: 'Follow Ups', icon: Users, color: 'green' },
+        { key: 'nos', label: 'Definitive No\'s', icon: XCircle, color: 'red' },
         { key: 'presentations', label: 'Presentations', icon: BarChart2, color: 'purple', isPresentation: true },
         { key: 'threeWays', label: '3-Way Calls', icon: PhoneCall, color: 'pink' },
         { key: 'enrolls', label: 'Memberships Sold', icon: UserCheck, color: 'teal' }

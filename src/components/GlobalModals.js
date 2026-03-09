@@ -92,7 +92,7 @@ export const OnboardingModal = ({ onDismiss }) => {
                             <span className="font-bold text-indigo-600">3 Pts</span>
                         </li>
                         <li className="flex justify-between items-center bg-gray-50 p-2 rounded">
-                            <span>📞 Exposure / Follow-Up</span>
+                            <span>📞 Exposure / Follow-Up / No</span>
                             <span className="font-bold text-gray-600">1 Pt</span>
                         </li>
                     </ul>
@@ -165,6 +165,7 @@ export const DayEntryModal = ({ day, data, onClose, onChange }) => {
                 <div className="p-4 sm:p-6 space-y-4 overflow-y-auto max-h-[70vh]">
                     <div className="flex items-center justify-between"><label className="font-medium text-gray-700">Exposures</label><NumberInput value={data.exposures || ''} onChange={e => onChange('exposures', e.target.value)} /></div>
                     <div className="flex items-center justify-between"><label className="font-medium text-gray-700">Follow Ups</label><NumberInput value={data.followUps || ''} onChange={e => onChange('followUps', e.target.value)} /></div>
+                    <div className="flex items-center justify-between"><label className="font-medium text-gray-700">Definitive No's</label><NumberInput value={data.nos || ''} onChange={e => onChange('nos', e.target.value)} /></div>
                     <div className="flex items-center justify-between"><label className="font-medium text-gray-700">Memberships Sold</label><NumberInput value={data.enrolls || ''} onChange={e => onChange('enrolls', e.target.value)} /></div>
                     <div className="flex items-center justify-between"><label className="font-medium text-gray-700">3 Ways</label><NumberInput value={data.threeWays || ''} onChange={e => onChange('threeWays', e.target.value)} /></div>
                     <PresentationTracker value={data.presentations || []} onChange={val => onChange('presentations', val)} />
@@ -245,7 +246,7 @@ export const ScoringLegendModal = ({ onClose }) => (
                             <span className="font-bold text-indigo-700 badge">3 Pts</span>
                         </div>
                         <div className="flex justify-between items-center p-2 rounded bg-gray-50 border border-gray-100">
-                            <span className="font-medium text-gray-700">Exposure / Follow-Up</span>
+                            <span className="font-medium text-gray-700">Exposure / Follow-Up / No</span>
                             <span className="font-bold text-gray-600 badge">1 Pt</span>
                         </div>
                     </div>

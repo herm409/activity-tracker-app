@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { TrendingUp, Award, Lightbulb, Users, ChevronsRight, Target } from 'lucide-react';
+import { TrendingUp, Award, Lightbulb, Users, ChevronsRight, Target, XCircle } from 'lucide-react';
 import { appId } from '../firebaseConfig';
 
 const AnalyticsDashboard = ({ db, user }) => {
@@ -11,6 +11,7 @@ const AnalyticsDashboard = ({ db, user }) => {
         funnelEnrolls: 0,
         expToPresentationRatio: 0,
         presentationToEnrollRatio: 0,
+        noToEnrollRatio: 0,
     });
     const [loading, setLoading] = useState(true);
     const [historicalData, setHistoricalData] = useState([]);
@@ -25,7 +26,7 @@ const AnalyticsDashboard = ({ db, user }) => {
             setMonthName(today.toLocaleString('default', { month: 'long' }));
             const currentMonthYearId = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
 
-            let lifetimeExposures = 0, lifetimePresentations = 0, lifetimeEnrolls = 0;
+            let lifetimeExposures = 0, lifetimePresentations = 0, lifetimeEnrolls = 0, lifetimeNos = 0;
             let currentMonthExposures = 0, currentMonthPresentations = 0, currentMonthEnrolls = 0;
 
             // OPTIMIZATION NOTE: Fetching ALL docs is expensive as data grows. 
@@ -41,10 +42,12 @@ const AnalyticsDashboard = ({ db, user }) => {
                     const exposures = Number(day.exposures) || 0;
                     const presentations = (day.presentations?.length || 0) + (Number(day.pbrs) || 0);
                     const enrolls = (Number(day.enrolls) || 0) + (Array.isArray(day.sitdowns) ? day.sitdowns.filter(s => s === 'E').length : 0);
+                    const nos = Number(day.nos) || 0;
 
                     lifetimeExposures += exposures;
                     lifetimePresentations += presentations;
                     lifetimeEnrolls += enrolls;
+                    lifetimeNos += nos;
 
                     if (isCurrentMonth) {
                         currentMonthExposures += exposures;
@@ -56,6 +59,7 @@ const AnalyticsDashboard = ({ db, user }) => {
 
             const expToPresentationRatio = lifetimePresentations > 0 ? (lifetimeExposures / lifetimePresentations) : 0;
             const presentationToEnrollRatio = lifetimeEnrolls > 0 ? (lifetimePresentations / lifetimeEnrolls) : 0;
+            const noToEnrollRatio = lifetimeEnrolls > 0 ? (lifetimeNos / lifetimeEnrolls) : 0;
 
             setStats({
                 funnelExposures: currentMonthExposures,
@@ -63,6 +67,7 @@ const AnalyticsDashboard = ({ db, user }) => {
                 funnelEnrolls: currentMonthEnrolls,
                 expToPresentationRatio,
                 presentationToEnrollRatio,
+                noToEnrollRatio,
             });
 
             const monthLabels = [];
@@ -171,6 +176,12 @@ const AnalyticsDashboard = ({ db, user }) => {
                 </div>
 
                 <div className="lg:col-span-2 space-y-4">
+                    <RatioCard
+                        title="The Scorecard: Value of a 'No'"
+                        value={stats.noToEnrollRatio > 0 ? `${stats.noToEnrollRatio.toFixed(1)} No's = 1 Membership` : 'N/A'}
+                        detail="Average number of No's historically required to close one deal."
+                        icon={XCircle}
+                    />
                     <RatioCard
                         title="Lifetime Exposure-to-Presentation"
                         value={stats.expToPresentationRatio > 0 ? `${stats.expToPresentationRatio.toFixed(1)} : 1` : 'N/A'}

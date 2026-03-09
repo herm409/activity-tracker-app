@@ -442,7 +442,6 @@ const AppContent = () => {
         const lastWeekTotals = getWeekTotals(startOfLastWeek, endOfLastWeek);
         const dateRange = `${startOfWeek.toLocaleDateString('default', { month: 'short', day: 'numeric' })} - ${endOfWeek.toLocaleDateString('default', { month: 'short', day: 'numeric' })}`;
 
-        const hotlistColRef = collection(db, 'artifacts', appId, 'users', user.uid, 'hotlist');
         const allItems = hotlist;
 
         const activeInPipeline = allItems.filter(item => item.isArchived !== true && (item.status === 'Hot' || item.status === 'Warm')).length;

@@ -4,6 +4,7 @@
 export const WEIGHTS = {
     exposures: 1,
     followUps: 1,
+    nos: 1,
     presentations: 3,
     threeWays: 3,
     enrolls: 5
@@ -35,9 +36,12 @@ export const calculatePoints = (data) => {
         enrolls += data.sitdowns.filter(s => s === 'E').length;
     }
 
+    const nos = Number(data.nos) || 0;
+
     // Weighted Sum
     return (exposures * WEIGHTS.exposures) +
         (followUps * WEIGHTS.followUps) +
+        (nos * WEIGHTS.nos) +
         (presentations * WEIGHTS.presentations) +
         (threeWays * WEIGHTS.threeWays) +
         (enrolls * WEIGHTS.enrolls);

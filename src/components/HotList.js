@@ -111,6 +111,10 @@ const ProspectCard = ({ item, onUpdate, onInstantUpdate, onDecide, onDataChange,
         onInstantUpdate(item.id, { exposureCount: exposureCount + 1, lastContacted: new Date().toISOString() });
         updateDailyStats('exposures');
     };
+    const handleNotInterested = () => {
+        onInstantUpdate(item.id, { isArchived: true, outcome: 'Not Interested', decisionDate: new Date().toISOString() });
+        updateDailyStats('nos');
+    };
     const updateDailyStats = (metric) => {
         const day = new Date().getDate();
         const currentCount = Number(monthlyData?.[day]?.[metric] || 0);
@@ -127,7 +131,8 @@ const ProspectCard = ({ item, onUpdate, onInstantUpdate, onDecide, onDataChange,
             <div className="absolute top-2 right-2 flex items-center space-x-2">
                 {isOverdue && <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded text-[10px] font-bold flex items-center"><AlertTriangle className="w-3 h-3 mr-1" /> Overdue</span>}
                 {isStagnant && <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded text-[10px] font-bold flex items-center">Stagnant</span>}
-                <button onClick={() => onDelete(item.id)} className="text-gray-300 hover:text-red-500 transition-colors p-1" title="Quick Kill / Not Interested"><Trash2 className="h-4 w-4" /></button>
+                <button onClick={handleNotInterested} className="text-gray-400 hover:text-red-500 transition-colors p-1" title="Not Interested (Log a No)"><XCircle className="h-4 w-4" /></button>
+                <button onClick={() => onDelete(item.id)} className="text-gray-300 hover:text-red-500 transition-colors p-1" title="Delete"><Trash2 className="h-4 w-4" /></button>
             </div>
             <div className="flex justify-between items-start mt-2 pr-8">
                 <input type="text" defaultValue={item.name} onChange={(e) => onUpdate(item.id, 'name', e.target.value)} className="text-lg font-bold text-gray-800 border-none p-0 w-full focus:ring-0 bg-transparent" placeholder="Enter name..." />
@@ -255,6 +260,11 @@ export const HotList = ({ user, db, onDataChange, monthlyData, hotlist: allProsp
     const handleSetOutcome = async (outcome) => {
         if (!itemToDecide) return;
         await handleInstantUpdate(itemToDecide.id, { isArchived: true, outcome: outcome, decisionDate: new Date().toISOString() });
+        if (outcome === 'Not Interested') {
+            const day = new Date().getDate();
+            const currentCount = Number(monthlyData?.[day]?.nos || 0);
+            onDataChange(new Date(), 'nos', currentCount + 1);
+        }
         setItemToDecide(null);
     };
 
