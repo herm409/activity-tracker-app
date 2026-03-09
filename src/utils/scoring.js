@@ -75,48 +75,36 @@ export const getPeriodicCoachingAdvice = (totals, timeframe = 'week') => {
 
     const totalActivity = exposures + followUps + presentations + threeWays + nos + enrolls;
 
-    if (totalActivity === 0) {
-        return { grade: 'N/A', message: "No activity logged yet. Time to get started and fill that pipeline!", color: "text-gray-500", bg: "bg-gray-100" };
-    }
-
-    const exposureRatio = exposures > 0 ? followUps / exposures : followUps;
-    const closingActivity = presentations + threeWays + nos + enrolls;
-    const closingRatio = followUps > 0 ? closingActivity / followUps : closingActivity;
+    const exposureTarget = timeframe === 'week' ? 10 : 40;
+    const followUpTarget = exposures * 2;
+    const hasDecisions = (nos > 0 || enrolls > 0);
 
     let grade = 'C';
     let message = '';
     let color = 'text-red-500';
     let bg = 'bg-red-50';
 
-    if (totalActivity < (timeframe === 'week' ? 5 : 20)) {
+    if (totalActivity === 0) {
+        grade = 'N/A';
+        message = "No activity logged yet. Time to get started and fill that pipeline!";
+        color = "text-gray-500";
+        bg = "bg-gray-100";
+    } else if (exposures < exposureTarget) {
         grade = 'C';
-        message = `To build momentum, you need more at-bats. This ${timeframe}'s volume was low. Try to initiate more conversations (exposures) to see real progress.`;
-    } else if (exposures > 0 && followUps === 0) {
+        message = `To build momentum, you need more at-bats. Your exposure volume is too low for a ${timeframe}. Aim for at least ${exposureTarget} exposures to see real progress.`;
+    } else if (followUps < followUpTarget) {
         grade = 'C';
-        message = `You are exposing but dropping the ball on follow-ups. The fortune is in the follow-up! Reaching back out is how you progress an exposure to a decision.`;
-    } else if (exposures === 0 && followUps > 0) {
-        grade = 'C';
-        message = `You are doing a great job following up, but your pipeline needs new blood. Aim to add new "Day 1" exposures this ${timeframe} to spark fresh interest.`;
-    } else if (exposureRatio < 0.3) {
+        message = `You are hitting your exposure targets, but dropping the ball on follow-ups. Ensure you have at least double the follow-ups (${followUpTarget}) compared to exposures to close sales.`;
+    } else if (!hasDecisions) {
         grade = 'B';
-        message = `You have strong exposure volume, but your follow-up ratio is too low. Make sure you aren't letting those initial contacts slip away. Retarget them!`;
+        message = `Great volume and follow-up habits! However, we need to see decisions being made. Don't be afraid to push for a 'No'. A 'No' means you are truly prospecting and asking.`;
         color = 'text-blue-500';
         bg = 'bg-blue-50';
-    } else if (closingActivity === 0 && followUps >= 3) {
-        grade = 'B';
-        message = `You are consistently following up, but it's not progressing to presentations or 3-ways. Push for a definitive next step or a decision (Yes/No) to clear your pipeline.`;
-        color = 'text-blue-500';
-        bg = 'bg-blue-50';
-    } else if (exposureRatio >= 0.5 && closingRatio >= 0.3) {
+    } else {
         grade = 'A';
-        message = `Outstanding work! You have a highly balanced pipeline. Your follow-up ratio tells me you are tracking people effectively, and pushing them to decisions. Keep this habit.`;
+        message = `Outstanding work! You hit your minimum exposures (${exposureTarget}+), maintained the 2x follow-up ratio, and are successfully driving prospects to a definitive decision. Keep duplicating this system!`;
         color = 'text-green-600';
         bg = 'bg-green-50';
-    } else {
-        grade = 'B';
-        message = `Solid effort this ${timeframe}. To hit an 'A', focus on progression. Ensure every follow-up has a definitive next step assigned, like a 3-way call or a final decision.`;
-        color = 'text-blue-500';
-        bg = 'bg-blue-50';
     }
 
     return { grade, message, color, bg };
