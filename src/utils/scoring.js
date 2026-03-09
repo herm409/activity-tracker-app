@@ -90,31 +90,31 @@ export const getPeriodicCoachingAdvice = (totals, timeframe = 'week') => {
 
     if (totalActivity < (timeframe === 'week' ? 5 : 20)) {
         grade = 'C';
-        message = `Volume is a bit low for this ${timeframe}. Focus on increasing your total exposures to get the momentum going.`;
+        message = `To build momentum, you need more at-bats. This ${timeframe}'s volume was low. Try to initiate more conversations (exposures) to see real progress.`;
     } else if (exposures > 0 && followUps === 0) {
         grade = 'C';
-        message = `You are exposing but not following up! The fortune is in the follow-up. Make sure you reconnect with your prospects.`;
+        message = `You are exposing but dropping the ball on follow-ups. The fortune is in the follow-up! Reaching back out is how you progress an exposure to a decision.`;
     } else if (exposures === 0 && followUps > 0) {
         grade = 'C';
-        message = `You are doing a great job following up, but your pipeline needs new blood. Aim to add new exposures this ${timeframe}.`;
+        message = `You are doing a great job following up, but your pipeline needs new blood. Aim to add new "Day 1" exposures this ${timeframe} to spark fresh interest.`;
     } else if (exposureRatio < 0.3) {
         grade = 'B';
-        message = `Good exposure volume, but your follow-up ratio is a bit low. Don't let those initial contacts slip away.`;
+        message = `You have strong exposure volume, but your follow-up ratio is too low. Make sure you aren't letting those initial contacts slip away. Retarget them!`;
         color = 'text-blue-500';
         bg = 'bg-blue-50';
     } else if (closingActivity === 0 && followUps >= 3) {
         grade = 'B';
-        message = `You are following up, but it's not leading to presentations, 3-ways, or decisions (No/Enroll). Focus on pushing for a decision or validation.`;
+        message = `You are consistently following up, but it's not progressing to presentations or 3-ways. Push for a definitive next step or a decision (Yes/No) to clear your pipeline.`;
         color = 'text-blue-500';
         bg = 'bg-blue-50';
     } else if (exposureRatio >= 0.5 && closingRatio >= 0.3) {
         grade = 'A';
-        message = `Excellent balance! You are consistently exposing, following up, and driving prospects to a decision. Keep duplicating this system.`;
+        message = `Outstanding work! You have a highly balanced pipeline. Your follow-up ratio tells me you are tracking people effectively, and pushing them to decisions. Keep this habit.`;
         color = 'text-green-600';
         bg = 'bg-green-50';
     } else {
         grade = 'B';
-        message = `Solid effort this ${timeframe}. To hit an 'A', ensure your follow-ups are directly leading to 3-way calls or definitive answers.`;
+        message = `Solid effort this ${timeframe}. To hit an 'A', focus on progression. Ensure every follow-up has a definitive next step assigned, like a 3-way call or a final decision.`;
         color = 'text-blue-500';
         bg = 'bg-blue-50';
     }

@@ -8,7 +8,7 @@ const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
         return <div ref={ref}>Loading data...</div>;
     }
 
-    const { totals, dateRange, activeInPipeline, reportTitle } = weekData;
+    const { totals, dateRange, reportTitle } = weekData;
 
     // Scoreboard Metrics Configuration
     const scoreboard = [
@@ -23,8 +23,8 @@ const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
     const timeframe = reportTitle?.includes('Monthly') ? 'month' : 'week';
     const insight = getPeriodicCoachingAdvice(totals, timeframe);
 
-    // Dynamic height based on title to fit the new insight box without squishing
-    const cardHeight = reportTitle?.includes('Monthly') ? '860px' : '840px';
+    // Reverted back to 800px standard height since Pipeline summary is removed to make space for Coaching
+    const cardHeight = '800px';
 
     return (
         <div ref={ref} className="bg-white p-8 font-sans border border-gray-200 rounded-xl shadow-lg flex flex-col" style={{ width: '400px', height: cardHeight }}>
@@ -52,16 +52,6 @@ const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
                 ))}
             </div>
 
-            {/* Pipeline Summary */}
-            <div className="bg-gray-50 rounded-xl p-5 mb-4">
-                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 text-center">Pipeline Health</h3>
-                <div className="flex justify-center items-center">
-                    <div className="text-center">
-                        <p className="text-2xl font-bold text-gray-800">{activeInPipeline}</p>
-                        <p className="text-[10px] text-gray-500">Active Pipeline</p>
-                    </div>
-                </div>
-            </div>
 
             {/* Coach's Note */}
             <div className={`${insight.bg} rounded-xl p-4 mb-4 border border-opacity-50 flex items-start`} style={{ borderColor: insight.color.replace('text-', 'border-') }}>
