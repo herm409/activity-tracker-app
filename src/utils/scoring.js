@@ -5,6 +5,7 @@ export const WEIGHTS = {
     exposures: 1,
     followUps: 1,
     nos: 1,
+    tenacityFollowUps: 2,
     presentations: 3,
     threeWays: 3,
     enrolls: 5
@@ -37,11 +38,13 @@ export const calculatePoints = (data) => {
     }
 
     const nos = Number(data.nos) || 0;
+    const tenacityFollowUps = Number(data.tenacityFollowUps) || 0;
 
     // Weighted Sum
     return (exposures * WEIGHTS.exposures) +
         (followUps * WEIGHTS.followUps) +
         (nos * WEIGHTS.nos) +
+        (tenacityFollowUps * WEIGHTS.tenacityFollowUps) +
         (presentations * WEIGHTS.presentations) +
         (threeWays * WEIGHTS.threeWays) +
         (enrolls * WEIGHTS.enrolls);

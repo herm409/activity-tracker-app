@@ -108,10 +108,21 @@ const ProspectCard = ({ item, onUpdate, onInstantUpdate, onDecide, onDataChange,
         updateDailyStats('presentations');
     };
     const handleGenericLogExposure = () => {
+        const isTenacity = exposureCount >= 4;
         onInstantUpdate(item.id, { exposureCount: exposureCount + 1, lastContacted: new Date().toISOString() });
-        updateDailyStats('exposures');
+        if (isTenacity) {
+            updateDailyStats('tenacityFollowUps');
+        } else if (exposureCount > 0) {
+            updateDailyStats('followUps');
+        } else {
+            updateDailyStats('exposures');
+        }
     };
     const handleNotInterested = () => {
+        if (exposureCount === 0) {
+            alert("Warning: A true 'No' only counts after they've seen the information. Please educate the prospect first!");
+            return;
+        }
         onInstantUpdate(item.id, { isArchived: true, outcome: 'Not Interested', decisionDate: new Date().toISOString() });
         updateDailyStats('nos');
     };
@@ -151,7 +162,7 @@ const ProspectCard = ({ item, onUpdate, onInstantUpdate, onDecide, onDataChange,
                 )}
                 {item.status === 'Hot' && (
                     <button onClick={handleGenericLogExposure} className="flex-1 bg-green-50 hover:bg-green-100 text-green-700 py-2 rounded-md flex items-center justify-center text-xs font-semibold transition-colors border border-green-200">
-                        <Zap className="h-4 w-4 mr-1 text-green-600" /> Log Exposure
+                        <Zap className="h-4 w-4 mr-1 text-green-600" /> Log Follow Up
                     </button>
                 )}
                 <button onClick={handleSnooze} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-600 py-2 rounded-md flex items-center justify-center text-xs font-semibold transition-colors">

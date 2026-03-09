@@ -72,7 +72,10 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
                             );
                         }
 
-                        const rawValue = Number(todayData[metric.key]) || 0;
+                        let rawValue = Number(todayData[metric.key]) || 0;
+                        if (metric.key === 'followUps') {
+                            rawValue = (Number(todayData.followUps) || 0) + (Number(todayData.tenacityFollowUps) || 0);
+                        }
                         let displayValue = rawValue;
 
                         let onIncrement;
@@ -95,17 +98,28 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
                             // Calculate breakdown for tooltip
                             const ptsEnrolls = ((Number(todayData.enrolls) || 0) + (Array.isArray(todayData.sitdowns) ? todayData.sitdowns.filter(s => s === 'E').length : 0)) * 5;
                             const ptsPres = ((todayData.presentations?.length || 0) + (Number(todayData.pbrs) || 0)) * 3 + (Number(todayData.threeWays) || 0) * 3;
-                            const ptsActivity = (Number(todayData.exposures) || 0) * 1 + (Number(todayData.followUps) || 0) * 1;
+                            const ptsActivity = (Number(todayData.exposures) || 0) * 1 + (Number(todayData.followUps) || 0) * 1 + (Number(todayData.nos) || 0) * 1 + (Number(todayData.tenacityFollowUps) || 0) * 2;
 
                             tooltipContent = (
                                 <div className="space-y-1">
-                                    <div className="font-bold border-b border-gray-700 pb-1 mb-1">Score Breakdown</div>
-                                    <div className="flex justify-between"><span>Start Debt:</span> <span>{currentPar}</span></div>
-                                    <div className="flex justify-between text-green-400"><span>- Enrolls:</span> <span>{ptsEnrolls}</span></div>
-                                    <div className="flex justify-between text-purple-400"><span>- Pres/3Way:</span> <span>{ptsPres}</span></div>
-                                    <div className="flex justify-between text-blue-400"><span>- Exp/Follow:</span> <span>{ptsActivity}</span></div>
+                                    <div className="flex justify-between border-b border-gray-700 pb-1 mb-1">
+                                        <span>Total Base Par:</span>
+                                        <span className="font-bold">{calculatePoints(todayData)} pts</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>Exposures / Follow-Ups / No's:</span>
+                                        <span>{ptsActivity} pts</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>Presentations / 3-Ways:</span>
+                                        <span>{ptsPres} pts</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>Enrolls:</span>
+                                        <span>{ptsEnrolls} pts</span>
+                                    </div>
                                     <div className="border-t border-gray-700 pt-1 mt-1 font-bold flex justify-between">
-                                        <span>Current:</span>
+                                        <span>Current Par:</span>
                                         <span>{currentPar - displayValue > 0 ? `+${currentPar - displayValue}` : (currentPar - displayValue)}</span>
                                     </div>
                                 </div>

@@ -92,8 +92,12 @@ export const OnboardingModal = ({ onDismiss }) => {
                             <span className="font-bold text-indigo-600">3 Pts</span>
                         </li>
                         <li className="flex justify-between items-center bg-gray-50 p-2 rounded">
-                            <span>📞 Exposure / Follow-Up / No</span>
+                            <span>📞 Exposure / Follow-Up / Educated No</span>
                             <span className="font-bold text-gray-600">1 Pt</span>
+                        </li>
+                        <li className="flex justify-between items-center bg-gray-50 p-2 rounded">
+                            <span>🔥 Tenacity Bonus (4+ Follow-Ups)</span>
+                            <span className="font-bold text-gray-600">2 Pts</span>
                         </li>
                     </ul>
                 </div>
@@ -246,8 +250,12 @@ export const ScoringLegendModal = ({ onClose }) => (
                             <span className="font-bold text-indigo-700 badge">3 Pts</span>
                         </div>
                         <div className="flex justify-between items-center p-2 rounded bg-gray-50 border border-gray-100">
-                            <span className="font-medium text-gray-700">Exposure / Follow-Up / No</span>
+                            <span className="font-medium text-gray-700">Exposure / Follow-Up / Educated No</span>
                             <span className="font-bold text-gray-600 badge">1 Pt</span>
+                        </div>
+                        <div className="flex justify-between items-center p-2 rounded bg-red-50 border border-red-100 mt-1">
+                            <span className="font-medium text-red-700 text-xs">Tenacity Bonus: 4+ Follow-Ups</span>
+                            <span className="font-bold text-red-700 badge">2 Pts</span>
                         </div>
                     </div>
                 </div>
