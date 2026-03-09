@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Plus } from 'lucide-react';
+import { X, Plus, BookOpen } from 'lucide-react';
 
 export const FollowUpModal = ({ prospects, onClose, onQuickLog, onLogForProspect, onAddNewProspect }) => {
     const [showAddForm, setShowAddForm] = useState(false);
@@ -64,6 +64,11 @@ export const FollowUpModal = ({ prospects, onClose, onQuickLog, onLogForProspect
                             Just do a quick log (no prospect)
                         </button>
                     </div>
+                </div>
+                <div className="bg-indigo-50 p-3 border-t text-center rounded-b-lg">
+                    <a href="https://text.wearetnv.com/" target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-indigo-700 hover:text-indigo-900 flex items-center justify-center transition-colors">
+                        <BookOpen className="h-4 w-4 mr-2" /> Need Inspiration? Open Text Wizard
+                    </a>
                 </div>
             </div>
         </div>
@@ -130,6 +135,11 @@ export const LogExposureModal = ({ prospects, onClose, onLogForProspect, onAddNe
                             </div>
                         </div>
                     )}
+                </div>
+                <div className="bg-indigo-50 p-3 border-t text-center rounded-b-lg">
+                    <a href="https://text.wearetnv.com/" target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-indigo-700 hover:text-indigo-900 flex items-center justify-center transition-colors">
+                        <BookOpen className="h-4 w-4 mr-2" /> Need Inspiration? Open Text Wizard
+                    </a>
                 </div>
             </div>
         </div>
