@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, ReferenceLine, ResponsiveContainer, Cell, Tooltip } from 'recharts';
-import { calculatePoints, WEIGHTS } from '../utils/scoring';
+import { calculatePoints, WEIGHTS, getPeriodicCoachingAdvice } from '../utils/scoring';
 import { ChevronUp, ChevronDown, HelpCircle } from 'lucide-react';
 import { DayEntryModal } from './GlobalModals';
 import TotalsFooter from './TotalsFooter';
@@ -8,6 +8,7 @@ import TotalsFooter from './TotalsFooter';
 const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChange, onShare, onShareMonthly, isSharing, user, userProfile, onQuickAdd, showGoalInstruction, onDismissGoalInstruction, streaks, dailyPar, onShowLegend }) => {
     const [selectedDay, setSelectedDay] = useState(null);
     const [viewMode, setViewMode] = useState('week');
+    const [periodicInsight, setPeriodicInsight] = useState(null);
     const year = date.getFullYear();
     const month = date.getMonth();
 
@@ -16,8 +17,18 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
     lastMonthDate.setMonth(date.getMonth() - 1);
     const lastMonthYearId = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, '0')}`;
 
-    const changeMonth = (offset) => { const newDate = new Date(date); newDate.setMonth(date.getMonth() + offset); setDate(newDate); };
-    const changeWeek = (offset) => { const newDate = new Date(date); newDate.setDate(date.getDate() + (7 * offset)); setDate(newDate); };
+    const changeMonth = (offset) => {
+        const newDate = new Date(date);
+        newDate.setMonth(date.getMonth() + offset);
+        setDate(newDate);
+        setPeriodicInsight(null);
+    };
+    const changeWeek = (offset) => {
+        const newDate = new Date(date);
+        newDate.setDate(date.getDate() + (7 * offset));
+        setDate(newDate);
+        setPeriodicInsight(null);
+    };
 
     const weekDisplayDays = useMemo(() => {
         const today = new Date();
@@ -182,7 +193,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
                     </h2>
                     <button onClick={() => viewMode === 'week' ? changeWeek(1) : changeMonth(1)} className="p-2 rounded-md hover:bg-gray-100"><ChevronUp className="h-5 w-5 rotate-90" /></button>
                 </div>
-                <button onClick={() => setViewMode(viewMode === 'week' ? 'month' : 'week')} className="text-sm bg-gray-200 text-gray-700 px-3 py-2 rounded-md hover:bg-gray-300 transition">
+                <button onClick={() => { setViewMode(viewMode === 'week' ? 'month' : 'week'); setPeriodicInsight(null); }} className="text-sm bg-gray-200 text-gray-700 px-3 py-2 rounded-md hover:bg-gray-300 transition">
                     {viewMode === 'week' ? 'View Month' : 'View Week'}
                 </button>
             </div>
@@ -254,6 +265,43 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
+
+                        {/* Weekly Insight On-Demand */}
+                        <div className="mt-4 flex flex-col items-center">
+                            {!periodicInsight ? (
+                                <button
+                                    onClick={() => {
+                                        const weekTotals = weekDisplayDays.reduce((acc, d) => {
+                                            if (d.date <= new Date() && d.data) {
+                                                acc.exposures += Number(d.data.exposures) || 0;
+                                                acc.followUps += Number(d.data.followUps) || 0;
+                                                acc.presentations += (d.data.presentations?.length || 0) + (Number(d.data.pbrs) || 0);
+                                                acc.threeWays += Number(d.data.threeWays) || 0;
+                                                acc.nos += Number(d.data.nos) || 0;
+                                                acc.enrolls += (Number(d.data.enrolls) || 0) + (Array.isArray(d.data.sitdowns) ? d.data.sitdowns.filter(s => s === 'E').length : 0);
+                                            }
+                                            return acc;
+                                        }, { exposures: 0, followUps: 0, presentations: 0, threeWays: 0, nos: 0, enrolls: 0 });
+                                        setPeriodicInsight(getPeriodicCoachingAdvice(weekTotals, 'week'));
+                                    }}
+                                    className="bg-indigo-100 text-indigo-700 hover:bg-indigo-200 px-4 py-2 rounded-full text-sm font-bold transition-colors flex items-center"
+                                >
+                                    <HelpCircle className="h-4 w-4 mr-2" />
+                                    Generate Weekly Insight
+                                </button>
+                            ) : (
+                                <div className={`${periodicInsight.bg} border-l-4 p-4 rounded-r-md shadow-sm w-full transition-all duration-300`} style={{ borderColor: periodicInsight.color.replace('text-', 'bg-') }}>
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div className="flex items-center">
+                                            <span className={`text-2xl font-black mr-3 ${periodicInsight.color}`}>{periodicInsight.grade}</span>
+                                            <h4 className={`font-bold text-sm ${periodicInsight.color}`}>Coach's Analysis</h4>
+                                        </div>
+                                        <button onClick={() => setPeriodicInsight(null)} className="text-gray-400 hover:text-gray-600 text-xs">Close</button>
+                                    </div>
+                                    <p className="text-gray-700 text-sm leading-relaxed">{periodicInsight.message}</p>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 ) : null
             }
@@ -303,6 +351,33 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
                     </div>
                 )
             }
+
+            {/* Monthly Insight On-Demand */}
+            {viewMode === 'month' && (
+                <div className="mt-6 mb-2 flex flex-col items-center">
+                    {!periodicInsight ? (
+                        <button
+                            onClick={() => setPeriodicInsight(getPeriodicCoachingAdvice(monthlyTotals, 'month'))}
+                            className="bg-indigo-100 text-indigo-700 hover:bg-indigo-200 px-4 py-2 rounded-full text-sm font-bold transition-colors flex items-center"
+                        >
+                            <HelpCircle className="h-4 w-4 mr-2" />
+                            Generate Monthly Insight
+                        </button>
+                    ) : (
+                        <div className={`${periodicInsight.bg} border-l-4 p-4 rounded-r-md shadow-sm w-full transition-all duration-300`} style={{ borderColor: periodicInsight.color.replace('text-', 'bg-') }}>
+                            <div className="flex justify-between items-start mb-2">
+                                <div className="flex items-center">
+                                    <span className={`text-2xl font-black mr-3 ${periodicInsight.color}`}>{periodicInsight.grade}</span>
+                                    <h4 className={`font-bold text-sm ${periodicInsight.color}`}>Coach's Analysis</h4>
+                                </div>
+                                <button onClick={() => setPeriodicInsight(null)} className="text-gray-400 hover:text-gray-600 text-xs">Close</button>
+                            </div>
+                            <p className="text-gray-700 text-sm leading-relaxed">{periodicInsight.message}</p>
+                        </div>
+                    )}
+                </div>
+            )}
+
             <TotalsFooter totals={monthlyTotals} onShare={onShare} onShareMonthly={onShareMonthly} isSharing={isSharing} streaks={streaks} goals={goals} onGoalChange={onGoalChange} userProfile={userProfile} onQuickAdd={onQuickAdd} showGoalInstruction={showGoalInstruction} onDismissGoalInstruction={onDismissGoalInstruction} />
             {selectedDay && <DayEntryModal day={selectedDay.getDate()} data={modalData} onClose={closeModal} onChange={handleModalDataChange} />}
         </div >

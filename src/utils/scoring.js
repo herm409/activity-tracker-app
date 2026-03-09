@@ -59,10 +59,65 @@ export const calculatePoints = (data) => {
     // Weighted Sum
     return (exposures * WEIGHTS.exposures) +
         (followUps * WEIGHTS.followUps) +
-        (nos * WEIGHTS.nos) +
-        (tenacityFollowUps * WEIGHTS.tenacityFollowUps) +
         (presentations * WEIGHTS.presentations) +
         (threeWays * WEIGHTS.threeWays) +
         (enrolls * WEIGHTS.enrolls) +
+        (tenacityFollowUps * WEIGHTS.tenacityFollowUps) +
+        (nos * WEIGHTS.nos) +
         ironmanBonus;
+};
+
+/**
+ * Provides macro-level weekly/monthly coaching based on activity ratios and volume.
+ */
+export const getPeriodicCoachingAdvice = (totals, timeframe = 'week') => {
+    const { exposures = 0, followUps = 0, presentations = 0, threeWays = 0, nos = 0, enrolls = 0 } = totals;
+
+    const totalActivity = exposures + followUps + presentations + threeWays + nos + enrolls;
+
+    if (totalActivity === 0) {
+        return { grade: 'N/A', message: "No activity logged yet. Time to get started and fill that pipeline!", color: "text-gray-500", bg: "bg-gray-100" };
+    }
+
+    const exposureRatio = exposures > 0 ? followUps / exposures : followUps;
+    const closingActivity = presentations + threeWays + nos + enrolls;
+    const closingRatio = followUps > 0 ? closingActivity / followUps : closingActivity;
+
+    let grade = 'C';
+    let message = '';
+    let color = 'text-red-500';
+    let bg = 'bg-red-50';
+
+    if (totalActivity < (timeframe === 'week' ? 5 : 20)) {
+        grade = 'C';
+        message = `Volume is a bit low for this ${timeframe}. Focus on increasing your total exposures to get the momentum going.`;
+    } else if (exposures > 0 && followUps === 0) {
+        grade = 'C';
+        message = `You are exposing but not following up! The fortune is in the follow-up. Make sure you reconnect with your prospects.`;
+    } else if (exposures === 0 && followUps > 0) {
+        grade = 'C';
+        message = `You are doing a great job following up, but your pipeline needs new blood. Aim to add new exposures this ${timeframe}.`;
+    } else if (exposureRatio < 0.3) {
+        grade = 'B';
+        message = `Good exposure volume, but your follow-up ratio is a bit low. Don't let those initial contacts slip away.`;
+        color = 'text-blue-500';
+        bg = 'bg-blue-50';
+    } else if (closingActivity === 0 && followUps >= 3) {
+        grade = 'B';
+        message = `You are following up, but it's not leading to presentations, 3-ways, or decisions (No/Enroll). Focus on pushing for a decision or validation.`;
+        color = 'text-blue-500';
+        bg = 'bg-blue-50';
+    } else if (exposureRatio >= 0.5 && closingRatio >= 0.3) {
+        grade = 'A';
+        message = `Excellent balance! You are consistently exposing, following up, and driving prospects to a decision. Keep duplicating this system.`;
+        color = 'text-green-600';
+        bg = 'bg-green-50';
+    } else {
+        grade = 'B';
+        message = `Solid effort this ${timeframe}. To hit an 'A', ensure your follow-ups are directly leading to 3-way calls or definitive answers.`;
+        color = 'text-blue-500';
+        bg = 'bg-blue-50';
+    }
+
+    return { grade, message, color, bg };
 };

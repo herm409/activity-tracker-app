@@ -1,5 +1,6 @@
 import React, { forwardRef } from 'react';
 import { Trophy, Calendar, TrendingUp, Users, Video, Award, XCircle, PhoneCall } from 'lucide-react';
+import { getPeriodicCoachingAdvice } from '../utils/scoring';
 
 const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
     // Check if weekData exists before destructuring
@@ -19,8 +20,14 @@ const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
         { label: 'New Members', value: totals.enrolls, icon: Award, color: 'text-green-600', bg: 'bg-green-50' }
     ];
 
+    const timeframe = reportTitle?.includes('Monthly') ? 'month' : 'week';
+    const insight = getPeriodicCoachingAdvice(totals, timeframe);
+
+    // Dynamic height based on title to fit the new insight box without squishing
+    const cardHeight = reportTitle?.includes('Monthly') ? '860px' : '840px';
+
     return (
-        <div ref={ref} className="bg-white p-8 font-sans border border-gray-200 rounded-xl shadow-lg" style={{ width: '400px', height: '800px' }}>
+        <div ref={ref} className="bg-white p-8 font-sans border border-gray-200 rounded-xl shadow-lg flex flex-col" style={{ width: '400px', height: cardHeight }}>
             {/* Header */}
             <div className="flex flex-col items-center mb-8">
                 <div className="bg-gradient-to-r from-indigo-500 to-purple-600 p-4 rounded-full shadow-lg mb-4">
@@ -46,9 +53,9 @@ const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
             </div>
 
             {/* Pipeline Summary */}
-            <div className="bg-gray-50 rounded-xl p-5 mb-6">
-                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 text-center">Pipeline Health</h3>
-                <div className="flex justify-center items-center px-4">
+            <div className="bg-gray-50 rounded-xl p-5 mb-4">
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 text-center">Pipeline Health</h3>
+                <div className="flex justify-center items-center">
                     <div className="text-center">
                         <p className="text-2xl font-bold text-gray-800">{activeInPipeline}</p>
                         <p className="text-[10px] text-gray-500">Active Pipeline</p>
@@ -56,8 +63,17 @@ const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
                 </div>
             </div>
 
+            {/* Coach's Note */}
+            <div className={`${insight.bg} rounded-xl p-4 mb-4 border border-opacity-50 flex items-start`} style={{ borderColor: insight.color.replace('text-', 'border-') }}>
+                <span className={`text-3xl font-black mr-3 ${insight.color}`}>{insight.grade}</span>
+                <div>
+                    <h3 className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${insight.color}`}>Coach's Note</h3>
+                    <p className={`text-xs ${insight.color} leading-tight`}>{insight.message}</p>
+                </div>
+            </div>
+
             {/* Footer / Branding */}
-            <div className="mt-auto text-center border-t border-gray-100 pt-6">
+            <div className="mt-auto text-center border-t border-gray-100 pt-4">
                 <p className="text-[10px] text-gray-400 font-medium tracking-wide">POWERED BY PLATINUM TOOLKIT</p>
             </div>
         </div>
