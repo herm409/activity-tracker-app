@@ -68,14 +68,20 @@ export const calculatePoints = (data) => {
 };
 
 /**
- * Provides macro-level weekly/monthly coaching based on activity ratios and volume.
+ * Provides macro-level weekly/monthly coaching based on activity volume requirements.
+ * Defines "Pace" targets to support users early in the week/month without demoralizing them.
  */
-export const getPeriodicCoachingAdvice = (totals, timeframe = 'week') => {
+export const getPeriodicCoachingAdvice = (totals, timeframe = 'week', elapsedDays = 5, workingDays = 5) => {
     const { exposures = 0, followUps = 0, presentations = 0, threeWays = 0, nos = 0, enrolls = 0 } = totals;
 
     const totalActivity = exposures + followUps + presentations + threeWays + nos + enrolls;
 
     const exposureTarget = timeframe === 'week' ? 10 : 40;
+
+    // Pace calculation: What should they be at *right now* based on elapsed days?
+    // Math.ceil ensures they don't get 'On Pace' for passing 1.5 with only 1 exposure.
+    const paceTarget = Math.ceil(exposureTarget * (elapsedDays / workingDays));
+
     const followUpTarget = exposures * 2;
     const hasDecisions = (nos > 0 || enrolls > 0);
 
@@ -89,12 +95,18 @@ export const getPeriodicCoachingAdvice = (totals, timeframe = 'week') => {
         message = "No activity logged yet. Time to get started and fill that pipeline!";
         color = "text-gray-500";
         bg = "bg-gray-100";
-    } else if (exposures < exposureTarget) {
+    } else if (exposures < paceTarget) {
         grade = 'C';
-        message = `To build momentum, you need more at-bats. Your exposure volume is too low for a ${timeframe}. Aim for at least ${exposureTarget} exposures to see real progress.`;
+        message = `You are currently BEHIND SCHEDULE. To build momentum, you need more at-bats. Your exposure volume is too low for day ${elapsedDays} of this ${timeframe}. Aim for at least ${exposureTarget} total exposures by the end of the ${timeframe}.`;
+    } else if (exposures >= paceTarget && exposures < exposureTarget) {
+        // They haven't hit the FINAL target, but they are ON PACE for where they are in the timeframe!
+        grade = 'B';
+        message = `You are perfectly ON PACE for this ${timeframe}! Your daily exposure habits are solid. Keep knocking out these daily wins to hit your final target of ${exposureTarget}+.`;
+        color = 'text-blue-500';
+        bg = 'bg-blue-50';
     } else if (followUps < followUpTarget) {
         grade = 'C';
-        message = `You are hitting your exposure targets, but dropping the ball on follow-ups. Ensure you have at least double the follow-ups (${followUpTarget}) compared to exposures to close sales.`;
+        message = `You are hitting your exposure targets, but dropping the ball on follow-ups. Ensure you have at least double the follow-ups (${followUpTarget}) compared to your exposures (${exposures}) to close sales.`;
     } else if (!hasDecisions) {
         grade = 'B';
         message = `Great volume and follow-up habits! However, we need to see decisions being made. Don't be afraid to push for a 'No'. A 'No' means you are truly prospecting and asking.`;
@@ -102,7 +114,7 @@ export const getPeriodicCoachingAdvice = (totals, timeframe = 'week') => {
         bg = 'bg-blue-50';
     } else {
         grade = 'A';
-        message = `Outstanding work! You hit your minimum exposures (${exposureTarget}+), maintained the 2x follow-up ratio, and are successfully driving prospects to a definitive decision. Keep duplicating this system!`;
+        message = `Outstanding work! You hit your exposures (${exposureTarget}+), maintained the 2x follow-up ratio, and are successfully driving prospects to a definitive decision. Keep duplicating this system!`;
         color = 'text-green-600';
         bg = 'bg-green-50';
     }

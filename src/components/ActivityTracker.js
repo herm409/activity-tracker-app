@@ -282,7 +282,14 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
                                             }
                                             return acc;
                                         }, { exposures: 0, followUps: 0, presentations: 0, threeWays: 0, nos: 0, enrolls: 0 });
-                                        setPeriodicInsight(getPeriodicCoachingAdvice(weekTotals, 'week'));
+
+                                        // Calculate elapsed days for Pace logic
+                                        const workingDays = 5;
+                                        let elapsedDays = weekDisplayDays.filter(d => !d.isFuture).length;
+                                        elapsedDays = Math.min(elapsedDays, workingDays); // Cap at 5 days
+                                        if (elapsedDays === 0) elapsedDays = 1; // Prevent division by zero early Monday
+
+                                        setPeriodicInsight(getPeriodicCoachingAdvice(weekTotals, 'week', elapsedDays, workingDays));
                                     }}
                                     className="bg-indigo-100 text-indigo-700 hover:bg-indigo-200 px-4 py-2 rounded-full text-sm font-bold transition-colors flex items-center"
                                 >
@@ -357,7 +364,15 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
                 <div className="mt-6 mb-2 flex flex-col items-center">
                     {!periodicInsight ? (
                         <button
-                            onClick={() => setPeriodicInsight(getPeriodicCoachingAdvice(monthlyTotals, 'month'))}
+                            onClick={() => {
+                                // Calculate elapsed days for Monthly Pace logic
+                                const workingDays = 20;
+                                let elapsedDays = calendarDays.filter(d => !d.isBlank && !d.isFuture).length;
+                                elapsedDays = Math.min(elapsedDays, workingDays); // Cap at 20 days
+                                if (elapsedDays === 0) elapsedDays = 1;
+
+                                setPeriodicInsight(getPeriodicCoachingAdvice(monthlyTotals, 'month', elapsedDays, workingDays));
+                            }}
                             className="bg-indigo-100 text-indigo-700 hover:bg-indigo-200 px-4 py-2 rounded-full text-sm font-bold transition-colors flex items-center"
                         >
                             <HelpCircle className="h-4 w-4 mr-2" />
