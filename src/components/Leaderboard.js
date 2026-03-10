@@ -34,9 +34,22 @@ const Leaderboard = ({ db, weekId, user }) => {
                 });
 
                 // 3. Process Individual Leaderboard (Top 20 display)
-                // Sort by weighted rankScore if available, else exposures?
-                // Query was orderBy exposures. Let's sort by rankingScore client side to be sure.
-                const sortedIndividuals = [...allEntries].sort((a, b) => (b.rankingScore || 0) - (a.rankingScore || 0));
+                // BUG FIX: Previously sorted by raw rankingScore, but each user has their own dailyPar.
+                // The displayed score is `parToDate - rankingScore` where parToDate varies per user.
+                // We MUST sort by the actual computed par score (ascending), not raw rankingScore.
+                const d = new Date();
+                const dayOfWeek = d.getDay(); // 0 = Sunday
+                const daysElapsed = dayOfWeek + 1; // 1 = Sunday, 2 = Monday, etc.
+
+                const withParScore = allEntries.map(entry => {
+                    const effectivePar = entry.dailyPar || 2;
+                    const parToDate = daysElapsed * effectivePar;
+                    const pts = (entry.rankingScore !== undefined) ? entry.rankingScore : 0;
+                    return { ...entry, _parScore: parToDate - pts };
+                });
+
+                // Golf logic: lowest par score is best (most negative = most under par = #1)
+                const sortedIndividuals = withParScore.sort((a, b) => a._parScore - b._parScore);
                 setScores(sortedIndividuals.slice(0, 20));
 
                 // Compute a "Most Hustle" sub-board: top 10 by nos count
@@ -75,13 +88,7 @@ const Leaderboard = ({ db, weekId, user }) => {
                     }
                 });
 
-                // Calculate Net Score
-                const d = new Date();
-                const currentDay = d.getDay(); // 0-6
-                const daysElapsed = currentDay + 1; // 1-7 (Sunday is 1)
-                // Note: If viewing historical week, this should be 7. 
-                // Since this component is mostly for "Current Leaderboard", using today is acceptable.
-
+                // Calculate Net Score for Teams
                 const calculatedTeams = Object.values(teamAgg).map(team => {
                     const teamParToDate = team.totalDailyPar * daysElapsed;
                     const teamGrossScore = team.totalPoints + team.handicap;
@@ -164,7 +171,8 @@ const Leaderboard = ({ db, weekId, user }) => {
                             <div className="text-center py-8 text-gray-400">No activity yet this week. Be the first!</div>
                         ) : (
                             scores.map((entry, index) => {
-                                const score = calculateParScore(entry);
+                                // Use the pre-computed par score (same value used for sorting) to guarantee display matches rank
+                                const score = entry._parScore !== undefined ? entry._parScore : calculateParScore(entry);
                                 const isDebt = score > 0;
                                 const isEven = score === 0;
 
