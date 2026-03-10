@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { calculatePoints } from '../utils/scoring';
 import { collection, query, orderBy, getDocs } from 'firebase/firestore';
 import { appId } from '../firebaseConfig';
-import { Trophy, Users, Flame, Award, Medal } from 'lucide-react';
+import { Trophy, Users, Flame, Award, Medal, ThumbsDown } from 'lucide-react';
 
 const Leaderboard = ({ db, weekId, user }) => {
     const [scores, setScores] = useState([]);
+    const [hustleScores, setHustleScores] = useState([]);
     const [teamScores, setTeamScores] = useState([]);
     const [userRank, setUserRank] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -37,6 +38,13 @@ const Leaderboard = ({ db, weekId, user }) => {
                 // Query was orderBy exposures. Let's sort by rankingScore client side to be sure.
                 const sortedIndividuals = [...allEntries].sort((a, b) => (b.rankingScore || 0) - (a.rankingScore || 0));
                 setScores(sortedIndividuals.slice(0, 20));
+
+                // Compute a "Most Hustle" sub-board: top 10 by nos count
+                const hustleBoard = [...allEntries]
+                    .filter(e => (e.nos || 0) > 0)
+                    .sort((a, b) => (b.nos || 0) - (a.nos || 0))
+                    .slice(0, 10);
+                setHustleScores(hustleBoard);
 
                 // 4. Calculate User Rank
                 if (user) {
@@ -181,7 +189,14 @@ const Leaderboard = ({ db, weekId, user }) => {
                                                 </span>
                                                 <span className="text-xs text-gray-400 ml-1 font-medium">{isDebt ? 'OVER' : (isEven ? 'EVEN' : 'UNDER')}</span>
                                             </div>
-                                            <span className="text-xs text-gray-400">({entry.exposures} exp)</span>
+                                            <div className="flex items-center gap-2 mt-0.5">
+                                                <span className="text-xs text-gray-400">{entry.exposures} exp</span>
+                                                {(entry.nos || 0) > 0 && (
+                                                    <span className="flex items-center text-xs font-semibold text-orange-500">
+                                                        <ThumbsDown className="h-3 w-3 mr-0.5" />{entry.nos} No's
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 );
@@ -226,6 +241,34 @@ const Leaderboard = ({ db, weekId, user }) => {
                                 </div>
                             );
                         })}
+                    </div>
+                </div>
+            )}
+
+            {/* Most Hustle Sub-Leaderboard */}
+            {!loading && hustleScores.length > 0 && (
+                <div className="p-4 bg-white rounded-xl shadow-sm border border-orange-100">
+                    <h2 className="text-xl font-bold mb-1 flex items-center text-gray-800">
+                        <ThumbsDown className="mr-2 text-orange-500 h-5 w-5" /> Most Hustle
+                    </h2>
+                    <p className="text-xs text-gray-400 mb-4">Ranked by No's collected — the bravest prospectors this week</p>
+                    <div className="space-y-2">
+                        {hustleScores.map((entry, index) => (
+                            <div key={entry.id} className={`flex items-center justify-between p-3 rounded-lg ${entry.userId === user?.uid ? 'bg-orange-50 border border-orange-200' : 'bg-gray-50 border border-gray-100'}`}>
+                                <div className="flex items-center">
+                                    <span className={`font-bold w-8 text-center ${index < 3 ? 'text-orange-500 text-lg' : 'text-gray-400'}`}>
+                                        #{index + 1}
+                                    </span>
+                                    <p className={`font-semibold ${entry.userId === user?.uid ? 'text-orange-900' : 'text-gray-800'}`}>
+                                        {entry.displayName} {entry.userId === user?.uid && '(You)'}
+                                    </p>
+                                </div>
+                                <div className="flex items-center bg-orange-100 text-orange-600 font-bold px-3 py-1 rounded-full">
+                                    <ThumbsDown className="h-3.5 w-3.5 mr-1.5" />
+                                    <span>{entry.nos}</span>
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 </div>
             )}
