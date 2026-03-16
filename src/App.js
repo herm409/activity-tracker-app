@@ -441,7 +441,7 @@ const AppContent = () => {
                     totals.exposures += Number(dayData.exposures) || 0;
                     totals.followUps += Number(dayData.followUps) || 0;
                     totals.nos += Number(dayData.nos) || 0;
-                    totals.presentations += (dayData.presentations?.length || 0) + (Number(dayData.pbrs) || 0);
+                    totals.presentations += (Array.isArray(dayData.presentations) ? dayData.presentations.length : Number(dayData.presentations) || 0) + (Number(dayData.pbrs) || 0);
                     totals.threeWays += Number(dayData.threeWays) || 0;
                     totals.enrolls += (Number(dayData.enrolls) || 0) + (Array.isArray(dayData.sitdowns) ? dayData.sitdowns.filter(s => s === 'E').length : 0);
                 }
@@ -483,7 +483,7 @@ const AppContent = () => {
             totals.exposures += Number(dayData.exposures) || 0;
             totals.followUps += Number(dayData.followUps) || 0;
             totals.nos += Number(dayData.nos) || 0;
-            totals.presentations += (dayData.presentations?.length || 0) + (Number(dayData.pbrs) || 0);
+            totals.presentations += (Array.isArray(dayData.presentations) ? dayData.presentations.length : Number(dayData.presentations) || 0) + (Number(dayData.pbrs) || 0);
             totals.threeWays += Number(dayData.threeWays) || 0;
             totals.enrolls += (Number(dayData.enrolls) || 0) + (Array.isArray(dayData.sitdowns) ? dayData.sitdowns.filter(s => s === 'E').length : 0);
         });

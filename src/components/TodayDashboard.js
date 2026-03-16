@@ -425,7 +425,7 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {metrics.map(metric => {
                         if (metric.isPresentation) {
-                            const value = (todayData.presentations?.length || 0) + (Number(todayData.pbrs) || 0);
+                            const value = (Array.isArray(todayData.presentations) ? todayData.presentations.length : Number(todayData.presentations) || 0) + (Number(todayData.pbrs) || 0);
                             return (<PresentationActivityCard key={metric.key} label={metric.label} value={value} streak={streaks.presentations || 0} icon={metric.icon} color={metric.color} onAddPresentation={onAddPresentation} />);
                         }
 

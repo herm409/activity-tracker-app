@@ -41,7 +41,7 @@ const AnalyticsDashboard = ({ db, user }) => {
 
                 Object.values(data).forEach(day => {
                     const exposures = Number(day.exposures) || 0;
-                    const presentations = (day.presentations?.length || 0) + (Number(day.pbrs) || 0);
+                    const presentations = (Array.isArray(day.presentations) ? day.presentations.length : Number(day.presentations) || 0) + (Number(day.pbrs) || 0);
                     const enrolls = (Number(day.enrolls) || 0) + (Array.isArray(day.sitdowns) ? day.sitdowns.filter(s => s === 'E').length : 0);
                     const nos = Number(day.nos) || 0;
 
@@ -90,7 +90,7 @@ const AnalyticsDashboard = ({ db, user }) => {
                     const data = doc.data().dailyData || {};
                     Object.values(data).forEach(day => {
                         monthlyTotals[doc.id].Exposures += Number(day.exposures) || 0;
-                        monthlyTotals[doc.id].Presentations += (day.presentations?.length || 0) + (Number(day.pbrs) || 0);
+                        monthlyTotals[doc.id].Presentations += (Array.isArray(day.presentations) ? day.presentations.length : Number(day.presentations) || 0) + (Number(day.pbrs) || 0);
                     });
                 }
             });

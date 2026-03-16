@@ -59,7 +59,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
             const isPast = currentDay < today;
             const isFuture = currentDay > today;
 
-            const noActivity = !dayData || ((Number(dayData.exposures || 0) === 0) && (Number(dayData.followUps || 0) === 0) && ((dayData.presentations?.length || 0) + (Number(dayData.pbrs) || 0) === 0));
+            const noActivity = !dayData || ((Number(dayData.exposures || 0) === 0) && (Number(dayData.followUps || 0) === 0) && ((Array.isArray(dayData.presentations) ? dayData.presentations.length : Number(dayData.presentations) || 0) + (Number(dayData.pbrs) || 0) === 0));
             const isWeekend = currentDay.getDay() === 0 || currentDay.getDay() === 6;
 
             days.push({ date: currentDay, day: currentDay.getDate(), data: dayData, hasNoActivity: isPast && noActivity, isBlank: false, isToday, isFuture, isWeekend });
@@ -101,7 +101,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
         return Object.values(data.current).reduce((acc, dayData) => {
             acc.exposures += Number(dayData.exposures) || 0;
             acc.followUps += Number(dayData.followUps) || 0;
-            acc.presentations += (dayData.presentations?.length || 0) + (Number(dayData.pbrs) || 0);
+            acc.presentations += (Array.isArray(dayData.presentations) ? dayData.presentations.length : Number(dayData.presentations) || 0) + (Number(dayData.pbrs) || 0);
             acc.threeWays += Number(dayData.threeWays) || 0;
             acc.enrolls += (Number(dayData.enrolls) || 0) + (Array.isArray(dayData.sitdowns) ? dayData.sitdowns.filter(s => s === 'E').length : 0);
             return acc;
@@ -275,7 +275,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
                                             if (d.date <= new Date() && d.data) {
                                                 acc.exposures += Number(d.data.exposures) || 0;
                                                 acc.followUps += Number(d.data.followUps) || 0;
-                                                acc.presentations += (d.data.presentations?.length || 0) + (Number(d.data.pbrs) || 0);
+                                                acc.presentations += (Array.isArray(d.data.presentations) ? d.data.presentations.length : Number(d.data.presentations) || 0) + (Number(d.data.pbrs) || 0);
                                                 acc.threeWays += Number(d.data.threeWays) || 0;
                                                 acc.nos += Number(d.data.nos) || 0;
                                                 acc.enrolls += (Number(d.data.enrolls) || 0) + (Array.isArray(d.data.sitdowns) ? d.data.sitdowns.filter(s => s === 'E').length : 0);
@@ -325,7 +325,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
                                     <div className="flex justify-center items-center space-x-1 h-2">
                                         {d.data.exposures > 0 && <div className={`h-2 w-2 ${activityColors.exposures} rounded-full`}></div>}
                                         {d.data.followUps > 0 && <div className={`h-2 w-2 ${activityColors.followUps} rounded-full`}></div>}
-                                        {((d.data.presentations?.length || 0) + (Number(d.data.pbrs) || 0)) > 0 && <div className={`h-2 w-2 ${activityColors.presentations} rounded-full`}></div>}
+                                        {((Array.isArray(d.data.presentations) ? d.data.presentations.length : Number(d.data.presentations) || 0) + (Number(d.data.pbrs) || 0)) > 0 && <div className={`h-2 w-2 ${activityColors.presentations} rounded-full`}></div>}
                                         {(d.data.enrolls > 0 || d.data.sitdowns?.some(s => s === 'E')) && <div className={`h-2 w-2 ${activityColors.enrolls} rounded-full`}></div>}
                                     </div>
                                 </div>
@@ -347,7 +347,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
                                             <div className="flex justify-center items-end space-x-1 mt-auto h-2">
                                                 {d.data.exposures > 0 && <div className={`h-2 w-2 ${activityColors.exposures} rounded-full`}></div>}
                                                 {d.data.followUps > 0 && <div className={`h-2 w-2 ${activityColors.followUps} rounded-full`}></div>}
-                                                {((d.data.presentations?.length || 0) + (Number(d.data.pbrs) || 0)) > 0 && <div className={`h-2 w-2 ${activityColors.presentations} rounded-full`}></div>}
+                                                {((Array.isArray(d.data.presentations) ? d.data.presentations.length : Number(d.data.presentations) || 0) + (Number(d.data.pbrs) || 0)) > 0 && <div className={`h-2 w-2 ${activityColors.presentations} rounded-full`}></div>}
                                                 {(d.data.enrolls > 0 || d.data.sitdowns?.some(s => s === 'E')) && <div className={`h-2 w-2 ${activityColors.enrolls} rounded-full`}></div>}
                                             </div>
                                         </>

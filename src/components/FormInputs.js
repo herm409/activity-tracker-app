@@ -47,6 +47,11 @@ export const CheckboxInput = (props) => (
 );
 
 export const PresentationTracker = ({ value = [], onChange }) => {
+    // Sanitize value: If legacy data stored presentations as a number, convert to array of 'P's.
+    const safeArray = Array.isArray(value) 
+        ? value 
+        : (!isNaN(value) && value > 0 ? Array(Number(value)).fill('P') : []);
+
     const options = { 'P': 'In Person', 'V': 'Virtual' };
 
     // Legacy support: Map old types to new ones for display
@@ -57,15 +62,15 @@ export const PresentationTracker = ({ value = [], onChange }) => {
     };
 
     const handleAdd = (type) => {
-        const newValue = [...value, type];
+        const newValue = [...safeArray, type];
         onChange(newValue);
     };
     const handleRemove = (indexToRemove) => {
-        const newValue = value.filter((_, index) => index !== indexToRemove);
+        const newValue = safeArray.filter((_, index) => index !== indexToRemove);
         onChange(newValue);
     };
 
-    const totalPresentations = (value.length || 0);
+    const totalPresentations = (safeArray.length || 0);
 
     return (
         <div className="pt-2">
@@ -79,7 +84,7 @@ export const PresentationTracker = ({ value = [], onChange }) => {
                 </button>
             </div>
             <div className="mt-2 space-y-2">
-                {value.map((item, index) => (
+                {safeArray.map((item, index) => (
                     <div key={index} className="flex items-center justify-between bg-gray-100 p-2 rounded-md">
                         <span className="text-sm">{getDisplayType(item)}</span>
                         <button onClick={() => handleRemove(index)} className="text-red-500 hover:text-red-700"><Trash2 className="h-4 w-4" /></button>
