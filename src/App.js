@@ -15,7 +15,9 @@ import TabBar from './components/TabBar';
 import AuthPage from './components/AuthPage';
 import TodayDashboard from './components/TodayDashboard';
 import ActivityTracker from './components/ActivityTracker';
-import { DisplayNameModal, OnboardingModal, CutReportModal, ScoringLegendModal } from './components/GlobalModals'; // Assuming these are exported from GlobalModals
+import QuickLogFAB from './components/QuickLogFAB';
+import NotificationBanner from './components/NotificationBanner';
+import { DisplayNameModal, OnboardingModal, CutReportModal, ScoringLegendModal } from './components/GlobalModals';
 import ReportCard from './components/ReportCard';
 
 // Components (Lazy Load)
@@ -452,13 +454,27 @@ const AppContent = () => {
         const lastWeekTotals = getWeekTotals(startOfLastWeek, endOfLastWeek);
         const dateRange = `${startOfWeek.toLocaleDateString('default', { month: 'short', day: 'numeric' })} - ${endOfWeek.toLocaleDateString('default', { month: 'short', day: 'numeric' })}`;
 
+        // Compute elapsed working days (Mon-Fri) up to today (or up to the target date if viewing a past week)
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+        const effectiveEnd = targetDate <= now ? targetDate : now;
+        let elapsedDays = 0;
+        let cur = new Date(startOfWeek);
+        while (cur <= effectiveEnd && cur <= endOfWeek) {
+            const dow = cur.getDay();
+            if (dow >= 1 && dow <= 5) elapsedDays++; // Mon=1 … Fri=5
+            cur.setDate(cur.getDate() + 1);
+        }
+        elapsedDays = Math.max(1, Math.min(elapsedDays, 5)); // clamp 1-5
+
         const allItems = hotlist;
 
         const activeInPipeline = allItems.filter(item => item.isArchived !== true && (item.status === 'Hot' || item.status === 'Warm')).length;
         const closingZone = allItems.filter(item => item.isArchived !== true && item.status === 'Hot');
 
-        return { totals: thisWeekTotals, lastWeekTotals, dateRange, activeInPipeline, closingZone, reportTitle: 'Weekly Scoreboard' };
+        return { totals: thisWeekTotals, lastWeekTotals, dateRange, activeInPipeline, closingZone, reportTitle: 'Weekly Scoreboard', elapsedDays };
     }, [monthlyData, lastMonthData, db, hotlist, currentDate]);
+
 
 
     const getMonthDataForReport = useCallback(async () => {
@@ -669,7 +685,9 @@ const AppContent = () => {
     const showTodayBadge = todayScore > 0;
 
     return (
-        <div className="min-h-screen bg-gray-50 text-gray-900 font-sans pb-20">
+        <div className="min-h-screen bg-gray-50 text-gray-900 font-sans pb-36">
+            {/* Notification permission banner — slides in at very top */}
+            <NotificationBanner todayPoints={todayPoints} dailyPar={dailyPar} />
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
                 <Header displayName={userProfile.displayName} onSignOut={() => auth.signOut()} onEditName={() => setShowNameModal(true)} />
                 <TabBar activeTab={activeTab} setActiveTab={setActiveTab} badges={{ today: showTodayBadge }} />
@@ -689,7 +707,10 @@ const AppContent = () => {
                             onLogExposure={() => setShowExposureModal(true)}
                             dailyPar={userProfile.dailyPar}
                             onShowLegend={() => setShowScoringLegend(true)}
+                            hotlist={hotlist}
+                            onNavigateToPipeline={() => setActiveTab('hotlist')}
                         />}
+
                         {activeTab === 'tracker' && <ActivityTracker
                             date={currentDate} setDate={setCurrentDate}
                             goals={monthlyGoals} onGoalChange={handleGoalChange}
@@ -714,6 +735,14 @@ const AppContent = () => {
                     </Suspense>
                 </main>
             </div>
+
+            {/* Global Quick Log FAB — visible on all tabs */}
+            <QuickLogFAB
+                onLogExposure={() => setShowExposureModal(true)}
+                onLogFollowUp={() => setShowFollowUpModal(true)}
+                onAddPresentation={handleAddPresentation}
+                onQuickAdd={handleQuickAdd}
+            />
 
             {showNameModal && <DisplayNameModal currentName={userProfile.displayName} currentPar={userProfile.dailyPar} onSave={handleSetDisplayName} onClose={!userProfile.displayName ? null : () => setShowNameModal(false)} />}
             {showEditNameModal && <DisplayNameModal currentName={userProfile.displayName} currentPar={userProfile.dailyPar} onSave={handleSetDisplayName} onClose={() => setShowEditNameModal(false)} />}

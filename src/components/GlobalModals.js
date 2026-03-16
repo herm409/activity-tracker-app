@@ -183,22 +183,26 @@ export const DayEntryModal = ({ day, data, onClose, onChange }) => {
     );
 };
 export const CutReportModal = ({ score, onClose }) => {
-    // Score > 0 means Deficit (Bad). Score < 0 means Surplus (Good).
-    // If they missed the cut, score is > 0.
     const isDeficit = score > 0;
+    const lastWeekIntentionKey = `weekIntention_prev`;
+    const lastIntention = localStorage.getItem(lastWeekIntentionKey) || '';
+    const [intention, setIntention] = React.useState('');
+
+    const handleClose = () => {
+        if (intention.trim()) {
+            localStorage.setItem(lastWeekIntentionKey, intention.trim());
+        }
+        onClose();
+    };
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-            <div className="bg-white rounded-lg shadow-2xl w-full max-w-md overflow-hidden animate-bounce-in">
+            <div className="bg-white rounded-lg shadow-2xl w-full max-w-md overflow-hidden">
                 <div className={`p-6 text-center ${isDeficit ? 'bg-red-50' : 'bg-green-50'}`}>
                     {isDeficit ? (
-                        <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 mb-4">
-                            <X className="h-8 w-8 text-red-600" />
-                        </div>
+                        <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 mb-4"><X className="h-8 w-8 text-red-600" /></div>
                     ) : (
-                        <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
-                            <Trophy className="h-8 w-8 text-green-600" />
-                        </div>
+                        <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4"><Trophy className="h-8 w-8 text-green-600" /></div>
                     )}
                     <h3 className={`text-2xl font-bold ${isDeficit ? 'text-red-900' : 'text-green-900'}`}>
                         {isDeficit ? 'Missed the Cut' : 'Made the Cut!'}
@@ -210,19 +214,38 @@ export const CutReportModal = ({ score, onClose }) => {
                     </p>
                 </div>
 
-                <div className="p-6">
-                    <h4 className="font-semibold text-gray-900 mb-2">Weekly Review</h4>
-                    <p className="text-gray-600 text-sm mb-4">
-                        {isDeficit
-                            ? "Consistency is key to momentum. Review your activity from last week and plan to make up the difference this week. You can do it!"
-                            : "Great job maintaining momentum! Keep pushing to stay in the green zone."}
-                    </p>
-
+                <div className="p-6 space-y-4">
+                    {lastIntention && (
+                        <div className="bg-indigo-50 border border-indigo-100 p-3 rounded-lg text-sm">
+                            <span className="block text-xs font-bold text-indigo-400 uppercase tracking-widest mb-1">Last Week You Said:</span>
+                            <span className="text-indigo-800 font-medium italic">"{lastIntention}"</span>
+                        </div>
+                    )}
+                    <div>
+                        <h4 className="font-semibold text-gray-900 mb-1">Weekly Review</h4>
+                        <p className="text-gray-600 text-sm">
+                            {isDeficit
+                                ? "Consistency is key to momentum. Review your activity from last week and plan to make up the difference this week. You can do it!"
+                                : "Great job maintaining momentum! Keep pushing to stay in the green zone."}
+                        </p>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1">🎯 This Week's Intention</label>
+                        <input
+                            type="text"
+                            value={intention}
+                            onChange={e => setIntention(e.target.value)}
+                            placeholder="This week I will focus on..."
+                            className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                            maxLength={120}
+                        />
+                        <p className="text-xs text-gray-400 mt-1">You'll see this next Monday as a reminder.</p>
+                    </div>
                     <button
-                        onClick={onClose}
+                        onClick={handleClose}
                         className={`w-full py-3 px-4 rounded-md font-semibold text-white shadow-sm transition-colors ${isDeficit ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'}`}
                     >
-                        {isDeficit ? 'Accept & Plan' : 'Let\'s Go!'}
+                        {isDeficit ? 'Accept & Plan' : "Let's Go!"}
                     </button>
                 </div>
             </div>

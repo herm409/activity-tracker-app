@@ -88,19 +88,52 @@ const VisualExposureMeter = ({ count }) => {
     );
 };
 
+// Stage breadcrumb strip shown at top of every card
+const StageBreadcrumb = ({ status }) => {
+    const stages = [
+        { key: 'Cold',   label: 'Cold',   emoji: '🧊' },
+        { key: 'Warm',   label: 'Warm',   emoji: '🌡️' },
+        { key: 'Hot',    label: 'Hot',    emoji: '🔥' },
+        { key: 'Closed', label: 'Closed', emoji: '✅' },
+    ];
+    const activeIdx = stages.findIndex(s => s.key === status);
+    return (
+        <div className="flex items-center space-x-1 mb-3">
+            {stages.map((s, i) => (
+                <React.Fragment key={s.key}>
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                        i === activeIdx
+                            ? 'bg-indigo-600 text-white'
+                            : i < activeIdx
+                            ? 'bg-indigo-100 text-indigo-500'
+                            : 'bg-gray-100 text-gray-400'
+                    }`}>
+                        {s.emoji} {s.label}
+                    </span>
+                    {i < stages.length - 1 && (
+                        <span className="text-gray-300 text-xs">›</span>
+                    )}
+                </React.Fragment>
+            ))}
+        </div>
+    );
+};
+
 const ProspectCard = ({ item, onUpdate, onInstantUpdate, onDecide, onDataChange, monthlyData, onDelete }) => {
     const [isNotesExpanded, setIsNotesExpanded] = useState(false);
+    const [showDetails, setShowDetails] = useState(false);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     const nextAction = item.nextActionDate ? new Date(item.nextActionDate) : null;
     const isOverdue = nextAction && nextAction < today;
+    const isSnoozed = nextAction && nextAction > today;  // future date = snoozed
     const lastContact = item.lastContacted ? new Date(item.lastContacted) : null;
     const daysSinceContact = lastContact ? (new Date() - lastContact) / (1000 * 60 * 60 * 24) : 999;
     const isStagnant = daysSinceContact > 7 && item.status !== 'Cold';
     const exposureCount = item.exposureCount || 0;
 
-    const handleSentTool = () => {
+    const handleSentInfo = () => {
         onInstantUpdate(item.id, { status: 'Warm', exposureCount: exposureCount + 1, lastContacted: new Date().toISOString() });
         updateDailyStats('exposures');
     };
@@ -108,31 +141,21 @@ const ProspectCard = ({ item, onUpdate, onInstantUpdate, onDecide, onDataChange,
         onInstantUpdate(item.id, { status: 'Hot', exposureCount: exposureCount + 1, lastContacted: new Date().toISOString() });
         updateDailyStats('presentations');
     };
-    const handleGenericLogExposure = () => {
+    const handleLogFollowUp = () => {
         const isTenacity = exposureCount >= 4;
         onInstantUpdate(item.id, { exposureCount: exposureCount + 1, lastContacted: new Date().toISOString() });
-        if (isTenacity) {
-            updateDailyStats('tenacityFollowUps');
-        } else if (exposureCount > 0) {
-            updateDailyStats('followUps');
-        } else {
-            updateDailyStats('exposures');
-        }
+        if (isTenacity) updateDailyStats('tenacityFollowUps');
+        else if (exposureCount > 0) updateDailyStats('followUps');
+        else updateDailyStats('exposures');
     };
     const handleNotInterested = () => {
         if (exposureCount === 0) {
-            alert("Warning: A true 'No' only counts after they've seen the information. Please educate the prospect first!");
+            alert("A true 'No' only counts after they've seen the information. Send them info first!");
             return;
         }
-
-        // Micro-Celebration out of the top/right when logging a No
-        confetti({
-            particleCount: 80,
-            spread: 60,
-            origin: { x: 0.8, y: 0.2 },
-            colors: ['#EF4444', '#F87171', '#FCA5A5'] // Red-ish themed confetti for No's
-        });
-
+        const ok = window.confirm(`Mark ${item.name || 'this prospect'} as Not Interested? This will archive them and log a No.`);
+        if (!ok) return;
+        confetti({ particleCount: 80, spread: 60, origin: { x: 0.8, y: 0.2 }, colors: ['#EF4444', '#F87171', '#FCA5A5'] });
         onInstantUpdate(item.id, { isArchived: true, outcome: 'Not Interested', decisionDate: new Date().toISOString() });
         updateDailyStats('nos');
     };
@@ -142,63 +165,158 @@ const ProspectCard = ({ item, onUpdate, onInstantUpdate, onDecide, onDataChange,
         onDataChange(new Date(), metric, currentCount + 1);
     };
     const handleSnooze = () => {
-        const newDate = new Date();
-        newDate.setDate(newDate.getDate() + 3);
-        onInstantUpdate(item.id, { nextActionDate: newDate.toISOString().split('T')[0] });
+        const snoozeDate = new Date();
+        snoozeDate.setDate(snoozeDate.getDate() + 3);
+        const label = snoozeDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+        const ok = window.confirm(`Remind me about ${item.name || 'this prospect'} on ${label}? They won't appear in Today's Prospects until then.`);
+        if (!ok) return;
+        onInstantUpdate(item.id, { nextActionDate: snoozeDate.toISOString().split('T')[0] });
+    };
+    const handleUnSnooze = () => {
+        onInstantUpdate(item.id, { nextActionDate: new Date().toISOString().split('T')[0] });
     };
 
+    // Last-contact human-readable label
+    const lastContactLabel = lastContact
+        ? daysSinceContact < 1 ? 'Today'
+        : daysSinceContact < 2 ? 'Yesterday'
+        : `${Math.floor(daysSinceContact)}d ago`
+        : 'Never';
+
+    const borderClass = isOverdue ? 'border-l-4 border-l-red-500' : isSnoozed ? 'border-l-4 border-l-blue-300' : 'border-l-4 border-l-transparent';
+
     return (
-        <div className={`p-4 border rounded-lg bg-white shadow-sm transition-all hover:shadow-md relative overflow-hidden ${isOverdue ? 'border-l-4 border-l-red-500' : 'border-l-4 border-l-transparent'} ${isStagnant ? 'bg-gray-50' : ''}`}>
-            <div className="absolute top-2 right-2 flex items-center space-x-2">
-                {isOverdue && <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded text-[10px] font-bold flex items-center"><AlertTriangle className="w-3 h-3 mr-1" /> Overdue</span>}
-                {isStagnant && <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded text-[10px] font-bold flex items-center">Stagnant</span>}
-                <button onClick={handleNotInterested} className="text-gray-400 hover:text-red-500 transition-colors p-1" title="Not Interested (Log a No)"><XCircle className="h-4 w-4" /></button>
-                <button onClick={() => onDelete(item.id)} className="text-gray-300 hover:text-red-500 transition-colors p-1" title="Delete"><Trash2 className="h-4 w-4" /></button>
+        <div className={`p-4 border rounded-lg bg-white shadow-sm transition-all hover:shadow-md ${borderClass} ${isStagnant ? 'bg-amber-50/30' : ''}`}>
+
+            {/* Stage Breadcrumb */}
+            <StageBreadcrumb status={item.status} />
+
+            {/* Name + Last contact row */}
+            <div className="flex justify-between items-start mb-1">
+                <input
+                    type="text"
+                    defaultValue={item.name}
+                    onChange={(e) => onUpdate(item.id, 'name', e.target.value)}
+                    className="text-base font-bold text-gray-900 border-none p-0 w-full focus:ring-0 bg-transparent"
+                    placeholder="Enter name..."
+                />
             </div>
-            <div className="flex justify-between items-start mt-2 pr-8">
-                <input type="text" defaultValue={item.name} onChange={(e) => onUpdate(item.id, 'name', e.target.value)} className="text-lg font-bold text-gray-800 border-none p-0 w-full focus:ring-0 bg-transparent" placeholder="Enter name..." />
+            <div className="flex items-center space-x-2 mb-3">
+                <span className="text-xs text-gray-400">Last contact: <span className={`font-semibold ${daysSinceContact > 7 && item.status !== 'Cold' ? 'text-amber-600' : 'text-gray-600'}`}>{lastContactLabel}</span></span>
+                {isOverdue && <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded text-[10px] font-bold flex items-center"><AlertTriangle className="w-3 h-3 mr-1" />Action Overdue</span>}
+                {isSnoozed && <span className="bg-blue-100 text-blue-600 px-2 py-0.5 rounded text-[10px] font-semibold">💤 Snoozed until {new Date(item.nextActionDate).toLocaleDateString('en-US', {month:'short', day:'numeric'})}</span>}
             </div>
-            <div className="mt-2 mb-3"><VisualExposureMeter count={exposureCount} /></div>
-            <div className="flex space-x-2 my-3">
+
+            {/* Exposure Meter */}
+            <div className="mb-4"><VisualExposureMeter count={exposureCount} /></div>
+
+            {/* Un-snooze button when snoozed */}
+            {isSnoozed && (
+                <button
+                    onClick={handleUnSnooze}
+                    className="w-full mb-3 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 py-2 rounded-md flex items-center justify-center text-xs font-bold transition-colors"
+                >
+                    🔔 Remind Me Today — move back to Today's Prospects
+                </button>
+            )}
+
+            {/* Primary contextual action button */}
+            <div className="mb-3">
                 {item.status === 'Cold' && (
-                    <button onClick={handleSentTool} className="flex-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 py-2 rounded-md flex items-center justify-center text-xs font-semibold transition-colors border border-indigo-200">
-                        <Send className="h-4 w-4 mr-1 text-indigo-600" /> Sent Tool (Move Warm)
+                    <button onClick={handleSentInfo} className="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 py-2.5 rounded-md flex items-center justify-center text-sm font-bold transition-colors border border-indigo-200">
+                        <Send className="h-4 w-4 mr-2 text-indigo-600" /> 📤 Sent the Info — Move to Warm
                     </button>
                 )}
                 {item.status === 'Warm' && (
-                    <button onClick={handleDidPresentation} className="flex-1 bg-purple-50 hover:bg-purple-100 text-purple-700 py-2 rounded-md flex items-center justify-center text-xs font-semibold transition-colors border border-purple-200">
-                        <PlayCircle className="h-4 w-4 mr-1 text-purple-600" /> Did Pres (Move Hot)
+                    <button onClick={handleDidPresentation} className="w-full bg-purple-50 hover:bg-purple-100 text-purple-700 py-2.5 rounded-md flex items-center justify-center text-sm font-bold transition-colors border border-purple-200">
+                        <PlayCircle className="h-4 w-4 mr-2 text-purple-600" /> 🎬 Did Presentation — Move to Hot
                     </button>
                 )}
                 {item.status === 'Hot' && (
-                    <button onClick={handleGenericLogExposure} className="flex-1 bg-green-50 hover:bg-green-100 text-green-700 py-2 rounded-md flex items-center justify-center text-xs font-semibold transition-colors border border-green-200">
-                        <Zap className="h-4 w-4 mr-1 text-green-600" /> Log Follow Up
+                    <button onClick={handleLogFollowUp} className="w-full bg-green-50 hover:bg-green-100 text-green-700 py-2.5 rounded-md flex items-center justify-center text-sm font-bold transition-colors border border-green-200">
+                        <Zap className="h-4 w-4 mr-2 text-green-600" />
+                        {exposureCount >= 5 ? '⚡ Log Follow Up — Closing Zone!' : `Log Follow Up (${exposureCount} touches so far)`}
                     </button>
                 )}
-                <button onClick={handleSnooze} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-600 py-2 rounded-md flex items-center justify-center text-xs font-semibold transition-colors">
-                    <Clock className="h-4 w-4 mr-1 text-gray-500" /> Snooze
+            </div>
+
+            {/* Close Deal (Hot only) */}
+            {item.status === 'Hot' && (
+                <button onClick={() => onDecide(item)} className="w-full flex items-center justify-center text-sm font-bold text-white bg-green-600 hover:bg-green-700 px-3 py-2.5 rounded-md shadow-sm transition mb-3">
+                    <CheckCircle className="h-4 w-4 mr-2" /> ✅ Close the Deal
                 </button>
-            </div>
-            <div className="space-y-3">
-                <div className="relative">
-                    <textarea defaultValue={item.notes} onChange={(e) => onUpdate(item.id, 'notes', e.target.value)} placeholder="Add notes..." className="w-full text-sm text-gray-600 border-gray-200 rounded-md focus:ring-indigo-500 focus:border-indigo-500 transition-all bg-white" rows={isNotesExpanded ? 6 : 2}></textarea>
-                    <button onClick={() => setIsNotesExpanded(!isNotesExpanded)} className="absolute bottom-2 right-2 text-xs flex items-center font-semibold text-indigo-600 hover:text-indigo-800 bg-white/80 backdrop-blur-sm px-2 py-1 rounded-full border border-gray-100 shadow-sm">
-                        <MessageSquare className="h-3 w-3 mr-1" /> {isNotesExpanded ? 'Hide' : 'View'} Notes
+            )}
+
+            {/* Details Toggle */}
+            <button
+                onClick={() => setShowDetails(!showDetails)}
+                className="text-xs text-gray-400 hover:text-indigo-600 flex items-center transition-colors mt-1"
+            >
+                {showDetails ? <ChevronUp className="h-3.5 w-3.5 mr-1" /> : <ChevronDown className="h-3.5 w-3.5 mr-1" />}
+                {showDetails ? 'Hide Details' : 'Details & Actions'}
+            </button>
+
+            {/* Collapsible Details */}
+            {showDetails && (
+                <div className="mt-3 space-y-3 border-t border-gray-100 pt-3">
+                    {/* Notes */}
+                    <div className="relative">
+                        <textarea
+                            defaultValue={item.notes}
+                            onChange={(e) => onUpdate(item.id, 'notes', e.target.value)}
+                            placeholder="Add notes..."
+                            className="w-full text-sm text-gray-600 border-gray-200 rounded-md focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+                            rows={isNotesExpanded ? 6 : 2}
+                        />
+                        <button onClick={() => setIsNotesExpanded(!isNotesExpanded)} className="absolute bottom-2 right-2 text-xs flex items-center font-semibold text-indigo-600 hover:text-indigo-800 bg-white/80 px-2 py-1 rounded-full border border-gray-100 shadow-sm">
+                            <MessageSquare className="h-3 w-3 mr-1" /> {isNotesExpanded ? 'Collapse' : 'Expand'}
+                        </button>
+                    </div>
+
+                    {/* Next Action Date */}
+                    <div className="flex items-center space-x-2 bg-gray-50 p-2 rounded-md">
+                        <label htmlFor={`next-action-${item.id}`} className="text-xs font-medium text-gray-500 whitespace-nowrap">Follow-up date:</label>
+                        <input
+                            id={`next-action-${item.id}`}
+                            type="date"
+                            defaultValue={item.nextActionDate}
+                            onChange={(e) => onInstantUpdate(item.id, { nextActionDate: e.target.value })}
+                            className={`p-1 border rounded-md text-xs w-full bg-white ${isOverdue ? 'text-red-600 font-semibold' : ''}`}
+                        />
+                    </div>
+
+                    {/* Snooze — tucked away so it can't be tapped accidentally */}
+                    <button
+                        onClick={handleSnooze}
+                        className="w-full bg-gray-50 hover:bg-gray-100 text-gray-500 border border-gray-200 py-2 rounded-md flex items-center justify-center text-xs font-medium transition-colors"
+                    >
+                        <Clock className="h-3.5 w-3.5 mr-2" /> 📅 Remind Me in 3 Days — Remove from Today
                     </button>
+
+                    {/* Danger zone */}
+                    <div className="pt-2 border-t border-gray-100 flex items-center justify-between">
+                        <span className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Danger Zone</span>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={handleNotInterested}
+                                className="flex items-center text-xs text-red-500 hover:text-red-700 font-medium"
+                            >
+                                <XCircle className="h-3.5 w-3.5 mr-1" /> Not Interested
+                            </button>
+                            <button
+                                onClick={() => onDelete(item.id)}
+                                className="flex items-center text-xs text-gray-400 hover:text-red-600 font-medium"
+                            >
+                                <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <div className="flex items-center space-x-2 bg-gray-50 p-2 rounded-md">
-                    <label htmlFor={`next-action-${item.id}`} className="text-xs font-medium text-gray-500 whitespace-nowrap">Next Action:</label>
-                    <input id={`next-action-${item.id}`} type="date" defaultValue={item.nextActionDate} onChange={(e) => onInstantUpdate(item.id, { nextActionDate: e.target.value })} className={`p-1 border rounded-md text-xs w-full bg-white ${isOverdue ? 'text-red-600 font-semibold' : ''}`} />
-                </div>
-            </div>
-            <div className="mt-3 pt-3 border-t border-gray-100 flex flex-wrap items-center justify-end gap-2 opacity-60 hover:opacity-100 transition-opacity">
-                {item.status === 'Cold' && <button onClick={() => onInstantUpdate(item.id, { status: 'Warm' })} className="text-[10px] text-gray-400 hover:text-indigo-600">Manual &gt; Warm</button>}
-                {item.status === 'Warm' && <button onClick={() => onInstantUpdate(item.id, { status: 'Hot' })} className="text-[10px] text-gray-400 hover:text-red-600">Manual &gt; Hot</button>}
-                {item.status === 'Hot' && <button onClick={() => onDecide(item)} className="flex items-center text-xs font-bold text-green-600 hover:text-green-800 bg-green-50 px-3 py-1 rounded-full"><CheckCircle className="h-3 w-3 mr-1" /> CLOSE DEAL</button>}
-            </div>
+            )}
         </div>
     );
 };
+
 
 const ArchivedProspectsList = ({ list, onUnarchive, onDelete }) => {
     if (list.length === 0) {
@@ -297,9 +415,9 @@ export const HotList = ({ user, db, onDataChange, monthlyData, hotlist: allProsp
     };
 
     const statusConfig = {
-        Hot: { title: 'HOT - Closing Zone', icon: Flame, color: 'red', description: 'Prospects who have seen a presentation.' },
-        Warm: { title: 'WARM - Building Interest', icon: TrendingUp, color: 'amber', description: "Prospects who have been sent a tool/video." },
-        Cold: { title: 'COLD - Prospect List', icon: Users, color: 'blue', description: 'New prospects to start conversations with.' },
+        Hot: { title: '🔥 Hot — Follow Up & Close', icon: Flame, color: 'red', description: 'They saw a presentation. Keep following up until they decide. 5+ touches = Closing Zone.' },
+        Warm: { title: '🌡️ Warm — Book a Presentation', icon: TrendingUp, color: 'amber', description: 'They received the info. Next step: sit them down for a full presentation.' },
+        Cold: { title: '🧊 Cold — Prospect List', icon: Users, color: 'blue', description: 'New contacts. First step: share the info or a video to start the conversation.' },
     };
 
     const getPriorityScore = (p) => {

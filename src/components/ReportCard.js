@@ -8,7 +8,7 @@ const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
         return <div ref={ref}>Loading data...</div>;
     }
 
-    const { totals, dateRange, reportTitle } = weekData;
+    const { totals, dateRange, reportTitle, elapsedDays = 5 } = weekData;
 
     // Scoreboard Metrics Configuration
     const scoreboard = [
@@ -21,7 +21,8 @@ const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
     ];
 
     const timeframe = reportTitle?.includes('Monthly') ? 'month' : 'week';
-    const insight = getPeriodicCoachingAdvice(totals, timeframe);
+    const insight = getPeriodicCoachingAdvice(totals, timeframe, elapsedDays, 5);
+
 
     // Reverted back to 800px standard height since Pipeline summary is removed to make space for Coaching
     const cardHeight = '800px';

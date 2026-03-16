@@ -280,6 +280,33 @@ const Leaderboard = ({ db, weekId, user }) => {
                     </div>
                 </div>
             )}
+            {/* --- Most Consistent / Discipline Board --- */}
+            <div className="mt-8 p-5 bg-white rounded-xl shadow-sm border">
+                <h3 className="text-base font-black text-gray-700 uppercase tracking-widest mb-4 flex items-center">
+                    <span className="mr-2">💪</span> Most Consistent — Daily Cycle Streak
+                </h3>
+                {scores
+                    .filter(e => (e.ironmanStreak || 0) > 0)
+                    .sort((a, b) => (b.ironmanStreak || 0) - (a.ironmanStreak || 0))
+                    .slice(0, 5)
+                    .map((entry, idx) => (
+                        <div key={entry.userId} className={`flex items-center justify-between p-3 rounded-lg mb-2 ${
+                            entry.userId === user?.uid ? 'bg-indigo-50 border border-indigo-200' : 'bg-gray-50'
+                        }`}>
+                            <div className="flex items-center">
+                                <span className="text-lg font-black text-gray-400 w-7 text-center">{idx + 1}</span>
+                                <span className="ml-3 font-semibold text-gray-800 text-sm">{entry.displayName || 'Player'}</span>
+                            </div>
+                            <div className="flex items-center text-sm font-bold text-orange-600">
+                                <span className="mr-1">🔥</span> {entry.ironmanStreak || 0}d streak
+                            </div>
+                        </div>
+                    ))
+                }
+                {scores.filter(e => (e.ironmanStreak || 0) > 0).length === 0 && (
+                    <p className="text-sm text-gray-500 text-center py-4">No streaks yet — complete your Daily Cycle to get on the board!</p>
+                )}
+            </div>
         </div>
     );
 };
