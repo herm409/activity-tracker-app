@@ -686,12 +686,16 @@ const AppContent = () => {
 
     return (
         <div className="min-h-screen bg-gray-50 text-gray-900 font-sans pb-36">
-            {/* Notification permission banner — slides in at very top */}
             <NotificationBanner todayPoints={todayPoints} dailyPar={dailyPar} />
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-                <Header displayName={userProfile.displayName} onSignOut={() => auth.signOut()} onEditName={() => setShowNameModal(true)} />
-                <TabBar activeTab={activeTab} setActiveTab={setActiveTab} badges={{ today: showTodayBadge }} />
+            
+            <div className="sticky top-0 z-40 bg-gray-50 pt-6">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <Header displayName={userProfile.displayName} onSignOut={() => auth.signOut()} onEditName={() => setShowNameModal(true)} />
+                    <TabBar activeTab={activeTab} setActiveTab={setActiveTab} badges={{ today: showTodayBadge }} />
+                </div>
+            </div>
 
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6">
                 <main className="mt-6">
                     <Suspense fallback={<div className="text-center p-10">Loading...</div>}>
                         {activeTab === 'today' && <TodayDashboard
