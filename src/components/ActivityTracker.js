@@ -96,16 +96,17 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
 
     const monthlyTotals = useMemo(() => {
         // Only sum if data.current matches the view
-        if (data.current.id && data.current.id !== monthYearId) return { exposures: 0, followUps: 0, presentations: 0, threeWays: 0, enrolls: 0 };
+        if (data.current.id && data.current.id !== monthYearId) return { exposures: 0, followUps: 0, presentations: 0, threeWays: 0, teamSupport: 0, enrolls: 0 };
 
         return Object.values(data.current).reduce((acc, dayData) => {
             acc.exposures += Number(dayData.exposures) || 0;
             acc.followUps += Number(dayData.followUps) || 0;
             acc.presentations += (Array.isArray(dayData.presentations) ? dayData.presentations.length : Number(dayData.presentations) || 0) + (Number(dayData.pbrs) || 0);
             acc.threeWays += Number(dayData.threeWays) || 0;
+            acc.teamSupport += Number(dayData.teamSupport) || 0;
             acc.enrolls += (Number(dayData.enrolls) || 0) + (Array.isArray(dayData.sitdowns) ? dayData.sitdowns.filter(s => s === 'E').length : 0);
             return acc;
-        }, { exposures: 0, followUps: 0, presentations: 0, threeWays: 0, enrolls: 0 });
+        }, { exposures: 0, followUps: 0, presentations: 0, threeWays: 0, teamSupport: 0, enrolls: 0 });
     }, [data, monthYearId]);
 
     const handleDayClick = (dayObj) => {
@@ -115,7 +116,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
     const closeModal = () => setSelectedDay(null);
     const handleModalDataChange = (field, value) => onDataChange(selectedDay, field, value);
 
-    const activityColors = { exposures: 'bg-blue-500', followUps: 'bg-green-500', presentations: 'bg-purple-500', threeWays: 'bg-pink-500', enrolls: 'bg-teal-500' };
+    const activityColors = { exposures: 'bg-blue-500', followUps: 'bg-green-500', presentations: 'bg-purple-500', threeWays: 'bg-pink-500', teamSupport: 'bg-blue-400', enrolls: 'bg-teal-500' };
 
     // Par Protocol: Weekly Score Calculation
     const weeklyStats = useMemo(() => {
@@ -277,11 +278,12 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
                                                 acc.followUps += Number(d.data.followUps) || 0;
                                                 acc.presentations += (Array.isArray(d.data.presentations) ? d.data.presentations.length : Number(d.data.presentations) || 0) + (Number(d.data.pbrs) || 0);
                                                 acc.threeWays += Number(d.data.threeWays) || 0;
+                                                acc.teamSupport += Number(d.data.teamSupport) || 0;
                                                 acc.nos += Number(d.data.nos) || 0;
                                                 acc.enrolls += (Number(d.data.enrolls) || 0) + (Array.isArray(d.data.sitdowns) ? d.data.sitdowns.filter(s => s === 'E').length : 0);
                                             }
                                             return acc;
-                                        }, { exposures: 0, followUps: 0, presentations: 0, threeWays: 0, nos: 0, enrolls: 0 });
+                                        }, { exposures: 0, followUps: 0, presentations: 0, threeWays: 0, teamSupport: 0, nos: 0, enrolls: 0 });
 
                                         // Calculate elapsed days for Pace logic
                                         const workingDays = 5;
@@ -326,6 +328,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
                                         {d.data.exposures > 0 && <div className={`h-2 w-2 ${activityColors.exposures} rounded-full`}></div>}
                                         {d.data.followUps > 0 && <div className={`h-2 w-2 ${activityColors.followUps} rounded-full`}></div>}
                                         {((Array.isArray(d.data.presentations) ? d.data.presentations.length : Number(d.data.presentations) || 0) + (Number(d.data.pbrs) || 0)) > 0 && <div className={`h-2 w-2 ${activityColors.presentations} rounded-full`}></div>}
+                                        {d.data.teamSupport > 0 && <div className={`h-2 w-2 ${activityColors.teamSupport} rounded-full`}></div>}
                                         {(d.data.enrolls > 0 || d.data.sitdowns?.some(s => s === 'E')) && <div className={`h-2 w-2 ${activityColors.enrolls} rounded-full`}></div>}
                                     </div>
                                 </div>
@@ -348,6 +351,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
                                                 {d.data.exposures > 0 && <div className={`h-2 w-2 ${activityColors.exposures} rounded-full`}></div>}
                                                 {d.data.followUps > 0 && <div className={`h-2 w-2 ${activityColors.followUps} rounded-full`}></div>}
                                                 {((Array.isArray(d.data.presentations) ? d.data.presentations.length : Number(d.data.presentations) || 0) + (Number(d.data.pbrs) || 0)) > 0 && <div className={`h-2 w-2 ${activityColors.presentations} rounded-full`}></div>}
+                                                {d.data.teamSupport > 0 && <div className={`h-2 w-2 ${activityColors.teamSupport} rounded-full`}></div>}
                                                 {(d.data.enrolls > 0 || d.data.sitdowns?.some(s => s === 'E')) && <div className={`h-2 w-2 ${activityColors.enrolls} rounded-full`}></div>}
                                             </div>
                                         </>

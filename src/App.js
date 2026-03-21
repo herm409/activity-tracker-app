@@ -19,6 +19,8 @@ import QuickLogFAB from './components/QuickLogFAB';
 import NotificationBanner from './components/NotificationBanner';
 import { DisplayNameModal, OnboardingModal, CutReportModal, ScoringLegendModal } from './components/GlobalModals';
 import ReportCard from './components/ReportCard';
+import CoachingToast from './components/CoachingToast';
+import { COACHING_REPOSITORY } from './utils/coachingRepository';
 
 // Components (Lazy Load)
 const AnalyticsDashboard = React.lazy(() => import('./components/AnalyticsDashboard'));
@@ -35,7 +37,7 @@ const AppContent = () => {
 
     const [monthlyData, setMonthlyData] = useState({});
     const [lastMonthData, setLastMonthData] = useState({});
-    const [monthlyGoals, setMonthlyGoals] = useState({ exposures: 0, followUps: 0, presentations: 0, threeWays: 0, enrolls: 0 });
+    const [monthlyGoals, setMonthlyGoals] = useState({ exposures: 0, followUps: 0, presentations: 0, threeWays: 0, teamSupport: 0, enrolls: 0 });
     const [activeTab, setActiveTab] = useState('today');
 
     // UI State
@@ -59,6 +61,9 @@ const AppContent = () => {
     const [reportCardData, setReportCardData] = useState(null);
     const reportCardRef = useRef(null);
 
+    // Coaching Toast
+    const [coachingToast, setCoachingToast] = useState(null);
+
 
 
     // --- Monday Cut Report Logic ---
@@ -80,25 +85,14 @@ const AppContent = () => {
     lastMonthDate.setMonth(currentDate.getMonth() - 1);
     const lastMonthYearId = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, '0')}`;
 
-    const fetchData = useCallback(async () => {
+    const fetchActivitiesData = useCallback(async () => {
         if (!user || !db) return;
-
-        // Profile logic is handled in AppContext, but we might need to handle specific flags here or verify
-        if (!userProfile.displayName && !loading) {
-            setShowNameModal(true);
-        }
-        if (!userProfile.hasCompletedOnboarding && !loading && !userProfile.displayName) {
-            // Logic in original was: if profile exists but no hasCompletedOnboarding -> show.
-            // If profile completely missing -> show name modal AND onboarding.
-            // AppContext fetches profile.
-            if (userProfile.uid && userProfile.hasCompletedOnboarding === undefined) setShowOnboarding(true);
-        }
-        if (userProfile.uid && !userProfile.hasCompletedOnboarding) setShowOnboarding(true);
+        console.log("TRACE: fetchActivitiesData FIRED");
 
 
         const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', monthYearId);
         const docSnap = await getDoc(docRef);
-        let currentGoals = { exposures: 0, followUps: 0, presentations: 0, pbrs: 0, threeWays: 0, enrolls: 0 };
+        let currentGoals = { exposures: 0, followUps: 0, presentations: 0, pbrs: 0, threeWays: 0, teamSupport: 0, enrolls: 0 };
         if (docSnap.exists()) {
             const data = docSnap.data();
             setMonthlyData(data.dailyData || {});
@@ -109,10 +103,7 @@ const AppContent = () => {
             setMonthlyGoals(currentGoals);
         }
 
-        const allGoalsZero = Object.values(currentGoals).every(goal => goal === 0);
-        if (userProfile.uid && !userProfile.hasSeenGoalInstruction && allGoalsZero) {
-            setShowGoalInstruction(true);
-        }
+
 
         const lastMonthDocRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', lastMonthYearId);
         const lastMonthDocSnap = await getDoc(lastMonthDocRef);
@@ -121,8 +112,7 @@ const AppContent = () => {
         } else {
             setLastMonthData({});
         }
-    }, [user, db, monthYearId, lastMonthYearId, userProfile, loading]);
-
+    }, [user, db, monthYearId, lastMonthYearId]);
     useEffect(() => {
         if (!user || !db) return;
         const hotlistColRef = collection(db, 'artifacts', appId, 'users', user.uid, 'hotlist');
@@ -137,9 +127,27 @@ const AppContent = () => {
     // Handle initial data load
     useEffect(() => {
         if (user && db) {
-            fetchData();
+            fetchActivitiesData();
         }
-    }, [user, db, currentDate, fetchData]);
+    }, [user, db, currentDate, fetchActivitiesData]);
+
+    // Handle Profile Modals (Onboarding & Goals)
+    useEffect(() => {
+        if (!user || loading) return;
+
+        if (!userProfile.displayName) {
+            setShowNameModal(true);
+        }
+        if (!userProfile.hasCompletedOnboarding && !userProfile.displayName) {
+            if (userProfile.uid && userProfile.hasCompletedOnboarding === undefined) setShowOnboarding(true);
+        }
+        if (userProfile.uid && !userProfile.hasCompletedOnboarding) setShowOnboarding(true);
+
+        const allGoalsZero = Object.values(monthlyGoals).every(goal => goal === 0);
+        if (userProfile.uid && !userProfile.hasSeenGoalInstruction && allGoalsZero) {
+            setShowGoalInstruction(true);
+        }
+    }, [user, userProfile, loading, monthlyGoals]);
 
 
     // --- Actions ---
@@ -287,19 +295,92 @@ const AppContent = () => {
         }
     }, 1500), [user, db, updateLeaderboard]);
 
+    const evaluateCoaching = (date, metricKey, newValue, prevValue) => {
+        let numVal = Array.isArray(newValue) ? newValue.length : Number(newValue) || 0;
+        let prevNumVal = Array.isArray(prevValue) ? prevValue.length : Number(prevValue) || 0;
+        if (numVal <= prevNumVal) return;
+
+        const categoryMap = { exposures: 'exposures', followUps: 'followUps', tenacityFollowUps: 'followUps', presentations: 'presentations', pbrs: 'presentations', threeWays: 'threeWayCalls', teamSupport: 'teamSupport', enrolls: 'membershipsSold', sitdowns: 'membershipsSold', nos: 'rejections', exerc: 'dailyDisciplines', personalDevelopment: 'dailyDisciplines', read: 'dailyDisciplines', audio: 'dailyDisciplines' };
+        const category = categoryMap[metricKey];
+        if (!category) return;
+
+        const now = new Date();
+        const allTimeBests = userProfile.allTimeBests || {};
+        const lastActivityTimestamps = userProfile.lastActivityTimestamps || {};
+        let priority = 6;
+        let message = '';
+        
+        if (metricKey === 'nos') {
+            priority = 4;
+            message = "SW4! Someone's Waiting! Move to the next diamond.";
+        } else if (numVal > (allTimeBests[metricKey] || 0)) {
+            priority = 1;
+            message = "NEW PERSONAL BEST! You are operating at a Diamond level today! 💎🔥";
+            if (window.confetti) window.confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
+        } else if (numVal === 1 && lastActivityTimestamps[metricKey]) {
+            const lastDate = new Date(lastActivityTimestamps[metricKey]);
+            if ((now - lastDate) / (1000 * 60 * 60 * 24) > 3) {
+                priority = 2;
+                message = "The drought is over! Welcome back to the field. Consistency is the key to the Winner's Circle!";
+            }
+        } 
+        
+        if (priority === 6) {
+            let currentMonthTotal = (numVal - prevNumVal);
+            let previousMonthTotal = 0;
+            Object.values(monthlyData).forEach(d => { let v = d[metricKey]; currentMonthTotal += Array.isArray(v) ? v.length : Number(v) || 0; });
+            Object.values(lastMonthData).forEach(d => { let v = d[metricKey]; previousMonthTotal += Array.isArray(v) ? v.length : Number(v) || 0; });
+
+            if (currentMonthTotal > previousMonthTotal && previousMonthTotal > 0 && currentMonthTotal - (numVal - prevNumVal) <= previousMonthTotal) {
+                priority = 5;
+                message = `Massive Growth! You've officially done more this month than you did in all of last month.`;
+            }
+        }
+
+        if (priority === 6 && COACHING_REPOSITORY[category]) {
+           const repo = COACHING_REPOSITORY[category];
+           message = repo[Math.floor(Math.random() * repo.length)];
+        }
+
+        if (message) setCoachingToast({ priority, message });
+
+        const newBest = Math.max(allTimeBests[metricKey] || 0, numVal);
+        const updatedProfile = { 
+            ...userProfile, 
+            allTimeBests: { ...allTimeBests, [metricKey]: newBest },
+            lastActivityTimestamps: { ...lastActivityTimestamps, [metricKey]: now.toISOString() }
+        };
+        setUserProfile(updatedProfile);
+        
+        const profileRef = doc(db, 'artifacts', appId, 'users', user.uid);
+        updateDoc(profileRef, { [`allTimeBests.${metricKey}`]: newBest, [`lastActivityTimestamps.${metricKey}`]: now.toISOString() }).catch(err => console.error(err));
+    };
+
     const handleDataChange = (date, field, value) => {
         const day = date.getDate();
         const targetMonthId = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        
+        console.log(`TRACE: handleDataChange FIRED for field: ${field}, value: ${value}`);
 
         if (targetMonthId === monthYearId) {
-            const updatedData = { ...monthlyData, [day]: { ...monthlyData[day], [field]: value } };
-            setMonthlyData(updatedData);
-            isDirtyRef.current = true;
-            debouncedSave(updatedData, monthlyGoals, monthYearId, date);
+            setMonthlyData(prevData => {
+                const prevValue = prevData[day]?.[field];
+                const updatedData = { ...prevData, [day]: { ...prevData[day], [field]: value } };
+                
+                isDirtyRef.current = true;
+                debouncedSave(updatedData, monthlyGoals, monthYearId, date);
+                evaluateCoaching(date, field, value, prevValue);
+                
+                return updatedData;
+            });
         } else {
             if (targetMonthId === lastMonthYearId) {
-                const updatedLastMonthData = { ...lastMonthData, [day]: { ...lastMonthData[day], [field]: value } };
-                setLastMonthData(updatedLastMonthData);
+                setLastMonthData(prevData => {
+                    const prevValue = prevData[day]?.[field];
+                    const updatedLastMonthData = { ...prevData, [day]: { ...prevData[day], [field]: value } };
+                    evaluateCoaching(date, field, value, prevValue);
+                    return updatedLastMonthData;
+                });
             }
             // Atomic update for non-current month
             const saveAtomicUpdate = async () => {
@@ -325,7 +406,8 @@ const AppContent = () => {
             alert("Quick add is only available for the current day on the current month's view.");
             return;
         }
-        const todayData = monthlyData[today.getDate()] || {};
+        // Use the ref which always has the latest committed data for computation
+        const todayData = monthlyDataRef.current[today.getDate()] || {};
         const currentValue = Number(todayData[metricKey]) || 0;
         const newValue = Math.max(0, currentValue + amount);
         handleDataChange(today, metricKey, newValue);
@@ -337,7 +419,7 @@ const AppContent = () => {
             alert("Quick add is only available for the current day on the current month's view.");
             return;
         }
-        const todayData = monthlyData[today.getDate()] || {};
+        const todayData = monthlyDataRef.current[today.getDate()] || {};
         const currentPresentations = todayData.presentations || [];
         const newPresentations = [...currentPresentations, type];
         handleDataChange(today, 'presentations', newPresentations);
@@ -432,7 +514,7 @@ const AppContent = () => {
         endOfLastWeek.setDate(startOfWeek.getDate() - 1);
 
         const getWeekTotals = (startDate, endDate) => {
-            const totals = { exposures: 0, followUps: 0, nos: 0, presentations: 0, threeWays: 0, enrolls: 0 };
+            const totals = { exposures: 0, followUps: 0, nos: 0, presentations: 0, threeWays: 0, teamSupport: 0, enrolls: 0 };
             let current = new Date(startDate);
             while (current <= endDate) {
                 const dataSet = current.getMonth() === targetDate.getMonth() ? monthlyData : lastMonthData;
@@ -443,6 +525,7 @@ const AppContent = () => {
                     totals.nos += Number(dayData.nos) || 0;
                     totals.presentations += (Array.isArray(dayData.presentations) ? dayData.presentations.length : Number(dayData.presentations) || 0) + (Number(dayData.pbrs) || 0);
                     totals.threeWays += Number(dayData.threeWays) || 0;
+                    totals.teamSupport += Number(dayData.teamSupport) || 0;
                     totals.enrolls += (Number(dayData.enrolls) || 0) + (Array.isArray(dayData.sitdowns) ? dayData.sitdowns.filter(s => s === 'E').length : 0);
                 }
                 current.setDate(current.getDate() + 1);
@@ -478,13 +561,14 @@ const AppContent = () => {
 
 
     const getMonthDataForReport = useCallback(async () => {
-        const totals = { exposures: 0, followUps: 0, nos: 0, presentations: 0, threeWays: 0, enrolls: 0 };
+        const totals = { exposures: 0, followUps: 0, nos: 0, presentations: 0, threeWays: 0, teamSupport: 0, enrolls: 0 };
         Object.values(monthlyData).forEach(dayData => {
             totals.exposures += Number(dayData.exposures) || 0;
             totals.followUps += Number(dayData.followUps) || 0;
             totals.nos += Number(dayData.nos) || 0;
             totals.presentations += (Array.isArray(dayData.presentations) ? dayData.presentations.length : Number(dayData.presentations) || 0) + (Number(dayData.pbrs) || 0);
             totals.threeWays += Number(dayData.threeWays) || 0;
+            totals.teamSupport += Number(dayData.teamSupport) || 0;
             totals.enrolls += (Number(dayData.enrolls) || 0) + (Array.isArray(dayData.sitdowns) ? dayData.sitdowns.filter(s => s === 'E').length : 0);
         });
 
@@ -515,7 +599,7 @@ const AppContent = () => {
         const titleLabel = reportTitle || 'Activity Report';
 
         let shareText = `My ${titleLabel}\nFrom: ${userProfile.displayName}\n${dateLabel}: ${dateRange}\n\n`;
-        shareText += `**${isMonthly ? "This Month's" : "This Week's"} Numbers:**\n- Exposures: ${totals.exposures}\n- Follow Ups: ${totals.followUps}\n- Definitive No's: ${totals.nos}\n- Presentations: ${totals.presentations}\n- 3-Way Calls: ${totals.threeWays}\n- Memberships Sold: ${totals.enrolls}\n\n`;
+        shareText += `**${isMonthly ? "This Month's" : "This Week's"} Numbers:**\n- Exposures: ${totals.exposures}\n- Follow Ups: ${totals.followUps}\n- Definitive No's: ${totals.nos}\n- Presentations: ${totals.presentations}\n- 3-Way Calls: ${totals.threeWays}\n- Team Support: ${totals.teamSupport}\n- Memberships Sold: ${totals.enrolls}\n\n`;
         shareText += `**Prospect Pipeline:**\n- Active Prospects: ${activeInPipeline}\n\n`;
         shareText += "--------------------\n\n";
 
@@ -773,6 +857,8 @@ const AppContent = () => {
             <div style={{ position: 'absolute', top: '-9999px', left: '-9999px' }}>
                 {reportCardData && <ReportCard ref={reportCardRef} profile={userProfile} weekData={reportCardData} goals={monthlyGoals} />}
             </div>
+
+            {coachingToast && <CoachingToast message={coachingToast.message} priority={coachingToast.priority} onClose={() => setCoachingToast(null)} />}
         </div>
     );
 };

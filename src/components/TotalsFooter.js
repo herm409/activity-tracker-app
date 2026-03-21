@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Target, Users, BarChart2, PhoneCall, UserCheck, Info, Edit2, X, Share2, Minus, Plus, Flame, Trophy } from 'lucide-react';
+import { Target, Users, BarChart2, PhoneCall, UserCheck, Info, Edit2, X, Share2, Minus, Plus, Flame, Trophy, HeartHandshake } from 'lucide-react';
 import { WEEKS_IN_MONTH } from '../utils/helpers';
 
 const TotalsFooter = ({ totals, onShare, onShareMonthly, isSharing, streaks, goals, onGoalChange, userProfile, onQuickAdd, showGoalInstruction, onDismissGoalInstruction }) => {
@@ -10,6 +10,7 @@ const TotalsFooter = ({ totals, onShare, onShareMonthly, isSharing, streaks, goa
         { key: 'followUps', label: 'Follow Ups', value: totals.followUps, icon: Users, color: 'green' },
         { key: 'presentations', label: 'Presentations', value: totals.presentations, icon: BarChart2, color: 'purple' },
         { key: 'threeWays', label: '3-Way Calls', value: totals.threeWays, icon: PhoneCall, color: 'pink' },
+        { key: 'teamSupport', label: 'Team Support', value: totals.teamSupport, icon: HeartHandshake, color: 'blue' },
         { key: 'enrolls', label: 'Memberships Sold', value: totals.enrolls, icon: UserCheck, color: 'teal' }
     ];
     const handleGoalEdit = (e) => {

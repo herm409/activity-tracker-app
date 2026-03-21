@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, X, Target, Users, XCircle, BarChart2, PhoneCall, UserCheck } from 'lucide-react';
+import { Plus, X, Target, Users, XCircle, BarChart2, PhoneCall, UserCheck, HeartHandshake } from 'lucide-react';
 
 const ACTIONS = [
     { key: 'exposures',     label: 'Exposure',    icon: Target,    color: '#e0e7ff', textColor: '#4338ca', type: 'modal' },
@@ -7,6 +7,7 @@ const ACTIONS = [
     { key: 'nos',           label: 'No',          icon: XCircle,   color: '#fee2e2', textColor: '#dc2626', type: 'confirm' },
     { key: 'presentations', label: 'Presentation',icon: BarChart2, color: '#f3e8ff', textColor: '#7e22ce', type: 'presentation' },
     { key: 'threeWays',     label: '3-Way Call',  icon: PhoneCall, color: '#fce7f3', textColor: '#be185d', type: 'direct' },
+    { key: 'teamSupport',   label: 'Team Support',icon: HeartHandshake, color: '#e0f2fe', textColor: '#0284c7', type: 'direct' },
     { key: 'enrolls',       label: 'Enrollment',  icon: UserCheck, color: '#ccfbf1', textColor: '#0f766e', type: 'direct' },
 ];
 
@@ -50,16 +51,17 @@ const QuickLogFAB = ({ onLogExposure, onLogFollowUp, onAddPresentation, onQuickA
                 />
             )}
 
-            {/* ── Bottom Sheet — uses inline style transform so Tailwind purge can't break it ── */}
+            {/* ── Bottom Sheet ── */}
             <div
                 style={{
                     position: 'fixed',
-                    bottom: 0,
+                    bottom: open ? 0 : '-100%',
                     left: 0,
                     right: 0,
                     zIndex: 50,
-                    transform: open ? 'translateY(0)' : 'translateY(100%)',
-                    transition: 'transform 0.28s cubic-bezier(0.32, 0.72, 0, 1)',
+                    opacity: open ? 1 : 0,
+                    pointerEvents: open ? 'auto' : 'none',
+                    transition: 'bottom 0.3s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.3s',
                     maxWidth: '512px',
                     margin: '0 auto',
                 }}

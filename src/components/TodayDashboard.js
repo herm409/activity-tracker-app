@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Target, Users, BarChart2, PhoneCall, UserCheck, Dumbbell, BookOpen, Share2, HelpCircle, XCircle, Flame, Lightbulb, AlertTriangle } from 'lucide-react';
+import { Target, Users, BarChart2, PhoneCall, UserCheck, Dumbbell, BookOpen, Share2, HelpCircle, XCircle, Flame, Lightbulb, AlertTriangle, HeartHandshake } from 'lucide-react';
 import { ActivityCard, PresentationActivityCard, DisciplineCheckbox } from './ActivityCards';
 import { calculatePoints } from '../utils/scoring';
 import confetti from 'canvas-confetti';
@@ -108,6 +108,7 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
         { key: 'nos', label: 'Definitive No\'s', icon: XCircle, color: 'red' },
         { key: 'presentations', label: 'Presentations', icon: BarChart2, color: 'purple', isPresentation: true },
         { key: 'threeWays', label: '3-Way Calls', icon: PhoneCall, color: 'pink' },
+        { key: 'teamSupport', label: 'Team Support', icon: HeartHandshake, color: 'blue' },
         { key: 'enrolls', label: 'Memberships Sold', icon: UserCheck, color: 'teal' }
     ];
 
