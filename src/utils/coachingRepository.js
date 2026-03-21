@@ -1,7 +1,7 @@
 export const COACHING_REPOSITORY = {
     exposures: [
         "Every exposure is a seed planted. Keep sowing!",
-        "LSEngage is your best friend. Share that tool and let it do the heavy lifting.",
+        "Prospect is your best friend. Share a resource and let it do the heavy lifting.",
         "A quiet mouth is a closed business. Great job opening yours!",
         "You are enabling someone to affordably live a just and secure life today.",
         "Disrupt the justice system one exposure at a time.",
