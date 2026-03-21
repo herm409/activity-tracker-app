@@ -313,7 +313,7 @@ const AppContent = () => {
         if (metricKey === 'nos') {
             priority = 4;
             message = "SW4! Someone's Waiting! Move to the next diamond.";
-        } else if (numVal > (allTimeBests[metricKey] || 0)) {
+        } else if (category !== 'dailyDisciplines' && numVal > (allTimeBests[metricKey] || 0)) {
             priority = 1;
             message = "NEW PERSONAL BEST! You are operating at a Diamond level today! 💎🔥";
             if (window.confetti) window.confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
