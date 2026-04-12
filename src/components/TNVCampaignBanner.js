@@ -1,5 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { ExternalLink, Target } from 'lucide-react';
+import { ExternalLink, Target, Users } from 'lucide-react';
+import { db, appId } from '../firebaseConfig';
+import { collection, query, getDocs } from 'firebase/firestore';
+import { getWeekId } from '../utils/helpers';
+
+const SPRINT_SCHEDULE = [
+    { label: "Exposures", key: "exposures", baseline: 12 },
+    { label: "Follow Ups", key: "followUps", baseline: 15 },
+    { label: "Presentations / 3-Ways", key: "presentations", baseline: 3 },
+    { label: "Definitive No's", key: "nos", baseline: 10 }
+];
+
+const getSprintFocus = (weekNum) => {
+    if (weekNum <= 0) return null;
+    const index = (weekNum - 1) % SPRINT_SCHEDULE.length;
+    return SPRINT_SCHEDULE[index];
+};
 
 const TNVCampaignBanner = () => {
     const EVENT_DATE = new Date('2026-07-16T00:00:00');
@@ -49,7 +65,55 @@ const TNVCampaignBanner = () => {
     if (now >= START_DATE) {
         const daysSinceStart = Math.floor((now - START_DATE) / (1000 * 60 * 60 * 24));
         currentWeek = Math.floor(daysSinceStart / 7) + 1;
+    } else {
+        // PRE-LAUNCH PREVIEW: Show Week 1 goal so team can visualize the sprint before April 17
+        currentWeek = 1;
     }
+
+    const [teamProgress, setTeamProgress] = useState({ current: 0, target: 0, activeUsers: 0, focusLabel: '' });
+
+    useEffect(() => {
+        if (currentWeek <= 0 || currentWeek > 13) return;
+
+        const fetchTeamProgress = async () => {
+            try {
+                const weekId = getWeekId(now);
+                const leaderboardColRef = collection(db, 'artifacts', appId, 'leaderboard', weekId, 'entries');
+                const snapshot = await getDocs(query(leaderboardColRef));
+                
+                let activeCount = 0;
+                let currentScore = 0;
+                const focus = getSprintFocus(currentWeek);
+                const metricKey = focus.key;
+
+                snapshot.docs.forEach(doc => {
+                    const data = doc.data();
+                    activeCount++;
+                    
+                    if (metricKey === 'presentations') {
+                        currentScore += (Number(data.presentations) || 0) + (Number(data.threeWays) || 0);
+                    } else {
+                        currentScore += (Number(data[metricKey]) || 0);
+                    }
+                });
+
+                // Floor of 5 active users to keep scale realistic before team fully adopts
+                const effectiveUsers = Math.max(activeCount, 5);
+                const targetScore = Math.max(effectiveUsers * focus.baseline, 1);
+
+                setTeamProgress({
+                    current: currentScore,
+                    target: targetScore,
+                    activeUsers: activeCount,
+                    focusLabel: focus.label
+                });
+            } catch (err) {
+                console.error("Error fetching sprint progress:", err);
+            }
+        };
+
+        fetchTeamProgress();
+    }, [currentWeek]);
 
     return (
         <div 
@@ -89,18 +153,47 @@ const TNVCampaignBanner = () => {
                     JULY 16–19, 2026
                 </p>
 
-                {/* Optional Sprint Tracking (only shows if past April 17) */}
-                {currentWeek > 0 && currentWeek <= 13 && (
-                     <div className="mt-3 flex items-center">
-                        <div 
-                            className="px-2 py-0.5 rounded text-xs font-bold border uppercase bg-opacity-20 border-opacity-30"
-                            style={{ 
-                                color: '#4cbce4', 
-                                backgroundColor: 'rgba(76, 188, 228, 0.2)',
-                                borderColor: 'rgba(76, 188, 228, 0.3)'
-                            }}
-                        >
-                            Sprint Week {currentWeek} of 13
+                {/* Sprint Thermometer */}
+                {currentWeek > 0 && currentWeek <= 13 && teamProgress.target > 0 && (
+                     <div className="mt-5 bg-black bg-opacity-30 p-4 rounded-xl border border-white border-opacity-10 w-full max-w-sm shadow-inner overflow-hidden relative">
+                        {/* Glow effect */}
+                        <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-10 pointer-events-none" style={{ backgroundColor: '#4cbce4' }}></div>
+                        
+                        <div className="flex justify-between items-end mb-2 relative z-10">
+                            <div>
+                                <span className="text-[9px] font-bold text-white uppercase tracking-wider opacity-60 flex items-center mb-0.5">
+                                    Sprint Week {currentWeek} of 13
+                                </span>
+                                <div className="text-sm font-black text-white leading-tight uppercase tracking-wide" style={{ color: '#4cbce4' }}>
+                                    Team Target: {teamProgress.focusLabel}
+                                </div>
+                            </div>
+                            <div className="text-right pl-3">
+                                <div className="text-2xl font-black text-white leading-none">
+                                    {teamProgress.current} <span className="text-xs font-bold opacity-40 uppercase">/ {teamProgress.target}</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {/* Progress Bar */}
+                        <div className="h-2.5 w-full bg-black bg-opacity-50 rounded-full overflow-hidden shadow-inner border border-white border-opacity-10 relative z-10">
+                            <div 
+                                className="h-full transition-all duration-1000 ease-in-out rounded-full"
+                                style={{ 
+                                    width: `${Math.min((teamProgress.current / teamProgress.target) * 100, 100)}%`,
+                                    backgroundImage: 'linear-gradient(to right, #2a7a9c, #4cbce4)',
+                                    boxShadow: '0 0 10px rgba(76, 188, 228, 0.5)'
+                                }}
+                            ></div>
+                        </div>
+                        
+                        <div className="mt-1.5 flex justify-between items-center text-[8px] text-white opacity-40 uppercase tracking-widest font-bold relative z-10">
+                            <span>0%</span>
+                            <span className="flex items-center">
+                                <Users className="w-2.5 h-2.5 mr-1" />
+                                Goal scaled for {teamProgress.activeUsers < 5 ? '5' : teamProgress.activeUsers} runners
+                            </span>
+                            <span>100%</span>
                         </div>
                      </div>
                 )}
