@@ -58,8 +58,6 @@ const TNVCampaignBanner = () => {
         return () => clearTimeout(timer);
     });
 
-    if (isPast) return null;
-
     // Calculate sprint week (April 17 start = Week 1)
     const START_DATE = new Date('2026-04-17T00:00:00');
     const now = new Date();
@@ -117,6 +115,8 @@ const TNVCampaignBanner = () => {
 
         fetchTeamProgress();
     }, [currentWeek]);
+
+    if (isPast) return null;
 
     return (
         <div 
