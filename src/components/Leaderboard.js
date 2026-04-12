@@ -158,10 +158,17 @@ const Leaderboard = ({ db, weekId, user }) => {
         <div className="space-y-8">
             {/* Individual Leaderboard */}
             <div className="p-4 bg-white rounded-xl shadow-sm border border-gray-100">
-                <h2 className="text-xl font-bold mb-4 flex items-center text-gray-800">
+                <h2 className="text-xl font-bold mb-2 flex items-center text-gray-800">
                     <Trophy className="mr-2 text-yellow-500 h-6 w-6" /> Individual Leaderboard
                 </h2>
-                <p className="text-xs text-gray-500 mb-4">Week of {weekId} (Sun-Sat)</p>
+                <div className="flex items-center flex-wrap gap-2 mb-4">
+                    <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-2.5 py-1 rounded">
+                        Week of {weekId}
+                    </span>
+                    <span className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded font-medium flex items-center">
+                        🔄 Scores reset every Sunday
+                    </span>
+                </div>
 
                 {loading ? (
                     <div className="text-center py-10 text-gray-400">Loading scores...</div>
@@ -222,9 +229,12 @@ const Leaderboard = ({ db, weekId, user }) => {
             {/* Team Leaderboard */}
             {!loading && teamScores.length > 0 && (
                 <div className="p-4 bg-white rounded-xl shadow-sm border border-gray-100">
-                    <h2 className="text-xl font-bold mb-4 flex items-center text-gray-800">
+                    <h2 className="text-xl font-bold mb-1 flex items-center text-gray-800">
                         <Users className="mr-2 text-indigo-500 h-6 w-6" /> Top Teams
                     </h2>
+                    <p className="text-xs text-gray-500 mb-4 flex items-center">
+                        <span className="text-indigo-600 mr-1">🔄</span> Team scores also reset weekly
+                    </p>
                     <div className="space-y-2">
                         {teamScores.map((team, index) => {
                             const isDebt = team.netScore > 0;
