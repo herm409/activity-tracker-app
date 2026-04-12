@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Target, Users, BarChart2, PhoneCall, UserCheck, Dumbbell, BookOpen, Share2, HelpCircle, XCircle, Flame, Lightbulb, AlertTriangle, HeartHandshake } from 'lucide-react';
+import { Target, Users, BarChart2, PhoneCall, UserCheck, Dumbbell, BookOpen, Share2, HelpCircle, XCircle, Flame, Lightbulb, AlertTriangle, HeartHandshake, Sun, Moon, TrendingUp } from 'lucide-react';
 import { ActivityCard, PresentationActivityCard, DisciplineCheckbox } from './ActivityCards';
 import { calculatePoints } from '../utils/scoring';
 import confetti from 'canvas-confetti';
+import TNVCampaignBanner from './TNVCampaignBanner';
 
 // --- Daily Par Progress Ring ---
 const DailyParRing = ({ todayPoints, dailyPar }) => {
@@ -56,7 +57,7 @@ const DailyParRing = ({ todayPoints, dailyPar }) => {
     );
 };
 
-// --- Active Streak Chips ---
+// --- Active Streak Chips (#2: show all streaks, at-risk float to top) ---
 const StreakRow = ({ streaks, todayData }) => {
     const items = [
         { key: 'ironman', label: 'Ironman', emoji: '🔥', streak: streaks.ironman || 0, done: [
@@ -73,7 +74,17 @@ const StreakRow = ({ streaks, todayData }) => {
         { key: 'exerc',              label: 'Exercise',   emoji: '💪', streak: streaks.exerc || 0,              done: !!todayData.exerc },
         { key: 'personalDevelopment',label: 'Personal Dev',emoji:'📚', streak: streaks.personalDevelopment || 0, done: !!(todayData.personalDevelopment || todayData.read || todayData.audio) },
     ];
-    const active = items.filter(i => i.streak > 0).sort((a, b) => b.streak - a.streak).slice(0, 4);
+    // Show all active streaks (up to 6). At-risk ones float to the top regardless of streak length.
+    const active = items
+        .filter(i => i.streak > 0)
+        .sort((a, b) => {
+            // At-risk (not done today) always sorts before safe
+            const aRisk = !a.done ? 1 : 0;
+            const bRisk = !b.done ? 1 : 0;
+            if (bRisk !== aRisk) return bRisk - aRisk;
+            return b.streak - a.streak;
+        })
+        .slice(0, 6);
     if (active.length === 0) return null;
     return (
         <div className="mb-5 flex flex-wrap gap-2">
@@ -95,7 +106,85 @@ const StreakRow = ({ streaks, todayData }) => {
     );
 };
 
-const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAddPresentation, onShare, onShareMonthly, isSharing, onLogFollowUp, onLogExposure, dailyPar, onShowLegend, hotlist, onNavigateToPipeline }) => {
+// --- Time-of-Day Coaching Block (#1) ---
+const TimeOfDayCoaching = ({ todayPoints, dailyPar, todayData }) => {
+    const hour = new Date().getHours();
+    const E = Number(todayData.exposures) || 0;
+    const F = (Number(todayData.followUps) || 0) + (Number(todayData.tenacityFollowUps) || 0);
+    const deficit = dailyPar - todayPoints;
+
+    let icon, bg, border, headline, body;
+
+    if (hour < 10) {
+        // Morning: Game Plan
+        icon = <Sun className="h-5 w-5 text-amber-500 flex-shrink-0" />;
+        bg = 'bg-amber-50'; border = 'border-amber-200';
+        headline = 'Good Morning — Game Plan';
+        body = `Your daily par is ${dailyPar} pts. Lead with exposures, water your pipeline with follow-ups, and aim for at least one No today. Let's win the morning.`;
+    } else if (hour < 17) {
+        // Afternoon: Pace Check
+        icon = <TrendingUp className="h-5 w-5 text-blue-500 flex-shrink-0" />;
+        bg = 'bg-blue-50'; border = 'border-blue-200';
+        headline = 'Midday Pace Check';
+        if (deficit > 0) {
+            body = `You're ${deficit} pt${deficit !== 1 ? 's' : ''} short of par. The afternoon is your best time to reach people — make it count with ${Math.max(1, deficit)} more activity${deficit !== 1 ? 's' : ''}.`;
+        } else if (E > 0 && F === 0) {
+            body = `Great exposure work this morning! Your follow-up count is at zero — afternoon is prime time to water those seeds.`;
+        } else {
+            body = `You're on pace — ${todayPoints} pts so far. Push for more before the end of the day. The game isn't over until the day is.`;
+        }
+    } else {
+        // Evening: Close-of-Day
+        icon = <Moon className="h-5 w-5 text-indigo-500 flex-shrink-0" />;
+        bg = 'bg-indigo-50'; border = 'border-indigo-200';
+        headline = 'Close of Day Recap';
+        if (todayPoints >= dailyPar) {
+            body = `Day closed! You finished at ${todayPoints} pts — ${todayPoints - dailyPar >= 0 ? `${todayPoints - dailyPar} pts under par` : 'even par'}. Log anything you haven't captured yet, then rest well.`;
+        } else {
+            body = `Day closing out at ${todayPoints} pts — ${deficit} short of par. Log anything you haven't captured and set a stronger intention for tomorrow.`;
+        }
+    }
+
+    return (
+        <div className={`${bg} border ${border} rounded-lg p-4 mb-5 flex items-start gap-3`}>
+            {icon}
+            <div>
+                <span className="text-xs font-bold uppercase tracking-widest text-gray-500">{headline}</span>
+                <p className="text-sm text-gray-700 mt-0.5 leading-snug">{body}</p>
+            </div>
+        </div>
+    );
+};
+
+// --- Daily Cycle Dot with tap-to-label (#3) ---
+const CycleDot = ({ label, done }) => {
+    const [showLabel, setShowLabel] = useState(false);
+    return (
+        <div className="relative flex flex-col items-center">
+            <button
+                type="button"
+                onMouseEnter={() => setShowLabel(true)}
+                onMouseLeave={() => setShowLabel(false)}
+                onFocus={() => setShowLabel(true)}
+                onBlur={() => setShowLabel(false)}
+                onClick={() => setShowLabel(v => !v)}
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all ${
+                    done ? 'bg-green-500 border-green-500 text-white shadow-sm' : 'bg-white border-gray-200 text-gray-400'
+                }`}
+                aria-label={label}
+            >
+                {label.charAt(0)}
+            </button>
+            {showLabel && (
+                <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[10px] font-semibold px-2 py-0.5 rounded whitespace-nowrap z-20 shadow-lg">
+                    {label}
+                </div>
+            )}
+        </div>
+    );
+};
+
+const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAddPresentation, onShare, onShareMonthly, isSharing, onLogFollowUp, onLogExposure, dailyPar, onShowLegend, hotlist, onNavigateToPipeline, weeklyPoints, weeklyPar, onLogFollowUpForProspect }) => {
     const [showInsight, setShowInsight] = useState(false);
     const [visibilityNudge, setVisibilityNudge] = useState(false);
     const today = new Date();
@@ -260,6 +349,8 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
     return (
         <div className="space-y-8">
             <div>
+                <TNVCampaignBanner />
+
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
                     <div>
                         <div className="flex items-center space-x-2">
@@ -293,13 +384,32 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
                     </div>
                 )}
 
+                {/* Time-of-Day Coaching (#1) */}
+                <TimeOfDayCoaching todayPoints={todayPoints} dailyPar={currentPar} todayData={todayData} />
+
                 {/* Daily Par Progress Ring */}
                 <DailyParRing todayPoints={todayPoints} dailyPar={currentPar} />
+
+                {/* Weekly Pace Chip (#5) */}
+                {weeklyPoints !== undefined && weeklyPar !== undefined && (() => {
+                    const pace = weeklyPar - weeklyPoints;
+                    const isAhead = pace < 0;
+                    const isEven = pace === 0;
+                    return (
+                        <div className={`flex items-center justify-center gap-2 -mt-3 mb-4 px-4 py-2 rounded-full border text-xs font-semibold w-fit mx-auto ${
+                            isAhead ? 'bg-green-50 border-green-200 text-green-700' :
+                            isEven  ? 'bg-blue-50 border-blue-200 text-blue-700' :
+                                      'bg-red-50 border-red-200 text-red-700'
+                        }`}>
+                            📅 Week: {weeklyPoints} pts / {weeklyPar} expected — {isAhead ? `${Math.abs(pace)} ahead` : isEven ? 'on pace' : `${pace} behind pace`}
+                        </div>
+                    );
+                })()}
 
                 {/* Active Streak Chips */}
                 <StreakRow streaks={streaks} todayData={todayData} />
 
-                {/* Ironman / Daily Cycle Tracker */}
+                {/* Ironman / Daily Cycle Tracker — dots now have tap-to-label (#3) */}
                 <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-orange-100 flex flex-col md:flex-row items-center justify-between mb-6">
                     <div className="flex items-center mb-3 md:mb-0 w-full md:w-auto">
                         <div className={`p-3 rounded-full mr-4 ${isIronman ? 'bg-orange-100' : 'bg-gray-100'}`}>
@@ -313,18 +423,17 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
                             <p className="text-sm text-gray-500">
                                 {isIronman ? "You crushed it! Full cycle complete." : `Complete all 6 core activities for a +15 pt bonus. (${ironmanCompleted}/6)`}
                             </p>
+                            <p className="text-[10px] text-gray-400 mt-0.5">Tap each circle to see its label</p>
                         </div>
                     </div>
                     <div className="flex space-x-2 w-full md:w-auto justify-center">
                         {ironmanProgress.map((item, idx) => (
-                            <div key={idx} className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all cursor-help ${item.done ? 'bg-green-500 border-green-500 text-white shadow-sm' : 'bg-white border-gray-200 text-gray-400'}`} title={item.label}>
-                                {item.label.charAt(0)}
-                            </div>
+                            <CycleDot key={idx} label={item.label} done={item.done} />
                         ))}
                     </div>
                 </div>
 
-                {/* Today's Prospects Panel */}
+                {/* Today's Prospects Panel — #4 prospect-specific follow-up, #11 snoozed chip at top */}
                 {(urgentProspects.length > 0 || snoozedCount > 0) && (
                     <div className="bg-white border border-amber-200 rounded-lg p-4 mb-6 shadow-sm">
                         <div className="flex justify-between items-center mb-3">
@@ -339,12 +448,29 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
                                 </button>
                             )}
                         </div>
+
+                        {/* #11 — Snoozed chip at TOP when no urgent prospects */}
+                        {urgentProspects.length === 0 && snoozedCount > 0 && (
+                            <div className="flex items-center justify-between bg-blue-50 border border-blue-100 rounded-md px-3 py-2 mb-3">
+                                <span className="text-xs text-blue-700 flex items-center font-medium">
+                                    💤 <span className="ml-1">{snoozedCount} prospect{snoozedCount > 1 ? 's' : ''} snoozed — you're all caught up for today!</span>
+                                </span>
+                                {onNavigateToPipeline && (
+                                    <button onClick={onNavigateToPipeline} className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 ml-2 whitespace-nowrap">View →</button>
+                                )}
+                            </div>
+                        )}
+
                         <div className="space-y-2">
                             {urgentProspects.map(p => {
                                 const now = new Date(); now.setHours(0, 0, 0, 0);
                                 const isOverdue = p.nextActionDate && new Date(p.nextActionDate) < now;
                                 const actionLabel = p.status === 'Hot' ? 'Log Follow Up' : 'Did Presentation';
                                 const actionColor = p.status === 'Hot' ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-purple-100 text-purple-700 hover:bg-purple-200';
+                                // #4 — wire Hot follow-up to the specific prospect if handler available
+                                const handleAction = p.status === 'Hot'
+                                    ? (onLogFollowUpForProspect ? () => onLogFollowUpForProspect(p.id) : onLogFollowUp)
+                                    : () => onQuickAdd('presentations', 1);
                                 return (
                                     <div key={p.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-md">
                                         <div className="flex items-center min-w-0 mr-2">
@@ -352,15 +478,16 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
                                             <span className={`ml-2 flex-shrink-0 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${p.status === 'Hot' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>{p.status}</span>
                                             {isOverdue && <span className="ml-1 flex-shrink-0 text-[10px] font-bold text-red-600">⚠️</span>}
                                         </div>
-                                        <button onClick={p.status === 'Hot' ? onLogFollowUp : () => onQuickAdd('presentations', 1)} className={`flex-shrink-0 text-xs font-semibold px-3 py-1 rounded-full transition ${actionColor}`}>
+                                        <button onClick={handleAction} className={`flex-shrink-0 text-xs font-semibold px-3 py-1 rounded-full transition ${actionColor}`}>
                                             {actionLabel}
                                         </button>
                                     </div>
                                 );
                             })}
                         </div>
-                        {/* Snoozed notice — helps user find accidentally-snoozed prospects */}
-                        {snoozedCount > 0 && (
+
+                        {/* Snoozed notice at bottom when there ARE urgent prospects too */}
+                        {urgentProspects.length > 0 && snoozedCount > 0 && (
                             <div className="mt-3 pt-2 border-t border-gray-100 flex items-center justify-between">
                                 <span className="text-xs text-blue-600 flex items-center">
                                     💤 <span className="ml-1"><strong>{snoozedCount}</strong> prospect{snoozedCount > 1 ? 's' : ''} snoozed — not showing here until their reminder date</span>

@@ -1,3 +1,16 @@
+// ─────────────────────────────────────────────────────────────────
+//  COACHING REPOSITORY  —  Tier-Aware Message System
+//
+//  Each category now has three tiers:
+//    tier1 : 0–3  activity this month  (new/early — encourage & build belief)
+//    tier2 : 4–10 activity this month  (developing — reinforce habits)
+//    tier3 : 11+  activity this month  (veteran — push for mastery)
+//
+//  Usage (in App.js / evaluateCoaching):
+//    import { getTieredMessage } from './utils/coachingRepository';
+//    const msg = getTieredMessage('exposures', monthlyTotal);
+// ─────────────────────────────────────────────────────────────────
+
 export const COACHING_REPOSITORY = {
     exposures: [
         "Every exposure is a seed planted. Keep sowing!",
@@ -141,7 +154,7 @@ export const COACHING_REPOSITORY = {
         "Performance Club is calling your name! Keep selling those memberships.",
         "You just provided someone with affordable legal access and peace of mind.",
         "IDShield and LegalShield – protecting families one policy at a time.",
-        "That’s income for today and residual for tomorrow!",
+        "That's income for today and residual for tomorrow!",
         "Every sale is a family protected. You're doing noble work.",
         "You are on fire! Let the momentum carry you to the next sale.",
         "Vested! Maintain that $100 personal premium for long-term freedom.",
@@ -215,4 +228,224 @@ export const COACHING_REPOSITORY = {
         "You are sifting and sorting, not convincing. On to the next!",
         "Celebrate the 'No' because it proves you are in the game!"
     ]
+};
+
+// ─────────────────────────────────────────────────────────────────
+//  TIERED MESSAGE REPOSITORY
+//  Each tier is curated for a different monthly experience level.
+// ─────────────────────────────────────────────────────────────────
+export const TIERED_COACHING = {
+    exposures: {
+        tier1: [
+            "First steps count! Every journey to Performance Club starts with a single exposure.",
+            "You're planting seeds. Be patient and consistent — the harvest is coming.",
+            "Great start! Build the habit of reaching out daily and your pipeline will flourish.",
+            "The hardest part is starting. You did it. Now let's build momentum!",
+            "Every expert was once a beginner. Keep sharing and keep growing.",
+        ],
+        tier2: [
+            "You're building real momentum now! Consistency is the secret weapon of top earners.",
+            "Look at you go! You're developing the daily habit that separates the pros from the amateurs.",
+            "Your pipeline is growing with every exposure. The fortune follows the active.",
+            "Momentum is real and you're feeling it. Don't let up — this is where habits are formed.",
+            "You're in the habit-building zone. Keep showing up and the results will follow.",
+        ],
+        tier3: [
+            "This is what elite activity looks like. Your pipeline is proof of your work ethic.",
+            "You are operating at a Diamond level. These numbers don't lie — you're a machine.",
+            "Top producers expose more people in a month than most do in a year. You're one of them.",
+            "Your exposure volume is performance-club worthy. Keep pushing and watch the membership count rise.",
+            "This level of activity is rare. You are in the top tier — and your residual income will reflect it.",
+        ],
+    },
+    followUps: {
+        tier1: [
+            "The follow-up is where money is made. You're starting to learn the most valuable habit in this business.",
+            "Don't stop now! The '5 to 12' rule means you're just getting warmed up.",
+            "Every follow-up is building trust. Trust is the currency of this business.",
+            "New habit alert! The consistent follow-up is the single biggest differentiator between good and great.",
+            "Keep the conversation alive — your future income depends on persistence.",
+        ],
+        tier2: [
+            "You're following up like a professional now. The fortune is definitely in YOUR follow-up.",
+            "The '5 to 12' rule is working in your favor. Every touch moves the needle closer to yes.",
+            "Your follow-up discipline is above average. This is what a growing business looks like.",
+            "Consistent follow-through sets top producers apart. You're developing that muscle.",
+            "You're proving that success isn't about luck — it's about relentless follow-up.",
+        ],
+        tier3: [
+            "Your follow-up volume this month is a masterclass in persistence. Take a bow.",
+            "Elite follow-up = elite results. You are building a closing machine.",
+            "The '5 to 12' rule says most deals close after the 5th contact. Your pipeline is loaded.",
+            "At this level of follow-up consistency, your closing rate should be climbing. Keep it up!",
+            "This is what Performance Club producers look like. Your follow-up game is elite.",
+        ],
+    },
+    presentations: {
+        tier1: [
+            "Your first presentations are the most valuable ones — you're learning the most valuable skill in the business!",
+            "Showing the plan is the art of this business. You're becoming an artist!",
+            "Every presentation you give makes you sharper. Keep presenting!",
+            "The best way to get better at presenting is to present more. You're doing the right thing.",
+            "New presenter energy is contagious! Keep sharing the vision.",
+        ],
+        tier2: [
+            "Your presentation count is growing along with your confidence. This is elite behavior.",
+            "Consistent presenters are consistent earners. You're building the habit of success.",
+            "The more you present, the luckier you get. Your numbers prove it.",
+            "You're showing the plan like a pro. Your closing rate will follow your volume.",
+            "Multiple presentations in a month means multiple opportunities to change lives. Incredible.",
+        ],
+        tier3: [
+            "This is Performance Club activity. Your presentation count this month is exceptional.",
+            "Elite producers show the plan consistently — and you're one of them. Outstanding.",
+            "Your presentation volume is elite. Now pair it with sharp follow-up and watch your membership count soar.",
+            "Month-over-month consistent presentations is the formula for Diamond producers. You're writing the book.",
+            "This level of presentation activity is rare and powerful. You're building an empire.",
+        ],
+    },
+    threeWayCalls: {
+        tier1: [
+            "A 3-way call is the smartest shortcut — you're learning to leverage the team already.",
+            "Great use of 'Joining Forces'! You don't need all the answers when your upline has them.",
+            "Starting to use 3-way calls early shows wisdom. This is how the pros build fast.",
+            "Your first 3-way calls are building the habit of smart teamwork. Keep it up!",
+            "Using your upline is not a weakness — it's the fastest path to success.",
+        ],
+        tier2: [
+            "Your 3-way call habit is paying off. Edification + an expert closer = unstoppable combo.",
+            "You're mastering the art of Joining Forces. This is top-tier duplication strategy.",
+            "Consistent 3-way calls mean consistent new members. You understand how to scale.",
+            "Every 3-way call you set shows your prospects that they'll have real support when they join.",
+            "You're leveraging your team correctly. This accelerates everything.",
+        ],
+        tier3: [
+            "Your 3-way call volume is Diamond-level. You're building through leverage, not just effort.",
+            "You've mastered Joining Forces. Your downline will learn this from you — it's duplicatable.",
+            "Top earners use 3-way calls religiously. You're in that company now.",
+            "This volume of 3-way calls builds culture, accelerates closings, and inspires your team. Masterful.",
+            "Edify. Introduce. Mute. You're running the play perfectly. Exceptional results incoming.",
+        ],
+    },
+    teamSupport: {
+        tier1: [
+            "Pouring into your team early shows incredible character. That's what real leaders do.",
+            "You're investing in your biggest multiplier — your team. Smart and generous.",
+            "Leadership starts with showing up for others. You're already a leader.",
+            "A supported associate stays longer, builds bigger, and duplicates faster. You understand this.",
+            "It only takes one quick call to change someone's whole week. You made that call.",
+        ],
+        tier2: [
+            "Your team knows they can count on you. That's the foundation of a long-term business.",
+            "Consistent team support creates culture, and culture creates retention. You're building something real.",
+            "A leader who supports their team creates a team that supports each other. The ripple effect is real.",
+            "You're investing in residual income every time you invest in your people.",
+            "Top associates don't just recruit — they develop. You're a developer.",
+        ],
+        tier3: [
+            "This level of team support is your legacy. You're not just building a business — you're building leaders.",
+            "Your team support numbers this month are exceptional. This is what a culture of Extreme Ownership looks like.",
+            "Diamond producers develop diamonds. Your consistent investment in your team this month proves you're on that path.",
+            "The business you're building is bigger than your personal production. It's generational. Keep it up.",
+            "Nobody builds alone at this level. Your team knows you're in the trenches with them. Unstoppable.",
+        ],
+    },
+    membershipsSold: {
+        tier1: [
+            "Your first memberships are the most meaningful — you're proof that this works!",
+            "Every family you protect is a testimony for your business. Celebrate this win!",
+            "From exposure to closed membership. You just ran the entire play. Incredible!",
+            "Your first sales prove the system works when you work it. More are coming!",
+            "This is the moment it becomes real. You did it — now let's build momentum!",
+        ],
+        tier2: [
+            "Multiple memberships this month means you're building momentum. Performance Club is watching.",
+            "You're developing the pattern of a consistent closer. Keep the pipeline full and keep closing.",
+            "Every membership is recurring revenue. You're building real, lasting income this month.",
+            "Your closing consistency is growing. This is what Vested income looks like in action.",
+            "You're not just having a good day — you're building a good month. Keep going!",
+        ],
+        tier3: [
+            "This level of membership production is Performance Club territory. Exceptional work.",
+            "Your closing rate this month tells the story of a skilled, relentless closer. Incredible.",
+            "Diamond-level producers close at this consistency. You belong at the top.",
+            "The residual income you're building this month will pay you for years. You're playing the long game.",
+            "This is generational wealth activity. Your membership count this month is elite. Don't stop.",
+        ],
+    },
+    dailyDisciplines: {
+        tier1: [
+            "Checking off your daily disciplines is the foundation everything else is built on. Great start!",
+            "The greats invest in themselves before they invest in their business. You're thinking like a champion.",
+            "This early habit of daily disciplines will compound into massive results. Keep going.",
+            "Mind + body daily = unstoppable. You're building the champion's morning routine.",
+            "Personal development is the rent you pay to stay at the top. You're paying it.",
+        ],
+        tier2: [
+            "Your consistent daily disciplines are rewiring your mindset for success. Keep the streak alive.",
+            "You're proving that winners wake up and invest in themselves first. Every. Single. Day.",
+            "The compounding effect of daily disciplines over weeks is extraordinary. You'll see it soon.",
+            "Exercise + personal development = the winning formula. You're living it.",
+            "Daily disciplines build the leader that the team needs. You're growing into that leader.",
+        ],
+        tier3: [
+            "This month's discipline streak is elite. Your mindset and body are your business's greatest asset — and you're protecting both.",
+            "The top 1% invest in themselves daily. You're consistently in that category this month. Powerful.",
+            "Your discipline record this month isn't just impressive — it's the reason your business is growing.",
+            "At this level of daily investment in yourself, you'll be a mentor others model themselves after.",
+            "Gold standard daily discipline. Your habits ARE your success. Keep the streak alive.",
+        ],
+    },
+    rejections: {
+        tier1: [
+            "Getting your first No's is a rite of passage. Welcome to the game — most people quit here and you didn't.",
+            "SW4! Someone's Waiting — you just got closer to finding them.",
+            "Every No is practice. You're getting sharper with every rejection.",
+            "The best closers in this business have the most No's. You're on your way.",
+            "Your willingness to hear No is what separates you from 90% of people. Keep going.",
+        ],
+        tier2: [
+            "Your No count shows you're truly in the game this month. Data, not emotion.",
+            "You're collecting No's like a professional. The Yes is always hiding behind enough No's.",
+            "SW4! Your No's this month prove you're asking boldly and moving fast. That's the formula.",
+            "The rejection tolerance you're building is worth more than a sales script. It's priceless.",
+            "You're learning the law of large numbers in real time. No's = inevitable Yes's.",
+        ],
+        tier3: [
+            "This volume of No's is elite. You're fearless and your volume proves it.",
+            "Your No count this month means you asked more people than most will ask in a year. That's grit.",
+            "SW4! Your rejection total is a trophy, not a scar. You're built differently.",
+            "Top earners in direct sales collect No's aggressively. You're one of them.",
+            "At this No count, statistically speaking, your breakthrough Yes is right around the corner. Don't stop!",
+        ],
+    },
+};
+
+/**
+ * Returns a tier-appropriate coaching message for a given category and monthly total.
+ * Falls back to the flat COACHING_REPOSITORY if no tiered messages exist.
+ *
+ * @param {string} category  - Key from TIERED_COACHING (e.g. 'exposures')
+ * @param {number} monthlyTotal - How many of this activity the user has done this month
+ * @returns {string}
+ */
+export const getTieredMessage = (category, monthlyTotal = 0) => {
+    const tiered = TIERED_COACHING[category];
+    if (!tiered) {
+        // Fallback to flat repo
+        const flat = COACHING_REPOSITORY[category];
+        if (!flat) return '';
+        return flat[Math.floor(Math.random() * flat.length)];
+    }
+
+    let pool;
+    if (monthlyTotal <= 3) {
+        pool = tiered.tier1;
+    } else if (monthlyTotal <= 10) {
+        pool = tiered.tier2;
+    } else {
+        pool = tiered.tier3;
+    }
+
+    return pool[Math.floor(Math.random() * pool.length)];
 };

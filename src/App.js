@@ -20,7 +20,7 @@ import NotificationBanner from './components/NotificationBanner';
 import { DisplayNameModal, OnboardingModal, CutReportModal, ScoringLegendModal } from './components/GlobalModals';
 import ReportCard from './components/ReportCard';
 import CoachingToast from './components/CoachingToast';
-import { COACHING_REPOSITORY } from './utils/coachingRepository';
+import { COACHING_REPOSITORY, getTieredMessage } from './utils/coachingRepository';
 
 // Components (Lazy Load)
 const AnalyticsDashboard = React.lazy(() => import('./components/AnalyticsDashboard'));
@@ -338,8 +338,12 @@ const AppContent = () => {
         }
 
         if (priority === 6 && COACHING_REPOSITORY[category]) {
-           const repo = COACHING_REPOSITORY[category];
-           message = repo[Math.floor(Math.random() * repo.length)];
+           // Use tier-aware message based on monthly total for this metric (#6)
+           const monthlyTotal = Object.values(monthlyData).reduce((sum, d) => {
+               const v = d[metricKey];
+               return sum + (Array.isArray(v) ? v.length : Number(v) || 0);
+           }, 0);
+           message = getTieredMessage(category, monthlyTotal);
         }
 
         if (message) setCoachingToast({ priority, message });
@@ -782,22 +786,44 @@ const AppContent = () => {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6">
                 <main className="mt-6">
                     <Suspense fallback={<div className="text-center p-10">Loading...</div>}>
-                        {activeTab === 'today' && <TodayDashboard
-                            monthlyData={monthlyData}
-                            streaks={currentStreaks}
-                            onQuickAdd={handleQuickAdd}
-                            onHabitChange={handleDataChange}
-                            onAddPresentation={handleAddPresentation}
-                            onShare={handleShare}
-                            onShareMonthly={handleShareMonthly}
-                            isSharing={isSharing}
-                            onLogFollowUp={() => setShowFollowUpModal(true)}
-                            onLogExposure={() => setShowExposureModal(true)}
-                            dailyPar={userProfile.dailyPar}
-                            onShowLegend={() => setShowScoringLegend(true)}
-                            hotlist={hotlist}
-                            onNavigateToPipeline={() => setActiveTab('hotlist')}
-                        />}
+                        {activeTab === 'today' && (() => {
+                            // Compute weekly points + par to pass the pace chip (#5)
+                            const now = new Date();
+                            now.setHours(0, 0, 0, 0);
+                            const startOfWeek = new Date(now);
+                            startOfWeek.setDate(now.getDate() - now.getDay());
+                            let wPoints = 0;
+                            let wPar = 0;
+                            for (let i = 0; i < 7; i++) {
+                                const d = new Date(startOfWeek);
+                                d.setDate(startOfWeek.getDate() + i);
+                                if (d > now) break;
+                                const dayData = monthlyData[d.getDate()] || {};
+                                wPoints += calculatePoints(dayData);
+                                wPar += (userProfile.dailyPar || 2);
+                            }
+                            return (
+                                <TodayDashboard
+                                    monthlyData={monthlyData}
+                                    streaks={currentStreaks}
+                                    onQuickAdd={handleQuickAdd}
+                                    onHabitChange={handleDataChange}
+                                    onAddPresentation={handleAddPresentation}
+                                    onShare={handleShare}
+                                    onShareMonthly={handleShareMonthly}
+                                    isSharing={isSharing}
+                                    onLogFollowUp={() => setShowFollowUpModal(true)}
+                                    onLogExposure={() => setShowExposureModal(true)}
+                                    dailyPar={userProfile.dailyPar}
+                                    onShowLegend={() => setShowScoringLegend(true)}
+                                    hotlist={hotlist}
+                                    onNavigateToPipeline={() => setActiveTab('hotlist')}
+                                    weeklyPoints={wPoints}
+                                    weeklyPar={wPar}
+                                    onLogFollowUpForProspect={handleLogFollowUpForProspect}
+                                />
+                            );
+                        })()}
 
                         {activeTab === 'tracker' && <ActivityTracker
                             date={currentDate} setDate={setCurrentDate}

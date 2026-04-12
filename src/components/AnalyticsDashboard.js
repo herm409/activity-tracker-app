@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { TrendingUp, Award, Lightbulb, Users, ChevronsRight, Target, XCircle } from 'lucide-react';
+import { TrendingUp, Award, Lightbulb, Users, ChevronsRight, Target, XCircle, Info } from 'lucide-react';
 import { appId } from '../firebaseConfig';
 
 const AnalyticsDashboard = ({ db, user }) => {
@@ -14,6 +14,7 @@ const AnalyticsDashboard = ({ db, user }) => {
         noToEnrollRatio: 0,
         lifetimeNos: 0
     });
+    const [teamAvg, setTeamAvg] = useState({ expToPresentation: 0, presentationToEnroll: 0 });
     const [loading, setLoading] = useState(true);
     const [historicalData, setHistoricalData] = useState([]);
     const [monthName, setMonthName] = useState('');
@@ -96,6 +97,32 @@ const AnalyticsDashboard = ({ db, user }) => {
             });
 
             setHistoricalData(Object.values(monthlyTotals).reverse());
+
+            // Fetch team avg ratios from leaderboard (current week)
+            try {
+                const today = new Date();
+                const wd = today.getDay();
+                const sun = new Date(today); sun.setDate(today.getDate() - wd); sun.setHours(0,0,0,0);
+                const weekId = sun.toISOString().slice(0,10);
+                const lbRef = collection(db, 'artifacts', appId, 'leaderboard', weekId, 'entries');
+                const lbSnap = await getDocs(lbRef);
+                let teamExposures = 0, teamPresentations = 0, teamEnrolls = 0, teamCount = 0;
+                lbSnap.forEach(d => {
+                    const e = d.data();
+                    if ((e.exposures || 0) > 0) {
+                        teamExposures += (e.exposures || 0);
+                        teamPresentations += (e.presentations || 0);
+                        teamEnrolls += (e.enrolls || 0);
+                        teamCount++;
+                    }
+                });
+                if (teamCount > 1) {
+                    const avgExpToPresentation = teamPresentations > 0 ? teamExposures / teamPresentations : 0;
+                    const avgPresentationToEnroll = teamEnrolls > 0 ? teamPresentations / teamEnrolls : 0;
+                    setTeamAvg({ expToPresentation: avgExpToPresentation, presentationToEnroll: avgPresentationToEnroll });
+                }
+            } catch (_) { /* team avg is optional — fail silently */ }
+
             setLoading(false);
         };
         fetchAllAnalyticsData();
@@ -148,15 +175,21 @@ const AnalyticsDashboard = ({ db, user }) => {
         );
     };
 
-    const RatioCard = ({ title, value, detail, icon: Icon }) => (
+    const RatioCard = ({ title, value, detail, icon: Icon, teamAvgLabel }) => (
         <div className="bg-gray-50 p-4 rounded-lg flex items-start space-x-4">
             <div className="bg-white p-3 rounded-full shadow">
                 <Icon className="h-6 w-6 text-indigo-600" />
             </div>
-            <div>
+            <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-600">{title}</p>
                 <p className="text-3xl font-bold text-gray-800">{value}</p>
                 <p className="text-xs text-gray-500">{detail}</p>
+                {teamAvgLabel && (
+                    <div className="mt-1.5 inline-flex items-center bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-full">
+                        <Users className="h-3 w-3 text-indigo-400 mr-1" />
+                        <span className="text-[11px] text-indigo-700 font-medium">Team avg: {teamAvgLabel}</span>
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -187,15 +220,35 @@ const AnalyticsDashboard = ({ db, user }) => {
                     <RatioCard
                         title="Lifetime Exposure-to-Presentation"
                         value={stats.expToPresentationRatio > 0 ? `${stats.expToPresentationRatio.toFixed(1)} : 1` : 'N/A'}
-                        detail="Exposures needed for one presentation"
+                        detail="Exposures needed for one presentation. Lower = better first contact quality."
                         icon={Users}
+                        teamAvgLabel={teamAvg.expToPresentation > 0 ? `${teamAvg.expToPresentation.toFixed(1)} : 1` : null}
                     />
                     <RatioCard
                         title="Lifetime Presentation-to-Membership"
                         value={stats.presentationToEnrollRatio > 0 ? `${stats.presentationToEnrollRatio.toFixed(1)} : 1` : 'N/A'}
-                        detail="Presentations needed for one membership"
+                        detail="Presentations needed for one membership. Lower = sharper closing skill."
                         icon={Award}
+                        teamAvgLabel={teamAvg.presentationToEnroll > 0 ? `${teamAvg.presentationToEnroll.toFixed(1)} : 1` : null}
                     />
+
+                    {/* Why Ratios Matter — educational block */}
+                    <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
+                        <div className="flex items-start gap-3">
+                            <Info className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                            <div>
+                                <p className="text-sm font-bold text-blue-800">Why These Ratios Matter</p>
+                                <p className="text-xs text-blue-700 mt-1 leading-relaxed">
+                                    Your ratios are your personal batting average — they tell you <strong>how efficiently your activity converts to membership sales</strong>. A high exposure-to-presentation ratio means you're having lots of conversations before getting a sit-down; focus on sharpening your initial approach. A high presentation-to-membership ratio means you're great at getting meetings but have an opportunity in your close. The good news: <strong>consistent activity improves both over time automatically</strong> — the more you do it, the better you get.
+                                </p>
+                                {teamAvg.expToPresentation > 0 && (
+                                    <p className="text-xs text-blue-600 mt-2 font-medium">
+                                        📊 Compare yourself to the team avg above and identify your biggest leverage point.
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 

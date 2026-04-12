@@ -1,17 +1,21 @@
-// tailwind.config.js
+/** @type {import('tailwindcss').Config} */
 module.exports = {
-  // In Tailwind CSS v2, 'purge' is used. For v3, this would be 'content'.
-  // This tells Tailwind to scan these files for class names.
-  purge: [
-    './src/**/*.{js,jsx,ts,tsx}', // All component files in the src folder
-    './public/index.html',      // The main HTML file
+  content: [
+    './src/**/*.{js,jsx,ts,tsx}',
+    './public/index.html',
   ],
-  darkMode: false, // or 'media' or 'class'
   theme: {
-    extend: {},
-  },
-  variants: {
-    extend: {},
+    extend: {
+      colors: {
+        tnv: {
+          cyan: '#4cbce4',
+          red: '#8b1c1c',
+          darkred: '#4a0a0a',
+          midred: '#2a0505',
+          blackred: '#120000',
+        }
+      }
+    },
   },
   plugins: [],
 };

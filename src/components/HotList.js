@@ -3,21 +3,53 @@ import { collection, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestor
 import { debounce } from '../utils/helpers';
 import { appId } from '../firebaseConfig';
 import confetti from 'canvas-confetti';
-import { AlertTriangle, PlayCircle, Zap, Send, CheckCircle, TrendingUp, XCircle, Trash2, Clock, MessageSquare, Archive, ArchiveRestore, Flame, Users, List, Plus, Search, SortAsc, ChevronDown, ChevronUp } from 'lucide-react';
+import { AlertTriangle, PlayCircle, Zap, Send, CheckCircle, TrendingUp, XCircle, Trash2, Clock, MessageSquare, Archive, ArchiveRestore, Flame, Users, List, Plus, Search, SortAsc, ChevronDown, ChevronUp, Phone, Mail, Tag, Smartphone, Coffee, LayoutGrid, LayoutList } from 'lucide-react';
 
 // --- Modals for Hotlist ---
 const AddHotlistItemModal = ({ onClose, onAdd }) => {
     const [name, setName] = useState('');
-    const handleAdd = () => { if (name.trim()) { onAdd(name.trim()); } };
+    const [phone, setPhone] = useState('');
+    const [source, setSource] = useState('');
+
+    const handleAdd = () => {
+        if (name.trim()) {
+            onAdd({ name: name.trim(), phone: phone.trim(), source });
+        }
+    };
+
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
-                <div className="p-6 border-b"><h3 className="text-xl font-semibold">Add New Prospect</h3></div>
-                <div className="p-6">
-                    <label htmlFor="hotlist-name" className="block text-sm font-medium text-gray-700">Name</label>
-                    <input type="text" id="hotlist-name" value={name} onChange={(e) => setName(e.target.value)} className="mt-1 block w-full p-2 border border-gray-300 rounded-md" autoFocus />
+                <div className="p-6 border-b">
+                    <h3 className="text-xl font-semibold">Add New Prospect</h3>
+                    <p className="text-xs text-gray-500 mt-1">Quick capture — you can add more info later.</p>
                 </div>
-                <div className="p-4 bg-gray-50 flex justify-end space-x-2"><button onClick={onClose} className="bg-gray-200 px-4 py-2 rounded-md">Cancel</button><button onClick={handleAdd} className="bg-indigo-600 text-white px-4 py-2 rounded-md">Add</button></div>
+                <div className="p-6 space-y-4">
+                    <div>
+                        <label htmlFor="hotlist-name" className="block text-sm font-medium text-gray-700">Name <span className="text-red-500">*</span></label>
+                        <input type="text" id="hotlist-name" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAdd()} className="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500" autoFocus placeholder="Full name" />
+                    </div>
+                    <div>
+                        <label htmlFor="hotlist-phone" className="block text-sm font-medium text-gray-700">Phone <span className="text-gray-400 font-normal">(optional)</span></label>
+                        <input type="tel" id="hotlist-phone" value={phone} onChange={(e) => setPhone(e.target.value)} className="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500" placeholder="(555) 000-0000" />
+                    </div>
+                    <div>
+                        <label htmlFor="hotlist-source" className="block text-sm font-medium text-gray-700">How'd you meet? <span className="text-gray-400 font-normal">(optional)</span></label>
+                        <select id="hotlist-source" value={source} onChange={(e) => setSource(e.target.value)} className="mt-1 block w-full p-2 border border-gray-300 rounded-md bg-white focus:ring-indigo-500 focus:border-indigo-500 text-sm">
+                            <option value="">Select a source…</option>
+                            <option value="In Person">In Person</option>
+                            <option value="Text / Social">Text / Social</option>
+                            <option value="Referral">Referral</option>
+                            <option value="Online">Online</option>
+                            <option value="Event">Event</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                </div>
+                <div className="p-4 bg-gray-50 flex justify-end space-x-2">
+                    <button onClick={onClose} className="bg-gray-200 px-4 py-2 rounded-md text-sm font-medium">Cancel</button>
+                    <button onClick={handleAdd} disabled={!name.trim()} className="bg-indigo-600 disabled:opacity-50 text-white px-4 py-2 rounded-md text-sm font-semibold">Add Prospect</button>
+                </div>
             </div>
         </div>
     );
@@ -133,17 +165,24 @@ const ProspectCard = ({ item, onUpdate, onInstantUpdate, onDecide, onDataChange,
     const isStagnant = daysSinceContact > 7 && item.status !== 'Cold';
     const exposureCount = item.exposureCount || 0;
 
-    const handleSentInfo = () => {
-        onInstantUpdate(item.id, { status: 'Warm', exposureCount: exposureCount + 1, lastContacted: new Date().toISOString() });
+    const logActivity = (description, typeStr = 'system') => {
+        const newActivity = { id: Date.now().toString() + Math.random().toString(), date: new Date().toISOString(), description, type: typeStr };
+        return [...(item.activities || []), newActivity];
+    };
+
+    const handleSentInfo = (typeStr = 'sent') => {
+        const title = typeStr === 'email' ? 'Emailed Info' : typeStr === 'text' ? 'Texted Info' : 'Sent Info';
+        onInstantUpdate(item.id, { status: 'Warm', exposureCount: exposureCount + 1, lastContacted: new Date().toISOString(), activities: logActivity(`Moved to Warm (${title})`, typeStr) });
         updateDailyStats('exposures');
     };
     const handleDidPresentation = () => {
-        onInstantUpdate(item.id, { status: 'Hot', exposureCount: exposureCount + 1, lastContacted: new Date().toISOString() });
+        onInstantUpdate(item.id, { status: 'Hot', exposureCount: exposureCount + 1, lastContacted: new Date().toISOString(), activities: logActivity('Did Presentation', 'meeting') });
         updateDailyStats('presentations');
     };
-    const handleLogFollowUp = () => {
+    const handleLogFollowUp = (typeStr = 'touch') => {
         const isTenacity = exposureCount >= 4;
-        onInstantUpdate(item.id, { exposureCount: exposureCount + 1, lastContacted: new Date().toISOString() });
+        const noun = typeStr === 'call' ? 'Called' : typeStr === 'text' ? 'Texted' : typeStr === 'email' ? 'Emailed' : typeStr === 'meeting' ? 'Met' : 'Followed up';
+        onInstantUpdate(item.id, { exposureCount: exposureCount + 1, lastContacted: new Date().toISOString(), activities: logActivity(`${noun} (Touch #${exposureCount + 1})`, typeStr) });
         if (isTenacity) updateDailyStats('tenacityFollowUps');
         else if (exposureCount > 0) updateDailyStats('followUps');
         else updateDailyStats('exposures');
@@ -223,20 +262,47 @@ const ProspectCard = ({ item, onUpdate, onInstantUpdate, onDecide, onDataChange,
             {/* Primary contextual action button */}
             <div className="mb-3">
                 {item.status === 'Cold' && (
-                    <button onClick={handleSentInfo} className="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 py-2.5 rounded-md flex items-center justify-center text-sm font-bold transition-colors border border-indigo-200">
-                        <Send className="h-4 w-4 mr-2 text-indigo-600" /> 📤 Sent the Info — Move to Warm
-                    </button>
+                    <div className="flex flex-col space-y-1.5">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">1. Log Sent Info to move to Warm:</span>
+                        <div className="flex gap-2">
+                            <button onClick={() => handleSentInfo('text')} title="Texted Info" className="flex-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 py-2 rounded-md flex items-center justify-center transition-colors border border-indigo-200 shadow-sm">
+                                <Smartphone className="h-4 w-4" />
+                            </button>
+                            <button onClick={() => handleSentInfo('email')} title="Emailed Info" className="flex-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 py-2 rounded-md flex items-center justify-center transition-colors border border-indigo-200 shadow-sm">
+                                <Mail className="h-4 w-4" />
+                            </button>
+                            <button onClick={() => handleSentInfo('other')} title="Other (Social/In-person)" className="flex-[2] bg-indigo-50 hover:bg-indigo-100 text-indigo-700 py-2 rounded-md flex items-center justify-center text-xs font-bold transition-colors border border-indigo-200 shadow-sm">
+                                <Send className="h-3.5 w-3.5 mr-1" /> Other
+                            </button>
+                        </div>
+                    </div>
                 )}
                 {item.status === 'Warm' && (
-                    <button onClick={handleDidPresentation} className="w-full bg-purple-50 hover:bg-purple-100 text-purple-700 py-2.5 rounded-md flex items-center justify-center text-sm font-bold transition-colors border border-purple-200">
-                        <PlayCircle className="h-4 w-4 mr-2 text-purple-600" /> 🎬 Did Presentation — Move to Hot
-                    </button>
+                    <div className="flex flex-col space-y-1.5">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">2. Present info to move to Hot:</span>
+                        <button onClick={handleDidPresentation} className="w-full bg-purple-50 hover:bg-purple-100 text-purple-700 py-2.5 rounded-md flex items-center justify-center text-sm font-bold transition-colors border border-purple-200 shadow-sm">
+                            <PlayCircle className="h-4 w-4 mr-2 text-purple-600" /> 🎬 Did Presentation
+                        </button>
+                    </div>
                 )}
                 {item.status === 'Hot' && (
-                    <button onClick={handleLogFollowUp} className="w-full bg-green-50 hover:bg-green-100 text-green-700 py-2.5 rounded-md flex items-center justify-center text-sm font-bold transition-colors border border-green-200">
-                        <Zap className="h-4 w-4 mr-2 text-green-600" />
-                        {exposureCount >= 5 ? '⚡ Log Follow Up — Closing Zone!' : `Log Follow Up (${exposureCount} touches so far)`}
-                    </button>
+                    <div className="flex flex-col space-y-1.5">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">3. Quick follow up ({exposureCount} touches):</span>
+                        <div className="flex gap-2">
+                            <button onClick={() => handleLogFollowUp('call')} title="Called" className="flex-1 bg-green-50 hover:bg-green-100 text-green-700 py-2 rounded-md flex items-center justify-center transition-colors border border-green-200 shadow-sm">
+                                <Phone className="h-4 w-4" />
+                            </button>
+                            <button onClick={() => handleLogFollowUp('text')} title="Texted" className="flex-1 bg-green-50 hover:bg-green-100 text-green-700 py-2 rounded-md flex items-center justify-center transition-colors border border-green-200 shadow-sm">
+                                <Smartphone className="h-4 w-4" />
+                            </button>
+                            <button onClick={() => handleLogFollowUp('email')} title="Emailed" className="flex-1 bg-green-50 hover:bg-green-100 text-green-700 py-2 rounded-md flex items-center justify-center transition-colors border border-green-200 shadow-sm">
+                                <Mail className="h-4 w-4" />
+                            </button>
+                            <button onClick={() => handleLogFollowUp('meeting')} title="Coffee/Meeting" className="flex-1 bg-green-50 hover:bg-green-100 text-green-700 py-2 rounded-md flex items-center justify-center transition-colors border border-green-200 shadow-sm">
+                                <Coffee className="h-4 w-4" />
+                            </button>
+                        </div>
+                    </div>
                 )}
             </div>
 
@@ -259,14 +325,47 @@ const ProspectCard = ({ item, onUpdate, onInstantUpdate, onDecide, onDataChange,
             {/* Collapsible Details */}
             {showDetails && (
                 <div className="mt-3 space-y-3 border-t border-gray-100 pt-3">
+                    {/* Contact Info & Tags */}
+                    <div className="space-y-2">
+                        <div className="flex gap-2">
+                            <div className="relative flex-1">
+                                <Phone className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+                                <input type="tel" placeholder="Phone" defaultValue={item.phone} onChange={(e) => onUpdate(item.id, 'phone', e.target.value)} className="pl-7 w-full text-xs border-gray-200 rounded-md focus:ring-indigo-500 focus:border-indigo-500 bg-white p-1.5" />
+                                {item.phone && <a href={`tel:${item.phone}`} className="absolute right-2 top-1/2 transform -translate-y-1/2 text-indigo-500 hover:text-indigo-700"><Phone className="h-3 w-3" /></a>}
+                            </div>
+                            <div className="relative flex-1">
+                                <Mail className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+                                <input type="email" placeholder="Email" defaultValue={item.email} onChange={(e) => onUpdate(item.id, 'email', e.target.value)} className="pl-7 w-full text-xs border-gray-200 rounded-md focus:ring-indigo-500 focus:border-indigo-500 bg-white p-1.5" />
+                                {item.email && <a href={`mailto:${item.email}`} className="absolute right-2 top-1/2 transform -translate-y-1/2 text-indigo-500 hover:text-indigo-700"><Mail className="h-3 w-3" /></a>}
+                            </div>
+                        </div>
+                        <div className="relative">
+                            <Tag className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+                            <input type="text" placeholder="Tags (comma separated)..." defaultValue={item.tags?.join(', ')} onChange={(e) => onUpdate(item.id, 'tags', e.target.value.split(',').map(t => t.trim()).filter(Boolean))} className="pl-7 w-full text-xs border-gray-200 rounded-md focus:ring-indigo-500 focus:border-indigo-500 bg-white p-1.5" />
+                        </div>
+                    </div>
+
+                    {/* Activity Timeline */}
+                    <div>
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1 block">Activity History</span>
+                        <div className="space-y-1.5 max-h-24 overflow-y-auto mb-2 text-xs bg-gray-50 rounded p-2 border border-gray-100">
+                            {item.activities && item.activities.length > 0 ? [...item.activities].sort((a,b) => new Date(b.date) - new Date(a.date)).map(act => (
+                                <div key={act.id} className="flex justify-between items-start border-b border-gray-200 last:border-0 pb-1 last:pb-0">
+                                    <span className="text-gray-700"><span className="font-semibold text-gray-500 mr-1">{act.type === 'meeting' ? '☕' : act.type === 'call' ? '📞' : act.type === 'text' ? '💬' : act.type === 'email' ? '✉️' : '⚡'}</span>{act.description}</span>
+                                    <span className="text-gray-400 text-[9px] whitespace-nowrap ml-2">{new Date(act.date).toLocaleDateString(undefined, {month:'short', day:'numeric'})}</span>
+                                </div>
+                            )) : <div className="text-gray-400 italic text-center text-[10px]">No activities logged yet.</div>}
+                        </div>
+                    </div>
+
                     {/* Notes */}
                     <div className="relative">
                         <textarea
                             defaultValue={item.notes}
                             onChange={(e) => onUpdate(item.id, 'notes', e.target.value)}
-                            placeholder="Add notes..."
+                            placeholder="Add general notes..."
                             className="w-full text-sm text-gray-600 border-gray-200 rounded-md focus:ring-indigo-500 focus:border-indigo-500 bg-white"
-                            rows={isNotesExpanded ? 6 : 2}
+                            rows={isNotesExpanded ? 4 : 2}
                         />
                         <button onClick={() => setIsNotesExpanded(!isNotesExpanded)} className="absolute bottom-2 right-2 text-xs flex items-center font-semibold text-indigo-600 hover:text-indigo-800 bg-white/80 px-2 py-1 rounded-full border border-gray-100 shadow-sm">
                             <MessageSquare className="h-3 w-3 mr-1" /> {isNotesExpanded ? 'Collapse' : 'Expand'}
@@ -318,7 +417,14 @@ const ProspectCard = ({ item, onUpdate, onInstantUpdate, onDecide, onDataChange,
 };
 
 
+// #8 — Win Wall + Archive with tabs
 const ArchivedProspectsList = ({ list, onUnarchive, onDelete }) => {
+    const [archiveTab, setArchiveTab] = useState('wins'); // 'wins' | 'all'
+    const wins = list.filter(item => item.outcome === 'Member');
+    const all  = list;
+
+    const displayList = archiveTab === 'wins' ? wins : all;
+
     if (list.length === 0) {
         return (
             <div className="text-center py-10 px-6 bg-gray-50 rounded-lg">
@@ -328,25 +434,94 @@ const ArchivedProspectsList = ({ list, onUnarchive, onDelete }) => {
             </div>
         );
     }
+
     return (
-        <div className="space-y-3">
-            {list.map(item => (
-                <div key={item.id} className="p-3 border rounded-lg bg-white shadow-sm flex flex-col sm:flex-row justify-between sm:items-center">
-                    <div>
-                        <p className="font-semibold">{item.name}</p>
-                        <p className={`text-sm font-medium ${item.outcome === 'Member' ? 'text-green-600' : 'text-red-600'}`}>Outcome: {item.outcome || 'Archived'}</p>
-                        <p className="text-xs text-gray-500">Decision Date: {item.decisionDate ? new Date(item.decisionDate).toLocaleDateString() : 'N/A'}</p>
+        <div className="space-y-4">
+            {/* Tab Bar */}
+            <div className="flex border-b border-gray-200">
+                <button
+                    onClick={() => setArchiveTab('wins')}
+                    className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${
+                        archiveTab === 'wins' ? 'border-yellow-500 text-yellow-700' : 'border-transparent text-gray-500 hover:text-gray-700'
+                    }`}
+                >
+                    🏆 Win Wall ({wins.length})
+                </button>
+                <button
+                    onClick={() => setArchiveTab('all')}
+                    className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${
+                        archiveTab === 'all' ? 'border-indigo-500 text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700'
+                    }`}
+                >
+                    All Archive ({all.length})
+                </button>
+            </div>
+
+            {/* Win Wall */}
+            {archiveTab === 'wins' && (
+                wins.length === 0 ? (
+                    <div className="text-center py-10 px-6 bg-yellow-50 rounded-lg border border-yellow-100">
+                        <span className="text-4xl">🏆</span>
+                        <h3 className="mt-2 text-lg font-semibold text-yellow-900">No Wins Yet — Go Get One!</h3>
+                        <p className="mt-1 text-sm text-yellow-700">Every member you close will be celebrated here permanently.</p>
                     </div>
-                    <div className="flex items-center space-x-2 mt-3 sm:mt-0">
-                        <button onClick={() => onUnarchive(item.id, { isArchived: false, outcome: null })} className="flex items-center space-x-1 px-3 py-1.5 text-xs font-medium rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200 transition">
-                            <ArchiveRestore className="h-3 w-3" /> <span>Unarchive</span>
-                        </button>
-                        <button onClick={() => onDelete(item.id)} className="flex items-center space-x-1 px-3 py-1.5 text-xs font-medium rounded-full bg-red-100 text-red-700 hover:bg-red-200 transition">
-                            <Trash2 className="h-3 w-3" /> <span>Delete</span>
-                        </button>
+                ) : (
+                    <div className="space-y-3">
+                        {wins
+                            .sort((a, b) => new Date(b.decisionDate) - new Date(a.decisionDate))
+                            .map((item, idx) => (
+                                <div key={item.id} className="relative bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 rounded-xl p-4 flex items-center justify-between shadow-sm overflow-hidden">
+                                    {/* Rank Badge */}
+                                    <div className="flex items-center gap-4">
+                                        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-yellow-400 flex items-center justify-center font-black text-white text-lg shadow">
+                                            {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '🏅'}
+                                        </div>
+                                        <div>
+                                            <p className="font-bold text-gray-900">{item.name}</p>
+                                            <p className="text-xs text-yellow-700 font-medium">
+                                                ✅ Became a Member &nbsp;·&nbsp; {item.decisionDate ? new Date(item.decisionDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Date N/A'}
+                                            </p>
+                                            {item.source && <p className="text-[10px] text-gray-500 mt-0.5">Source: {item.source}</p>}
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center space-x-1">
+                                        <button onClick={() => onUnarchive(item.id, { isArchived: false, outcome: null })} className="p-1.5 text-xs rounded-full bg-white border border-gray-200 text-gray-500 hover:bg-gray-100" title="Move back to pipeline">
+                                            <ArchiveRestore className="h-3.5 w-3.5" />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))
+                        }
+                        <p className="text-center text-xs text-gray-400 pt-2">🎉 {wins.length} total member{wins.length !== 1 ? 's' : ''} closed — keep adding to your legacy!</p>
                     </div>
+                )
+            )}
+
+            {/* All Archive */}
+            {archiveTab === 'all' && (
+                <div className="space-y-3">
+                    {displayList.map(item => (
+                        <div key={item.id} className="p-3 border rounded-lg bg-white shadow-sm flex flex-col sm:flex-row justify-between sm:items-center">
+                            <div>
+                                <p className="font-semibold">{item.name}</p>
+                                <p className={`text-sm font-medium ${item.outcome === 'Member' ? 'text-green-600' : 'text-red-600'}`}>
+                                    {item.outcome === 'Member' ? '✅ Became a Member' : '❌ Not Interested'}
+                                </p>
+                                <p className="text-xs text-gray-500">Decision: {item.decisionDate ? new Date(item.decisionDate).toLocaleDateString() : 'N/A'}</p>
+                                {item.source && <p className="text-xs text-gray-400">Source: {item.source}</p>}
+                            </div>
+                            <div className="flex items-center space-x-2 mt-3 sm:mt-0">
+                                <button onClick={() => onUnarchive(item.id, { isArchived: false, outcome: null })} className="flex items-center space-x-1 px-3 py-1.5 text-xs font-medium rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200 transition">
+                                    <ArchiveRestore className="h-3 w-3" /> <span>Unarchive</span>
+                                </button>
+                                <button onClick={() => onDelete(item.id)} className="flex items-center space-x-1 px-3 py-1.5 text-xs font-medium rounded-full bg-red-100 text-red-700 hover:bg-red-200 transition">
+                                    <Trash2 className="h-3 w-3" /> <span>Delete</span>
+                                </button>
+                            </div>
+                        </div>
+                    ))}
                 </div>
-            ))}
+            )}
         </div>
     );
 };
@@ -358,6 +533,7 @@ export const HotList = ({ user, db, onDataChange, monthlyData, hotlist: allProsp
     const [itemToDecide, setItemToDecide] = useState(null);
     const [itemToDelete, setItemToDelete] = useState(null);
     const [collapsedCategories, setCollapsedCategories] = useState({ Warm: false, Cold: true });
+    const [viewMode, setViewMode] = useState('board');
 
     // --- Command Center State ---
     const [searchQuery, setSearchQuery] = useState('');
@@ -373,11 +549,12 @@ export const HotList = ({ user, db, onDataChange, monthlyData, hotlist: allProsp
         return collection(db, 'artifacts', appId, 'users', user.uid, 'hotlist');
     }, [db, user]);
 
-    const handleAdd = async (name) => {
+    const handleAdd = async ({ name, phone = '', source = '' }) => {
         setShowAddModal(false);
         if (!name || !hotlistColRef) return;
         const newItem = {
-            name, notes: "", status: 'Cold', lastContacted: null, isArchived: false, exposureCount: 0, nextActionDate: null, outcome: null, decisionDate: null
+            name, phone, source, email: '', tags: [], activities: [], notes: '', status: 'Cold',
+            lastContacted: null, isArchived: false, exposureCount: 0, nextActionDate: null, outcome: null, decisionDate: null
         };
         await addDoc(hotlistColRef, newItem);
     };
@@ -542,6 +719,13 @@ export const HotList = ({ user, db, onDataChange, monthlyData, hotlist: allProsp
 
                             <div className="h-6 w-px bg-gray-300 hidden sm:block"></div>
 
+                            <div className="flex items-center bg-gray-50 rounded-md p-1 border">
+                                <button onClick={() => setViewMode('list')} className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-white shadow text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`} title="List View"><LayoutList className="h-4 w-4" /></button>
+                                <button onClick={() => setViewMode('board')} className={`p-1.5 rounded-md transition-all ${viewMode === 'board' ? 'bg-white shadow text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`} title="Board View"><LayoutGrid className="h-4 w-4" /></button>
+                            </div>
+
+                            <div className="h-6 w-px bg-gray-300 hidden sm:block"></div>
+
                             <div className="relative group">
                                 <select
                                     value={sortBy}
@@ -561,7 +745,7 @@ export const HotList = ({ user, db, onDataChange, monthlyData, hotlist: allProsp
 
             {isArchiveView ? (
                 <ArchivedProspectsList list={filteredHotlist} onUnarchive={handleInstantUpdate} onDelete={setItemToDelete} />
-            ) : (
+            ) : viewMode === 'list' ? (
                 <div className="space-y-8">
                     {Object.keys(statusConfig).map(statusKey => {
                         const { title, icon: Icon, color, description } = statusConfig[statusKey];
@@ -601,6 +785,47 @@ export const HotList = ({ user, db, onDataChange, monthlyData, hotlist: allProsp
                                         </div>
                                     )
                                 )}
+                            </div>
+                        )
+                    })}
+                </div>
+            ) : (
+                <div className="flex overflow-x-auto snap-x snap-mandatory gap-4 pb-6 -mx-4 px-4 sm:mx-0 sm:px-0" style={{ msOverflowStyle: 'none', scrollbarWidth: 'none' }}>
+                    {Object.keys(statusConfig).map(statusKey => {
+                        const { title, icon: Icon, color, description } = statusConfig[statusKey];
+                        const prospects = groupedProspects[statusKey];
+                        return (
+                            <div key={statusKey} className="flex-none w-[85vw] sm:w-[350px] lg:w-[calc(33.333%-16px)] snap-center shrink-0 flex flex-col max-h-[75vh]">
+                                <div className={`bg-gray-50 rounded-xl p-3 border-t-4 border-${color}-500 shadow-sm flex flex-col h-full`}>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <div className="flex items-center">
+                                            <Icon className={`h-5 w-5 text-${color}-500 mr-2`} />
+                                            <h3 className="font-bold text-gray-800 text-sm">{title.split('—')[0]}</h3>
+                                        </div>
+                                        <span className={`bg-${color}-100 text-${color}-800 text-xs font-bold px-2 py-0.5 rounded-full`}>{prospects.length}</span>
+                                    </div>
+                                    <p className="text-[10px] text-gray-500 mb-3 leading-tight">{description}</p>
+                                    <div className="flex-1 overflow-y-auto space-y-3 pr-1 pb-1">
+                                        {prospects.length > 0 ? (
+                                            prospects.map(item => (
+                                                <ProspectCard
+                                                    key={item.id}
+                                                    item={item}
+                                                    onUpdate={handleUpdate}
+                                                    onInstantUpdate={handleInstantUpdate}
+                                                    onDecide={setItemToDecide}
+                                                    onDataChange={onDataChange}
+                                                    monthlyData={monthlyData}
+                                                    onDelete={() => setItemToDelete(item.id)}
+                                                />
+                                            ))
+                                        ) : (
+                                            <div className="text-center py-8 px-4 border-2 border-dashed border-gray-200 rounded-lg bg-gray-50/50">
+                                                <p className="text-xs text-gray-400 font-medium">No prospects in {statusKey}.</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         )
                     })}

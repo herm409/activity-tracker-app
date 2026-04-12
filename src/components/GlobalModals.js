@@ -55,65 +55,82 @@ export const OnboardingModal = ({ onDismiss }) => {
 
     const steps = [
         {
-            title: "Welcome to Par Protocol",
+            title: "Welcome to Par Protocol 🏌️",
             icon: <Trophy className="h-12 w-12 mx-auto text-amber-500" />,
             content: (
-                <div className="text-center">
-                    <p className="text-gray-600 mb-4">Your daily activity tracker designed to keep you consistent and winning.</p>
-                    <p className="font-semibold text-indigo-600">Let's learn how to win the day.</p>
-                </div>
-            )
-        },
-        {
-            title: "Rule #1: The Daily Quota",
-            icon: <div className="h-12 w-12 mx-auto bg-gray-200 rounded-full flex items-center justify-center font-bold text-xl text-gray-700">2</div>,
-            content: (
-                <div className="space-y-3 text-left">
-                    <p className="text-gray-600">Every morning, you start with a <strong>Goal of 2 Points</strong>.</p>
-                    <div className="bg-red-50 p-3 rounded-lg border border-red-100 text-sm text-red-700">
-                        Think of it like a "debt" of work you need to pay off before the day ends.
-                    </div>
-                </div>
-            )
-        },
-        {
-            title: "Rule #2: Earn Points",
-            icon: <Plus className="h-12 w-12 mx-auto text-green-500" />,
-            content: (
-                <div className="space-y-2 text-left text-sm">
-                    <p className="text-gray-600 mb-2">Different activities pay off your debt faster:</p>
-                    <ul className="space-y-2">
-                        <li className="flex justify-between items-center bg-gray-50 p-2 rounded">
-                            <span>🤝 Enrollment</span>
-                            <span className="font-bold text-green-600">5 Pts</span>
-                        </li>
-                        <li className="flex justify-between items-center bg-gray-50 p-2 rounded">
-                            <span>🎤 Presentation / 3-Way</span>
-                            <span className="font-bold text-indigo-600">3 Pts</span>
-                        </li>
-                        <li className="flex justify-between items-center bg-gray-50 p-2 rounded">
-                            <span>📞 Exposure / Follow-Up / Educated No</span>
-                            <span className="font-bold text-gray-600">1 Pt</span>
-                        </li>
-                        <li className="flex justify-between items-center bg-gray-50 p-2 rounded">
-                            <span>🔥 Tenacity Bonus (4+ Follow-Ups)</span>
-                            <span className="font-bold text-gray-600">2 Pts</span>
-                        </li>
-                    </ul>
-                </div>
-            )
-        },
-        {
-            title: "Rule #3: Get to Green",
-            icon: <div className="h-12 w-12 mx-auto bg-green-100 rounded-full flex items-center justify-center font-bold text-xl text-green-600">✓</div>,
-            content: (
                 <div className="text-center space-y-3">
-                    <p className="text-gray-600">Once you earn 2 Points, you are <strong>"Even"</strong> (Safe).</p>
-                    <p className="text-gray-600">Earn <em>more</em> than 2 Points to go <strong>"Under Par"</strong> (Winning).</p>
-                    <div className="grid grid-cols-2 gap-2 text-xs mt-4">
-                        <div className="bg-red-100 p-2 rounded text-red-800 font-semibold">Red = Behind</div>
-                        <div className="bg-green-100 p-2 rounded text-green-800 font-semibold">Green = Winning</div>
+                    <p className="text-gray-600">The daily activity system that coaches you step-by-step toward consistent income.</p>
+                    <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-3 text-sm text-indigo-800 font-medium">
+                        This 5-step setup takes 2 minutes and will set you up to win your first day.
                     </div>
+                </div>
+            )
+        },
+        {
+            title: "Step 1: Know Your Daily Par",
+            icon: <div className="h-12 w-12 mx-auto bg-indigo-100 rounded-full flex items-center justify-center font-bold text-2xl text-indigo-700">⛳</div>,
+            content: (
+                <div className="space-y-3 text-left text-sm">
+                    <p className="text-gray-700">Your <strong>Daily Par</strong> is how many points you need to earn each day to stay on track.</p>
+                    <div className="bg-gray-50 rounded-lg p-3 space-y-2 border border-gray-200">
+                        <p className="font-semibold text-gray-800 text-xs uppercase tracking-widest">How Points Work</p>
+                        <div className="flex justify-between"><span>📞 Exposure / Follow-Up / No</span><span className="font-bold">1 pt</span></div>
+                        <div className="flex justify-between"><span>🎤 Presentation / 3-Way</span><span className="font-bold text-indigo-600">3 pts</span></div>
+                        <div className="flex justify-between"><span>🤝 Membership Sold</span><span className="font-bold text-green-600">5 pts</span></div>
+                    </div>
+                    <div className="bg-amber-50 border border-amber-100 p-3 rounded-lg text-amber-800">
+                        <strong>Action:</strong> Your par is already set to 2 pts/day. You can raise it in your Profile settings anytime. 2 pts is the minimum to get a green score daily.
+                    </div>
+                </div>
+            )
+        },
+        {
+            title: "Step 2: Add Your First Prospect",
+            icon: <Plus className="h-12 w-12 mx-auto text-blue-500" />,
+            content: (
+                <div className="space-y-3 text-left text-sm">
+                    <p className="text-gray-700">Think of one person right now who could benefit from LegalShield or IDShield. Write their name down.</p>
+                    <div className="bg-blue-50 border border-blue-100 p-3 rounded-lg text-blue-800">
+                        <strong>Action:</strong> After setup, go to the <span className="font-bold">Pipeline tab</span> and tap "Add Prospect." Add their name, their phone number, and how you met them.
+                    </div>
+                    <p className="text-gray-500 text-xs">The Pipeline tracks every person you're working — and reminds you when to follow up so no one falls through the cracks.</p>
+                </div>
+            )
+        },
+        {
+            title: "Step 3: Log Your First Exposure",
+            icon: <div className="h-12 w-12 mx-auto bg-green-100 rounded-full flex items-center justify-center font-bold text-2xl text-green-600">📲</div>,
+            content: (
+                <div className="space-y-3 text-left text-sm">
+                    <p className="text-gray-700">An exposure is any time you share information about LegalShield or IDShield — a text, a video link, a conversation.</p>
+                    <div className="bg-green-50 border border-green-100 p-3 rounded-lg text-green-800">
+                        <strong>Action:</strong> Right after setup, log your first exposure using the big green button on the <span className="font-bold">Today tab</span>. Even if it was from earlier today — log it now.
+                    </div>
+                    <p className="text-gray-500 text-xs">That first log starts your streak counter and gets you 1 point toward your daily par. One action. One point. Build from there.</p>
+                </div>
+            )
+        },
+        {
+            title: "You're Ready. Go Win Today. 🏆",
+            icon: <div className="h-12 w-12 mx-auto bg-amber-100 rounded-full flex items-center justify-center font-bold text-xl text-amber-600">🔥</div>,
+            content: (
+                <div className="text-center space-y-4">
+                    <p className="text-gray-700 leading-relaxed">Our mission is to help <strong>everyone affordably live a just and secure life</strong>. Every exposure you log moves that mission forward.</p>
+                    <div className="grid grid-cols-3 gap-2 text-xs">
+                        <div className="bg-gray-50 rounded-lg p-3 text-center border">
+                            <p className="text-lg">🏌️</p>
+                            <p className="font-semibold text-gray-700 mt-1">Hit Par Daily</p>
+                        </div>
+                        <div className="bg-gray-50 rounded-lg p-3 text-center border">
+                            <p className="text-lg">🔥</p>
+                            <p className="font-semibold text-gray-700 mt-1">Build Streaks</p>
+                        </div>
+                        <div className="bg-gray-50 rounded-lg p-3 text-center border">
+                            <p className="text-lg">🏆</p>
+                            <p className="font-semibold text-gray-700 mt-1">Rank Up</p>
+                        </div>
+                    </div>
+                    <p className="text-xs text-gray-400">Let's go build something great.</p>
                 </div>
             )
         }
