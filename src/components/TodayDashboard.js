@@ -289,39 +289,6 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
         return () => document.removeEventListener('visibilitychange', onVisibility);
     }, [todayPoints]);
 
-    // Today's Prospects (overdue/stale Hot or Warm, excluding snoozed)
-    const urgentProspects = useMemo(() => {
-        if (!hotlist) return [];
-        const now = new Date(); now.setHours(0, 0, 0, 0);
-        return hotlist
-            .filter(p => !p.isArchived && (p.status === 'Hot' || p.status === 'Warm'))
-            .filter(p => {
-                const nextAction = p.nextActionDate ? new Date(p.nextActionDate) : null;
-                // Exclude snoozed (nextActionDate in the future)
-                if (nextAction && nextAction > now) return false;
-                const lastContact = p.lastContacted ? new Date(p.lastContacted) : null;
-                const daysSince = lastContact ? (now - lastContact) / 86400000 : 999;
-                return (nextAction && nextAction <= now) || daysSince > 5;
-            })
-            .sort((a, b) => {
-                const aOD = a.nextActionDate && new Date(a.nextActionDate) < new Date();
-                const bOD = b.nextActionDate && new Date(b.nextActionDate) < new Date();
-                return aOD === bOD ? 0 : aOD ? -1 : 1;
-            })
-            .slice(0, 3);
-    }, [hotlist]);
-
-    // Count snoozed Hot/Warm prospects so user knows why they're missing
-    const snoozedCount = useMemo(() => {
-        if (!hotlist) return 0;
-        const now = new Date(); now.setHours(0, 0, 0, 0);
-        return hotlist.filter(p => {
-            if (p.isArchived || (p.status !== 'Hot' && p.status !== 'Warm')) return false;
-            const nextAction = p.nextActionDate ? new Date(p.nextActionDate) : null;
-            return nextAction && nextAction > now;
-        }).length;
-    }, [hotlist]);
-
 
     // --- Coaching Feedback ---
     const getCoachingAdvice = () => {
@@ -432,75 +399,6 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
                         ))}
                     </div>
                 </div>
-
-                {/* Today's Prospects Panel — #4 prospect-specific follow-up, #11 snoozed chip at top */}
-                {(urgentProspects.length > 0 || snoozedCount > 0) && (
-                    <div className="bg-white border border-amber-200 rounded-lg p-4 mb-6 shadow-sm">
-                        <div className="flex justify-between items-center mb-3">
-                            <h3 className="font-bold text-gray-800 flex items-center text-sm">
-                                <AlertTriangle className="h-4 w-4 text-amber-500 mr-2 flex-shrink-0" />
-                                Today's Prospects
-                                {urgentProspects.length > 0 && <span className="ml-1 text-amber-600">— {urgentProspects.length} need attention</span>}
-                            </h3>
-                            {onNavigateToPipeline && (
-                                <button onClick={onNavigateToPipeline} className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold whitespace-nowrap ml-2">
-                                    Open Pipeline →
-                                </button>
-                            )}
-                        </div>
-
-                        {/* #11 — Snoozed chip at TOP when no urgent prospects */}
-                        {urgentProspects.length === 0 && snoozedCount > 0 && (
-                            <div className="flex items-center justify-between bg-blue-50 border border-blue-100 rounded-md px-3 py-2 mb-3">
-                                <span className="text-xs text-blue-700 flex items-center font-medium">
-                                    💤 <span className="ml-1">{snoozedCount} prospect{snoozedCount > 1 ? 's' : ''} snoozed — you're all caught up for today!</span>
-                                </span>
-                                {onNavigateToPipeline && (
-                                    <button onClick={onNavigateToPipeline} className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 ml-2 whitespace-nowrap">View →</button>
-                                )}
-                            </div>
-                        )}
-
-                        <div className="space-y-2">
-                            {urgentProspects.map(p => {
-                                const now = new Date(); now.setHours(0, 0, 0, 0);
-                                const isOverdue = p.nextActionDate && new Date(p.nextActionDate) < now;
-                                const actionLabel = p.status === 'Hot' ? 'Log Follow Up' : 'Did Presentation';
-                                const actionColor = p.status === 'Hot' ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-purple-100 text-purple-700 hover:bg-purple-200';
-                                // #4 — wire Hot follow-up to the specific prospect if handler available
-                                const handleAction = p.status === 'Hot'
-                                    ? (onLogFollowUpForProspect ? () => onLogFollowUpForProspect(p.id) : onLogFollowUp)
-                                    : () => onQuickAdd('presentations', 1);
-                                return (
-                                    <div key={p.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-md">
-                                        <div className="flex items-center min-w-0 mr-2">
-                                            <span className="font-semibold text-sm text-gray-800 truncate">{p.name}</span>
-                                            <span className={`ml-2 flex-shrink-0 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${p.status === 'Hot' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>{p.status}</span>
-                                            {isOverdue && <span className="ml-1 flex-shrink-0 text-[10px] font-bold text-red-600">⚠️</span>}
-                                        </div>
-                                        <button onClick={handleAction} className={`flex-shrink-0 text-xs font-semibold px-3 py-1 rounded-full transition ${actionColor}`}>
-                                            {actionLabel}
-                                        </button>
-                                    </div>
-                                );
-                            })}
-                        </div>
-
-                        {/* Snoozed notice at bottom when there ARE urgent prospects too */}
-                        {urgentProspects.length > 0 && snoozedCount > 0 && (
-                            <div className="mt-3 pt-2 border-t border-gray-100 flex items-center justify-between">
-                                <span className="text-xs text-blue-600 flex items-center">
-                                    💤 <span className="ml-1"><strong>{snoozedCount}</strong> prospect{snoozedCount > 1 ? 's' : ''} snoozed — not showing here until their reminder date</span>
-                                </span>
-                                {onNavigateToPipeline && (
-                                    <button onClick={onNavigateToPipeline} className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 ml-2 whitespace-nowrap">
-                                        Un-snooze →
-                                    </button>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                )}
 
 
                 {/* Coach's Insight */}
