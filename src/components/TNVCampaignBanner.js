@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ExternalLink, Target, Users } from 'lucide-react';
-import { db, appId } from '../firebaseConfig';
+import { appId } from '../firebaseConfig';
+import { useAppContext } from '../context/AppContext';
 import { collection, query, getDocs } from 'firebase/firestore';
 import { getWeekId } from '../utils/helpers';
 
@@ -18,6 +19,7 @@ const getSprintFocus = (weekNum) => {
 };
 
 const TNVCampaignBanner = () => {
+    const { db } = useAppContext();
     const EVENT_DATE = new Date('2026-07-16T00:00:00');
     
     // Auto-hide if past event completion (July 19 end date)
@@ -77,6 +79,7 @@ const TNVCampaignBanner = () => {
 
         const fetchTeamProgress = async () => {
             try {
+                if (!db) return; // ensure db is loaded
                 const weekId = getWeekId(now);
                 const leaderboardColRef = collection(db, 'artifacts', appId, 'leaderboard', weekId, 'entries');
                 const snapshot = await getDocs(query(leaderboardColRef));
