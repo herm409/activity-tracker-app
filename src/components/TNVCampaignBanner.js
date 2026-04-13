@@ -167,10 +167,13 @@ const TNVCampaignBanner = () => {
                                     Team Target: {teamProgress.focusLabel}
                                 </div>
                             </div>
-                            <div className="text-right pl-3">
+                            <div className="text-right pl-3 flex flex-col items-end">
                                 <div className="text-2xl font-black text-white leading-none">
                                     {teamProgress.current} <span className="text-xs font-bold opacity-40 uppercase">/ {teamProgress.target}</span>
                                 </div>
+                                <span className="text-[10px] font-bold mt-1 text-white opacity-70">
+                                    {Math.round((teamProgress.current / teamProgress.target) * 100) || 0}% Complete
+                                </span>
                             </div>
                         </div>
                         
@@ -186,13 +189,11 @@ const TNVCampaignBanner = () => {
                             ></div>
                         </div>
                         
-                        <div className="mt-1.5 flex justify-between items-center text-[8px] text-white opacity-40 uppercase tracking-widest font-bold relative z-10">
-                            <span>0%</span>
+                        <div className="mt-1.5 flex justify-center items-center text-[8px] text-white opacity-40 uppercase tracking-widest font-bold relative z-10">
                             <span className="flex items-center">
                                 <Users className="w-2.5 h-2.5 mr-1" />
                                 Goal scaled for {teamProgress.activeUsers < 5 ? '5' : teamProgress.activeUsers} runners
                             </span>
-                            <span>100%</span>
                         </div>
                      </div>
                 )}
