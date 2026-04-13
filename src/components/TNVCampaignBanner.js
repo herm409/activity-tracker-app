@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ExternalLink, Target, Users } from 'lucide-react';
 import { appId } from '../firebaseConfig';
 import { useAppContext } from '../context/AppContext';
-import { collection, query, getDocs } from 'firebase/firestore';
+import { collection, query, onSnapshot } from 'firebase/firestore';
 import { getWeekId } from '../utils/helpers';
 
 const SPRINT_SCHEDULE = [
@@ -73,48 +73,44 @@ const TNVCampaignBanner = () => {
     const [teamProgress, setTeamProgress] = useState({ current: 0, target: 0, activeUsers: 0, focusLabel: '' });
 
     useEffect(() => {
-        if (currentWeek <= 0 || currentWeek > 13) return;
+        if (currentWeek <= 0 || currentWeek > 13 || !db) return;
 
-        const fetchTeamProgress = async () => {
-            try {
-                if (!db) return; // ensure db is loaded
-                const weekId = getWeekId(now);
-                const leaderboardColRef = collection(db, 'artifacts', appId, 'leaderboard', weekId, 'entries');
-                const snapshot = await getDocs(query(leaderboardColRef));
+        const weekId = getWeekId(now);
+        const leaderboardColRef = collection(db, 'artifacts', appId, 'leaderboard', weekId, 'entries');
+        
+        const unsubscribe = onSnapshot(query(leaderboardColRef), (snapshot) => {
+            let activeCount = 0;
+            let currentScore = 0;
+            const focus = getSprintFocus(currentWeek);
+            const metricKey = focus.key;
+
+            snapshot.docs.forEach(doc => {
+                const data = doc.data();
+                activeCount++;
                 
-                let activeCount = 0;
-                let currentScore = 0;
-                const focus = getSprintFocus(currentWeek);
-                const metricKey = focus.key;
+                if (metricKey === 'presentations') {
+                    currentScore += (Number(data.presentations) || 0) + (Number(data.threeWays) || 0);
+                } else {
+                    currentScore += (Number(data[metricKey]) || 0);
+                }
+            });
 
-                snapshot.docs.forEach(doc => {
-                    const data = doc.data();
-                    activeCount++;
-                    
-                    if (metricKey === 'presentations') {
-                        currentScore += (Number(data.presentations) || 0) + (Number(data.threeWays) || 0);
-                    } else {
-                        currentScore += (Number(data[metricKey]) || 0);
-                    }
-                });
+            // Floor of 5 active users to keep scale realistic before team fully adopts
+            const effectiveUsers = Math.max(activeCount, 5);
+            const targetScore = Math.max(effectiveUsers * focus.baseline, 1);
 
-                // Floor of 5 active users to keep scale realistic before team fully adopts
-                const effectiveUsers = Math.max(activeCount, 5);
-                const targetScore = Math.max(effectiveUsers * focus.baseline, 1);
+            setTeamProgress({
+                current: currentScore,
+                target: targetScore,
+                activeUsers: activeCount,
+                focusLabel: focus.label
+            });
+        }, (err) => {
+            console.error("Error subscribing to sprint progress:", err);
+        });
 
-                setTeamProgress({
-                    current: currentScore,
-                    target: targetScore,
-                    activeUsers: activeCount,
-                    focusLabel: focus.label
-                });
-            } catch (err) {
-                console.error("Error fetching sprint progress:", err);
-            }
-        };
-
-        fetchTeamProgress();
-    }, [currentWeek]);
+        return () => unsubscribe();
+    }, [currentWeek, db]);
 
     if (isPast) return null;
 
