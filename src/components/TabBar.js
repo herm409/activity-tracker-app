@@ -1,12 +1,12 @@
 import React from 'react';
-import { Sun, Calendar, Users, Trophy, List, BarChart2 } from 'lucide-react';
+import { Sun, Calendar, Users, Star, List, BarChart2 } from 'lucide-react';
 
 const TabBar = ({ activeTab, setActiveTab, badges = {} }) => {
     const tabs = [
         { id: 'today', name: 'Today', icon: Sun },
         { id: 'tracker', name: 'Calendar', icon: Calendar },
         { id: 'team', name: 'Team', icon: Users, isBeta: true },
-        { id: 'leaderboard', name: 'Leaderboard', icon: Trophy },
+        { id: 'community', name: 'Community', icon: Star },
         { id: 'hotlist', name: 'Prospect Pipeline', icon: List },
         { id: 'analytics', name: 'Analytics', icon: BarChart2 }
     ];

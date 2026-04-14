@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { doc, getDoc, collection, query, where, onSnapshot, writeBatch, updateDoc, deleteField } from 'firebase/firestore';
 import { appId } from '../firebaseConfig';
-import { Share2, Settings, LogOut, Trash2, Flame, Award, Medal, CheckCircle, ClipboardCopy, Users } from 'lucide-react';
+import { Share2, Settings, LogOut, Trash2, Flame, Award, Medal, CheckCircle, ClipboardCopy, Users, Trophy } from 'lucide-react';
 import { generateInviteCode as genCode } from '../utils/helpers';
+import Leaderboard from './Leaderboard';
 
 const CreateTeamModal = ({ onClose, onCreateTeam }) => {
     const [teamName, setTeamName] = useState('');
@@ -625,4 +626,56 @@ const TeamPage = ({ user, db, userProfile, setUserProfile, weekId }) => {
     return <TeamDashboard teamData={teamData} teamMembers={teamMembers} onLeaveTeam={handleLeaveTeam} onShareInvite={handleShareInvite} user={user} onUpdateTeam={handleUpdateTeam} onRemoveMember={handleRemoveMember} />;
 };
 
-export default TeamPage;
+// ── Team Page Shell with Sub-Navigation ────────────────────────────────────
+const TeamPageWithNav = ({ user, db, userProfile, setUserProfile, weekId }) => {
+    const [subTab, setSubTab] = useState('myteam');
+
+    const subTabs = [
+        { id: 'myteam',      label: 'My Team',    icon: Users },
+        { id: 'leaderboard', label: 'Leaderboard', icon: Trophy },
+    ];
+
+    return (
+        <div className="space-y-4">
+            {/* Sub-navigation */}
+            <div className="flex bg-gray-100 p-1 rounded-xl gap-1">
+                {subTabs.map(tab => {
+                    const Icon = tab.icon;
+                    const isActive = subTab === tab.id;
+                    return (
+                        <button
+                            key={tab.id}
+                            onClick={() => setSubTab(tab.id)}
+                            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-semibold transition-all ${
+                                isActive
+                                    ? 'bg-white text-indigo-700 shadow-sm'
+                                    : 'text-gray-500 hover:text-gray-700'
+                            }`}
+                        >
+                            <Icon className="h-4 w-4" />
+                            {tab.label}
+                        </button>
+                    );
+                })}
+            </div>
+
+            {/* Sub-tab content */}
+            {subTab === 'myteam' && (
+                <TeamPage
+                    user={user}
+                    db={db}
+                    userProfile={userProfile}
+                    setUserProfile={setUserProfile}
+                    weekId={weekId}
+                />
+            )}
+            {subTab === 'leaderboard' && (
+                <Suspense fallback={<div className="text-center p-10 text-gray-400">Loading Leaderboard...</div>}>
+                    <Leaderboard db={db} weekId={weekId} user={user} />
+                </Suspense>
+            )}
+        </div>
+    );
+};
+
+export default TeamPageWithNav;

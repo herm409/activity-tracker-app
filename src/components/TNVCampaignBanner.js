@@ -75,6 +75,7 @@ const TNVCampaignBanner = () => {
     useEffect(() => {
         if (currentWeek <= 0 || currentWeek > 13 || !db) return;
 
+        const now = new Date();
         const weekId = getWeekId(now);
         const leaderboardColRef = collection(db, 'artifacts', appId, 'leaderboard', weekId, 'entries');
         

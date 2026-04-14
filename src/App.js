@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, Suspense, useMemo } from 'react';
 import { calculatePoints } from './utils/scoring';
 import * as ActionModals from './components/ActionModals';
-import { doc, setDoc, getDoc, updateDoc, collection, query, orderBy, onSnapshot, addDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, collection, query, orderBy, onSnapshot, addDoc, where, getDocs } from 'firebase/firestore';
 import html2canvas from 'html2canvas';
 
 // Context
@@ -24,9 +24,20 @@ import { COACHING_REPOSITORY, getTieredMessage } from './utils/coachingRepositor
 
 // Components (Lazy Load)
 const AnalyticsDashboard = React.lazy(() => import('./components/AnalyticsDashboard'));
-const Leaderboard = React.lazy(() => import('./components/Leaderboard'));
 const TeamPage = React.lazy(() => import('./components/TeamPage'));
 const HotList = React.lazy(() => import('./components/HotList'));
+const CommunityFeed = React.lazy(() => import('./components/CommunityFeed'));
+
+// Community milestone thresholds & streak labels
+const STREAK_MILESTONES = [7, 14, 21, 30, 60, 90];
+const STREAK_TYPE_LABELS = {
+    ironman:             'Ironman',
+    exposures:           'Exposures',
+    followUps:           'Follow-Ups',
+    nos:                 "No's",
+    exerc:               'Exercise',
+    personalDevelopment: 'Personal Dev',
+};
 
 // --- Main App Content Component ---
 const AppContent = () => {
@@ -64,6 +75,41 @@ const AppContent = () => {
     // Coaching Toast
     const [coachingToast, setCoachingToast] = useState(null);
 
+    // Community Win Feed — badge state
+    const [hasUnreadCommunity, setHasUnreadCommunity] = useState(false);
+
+    // Community post writer — fire-and-forget, silent on failure
+    const writeCommunityPost = useCallback(async (postData) => {
+        if (!db || !user || !userProfile.displayName) return;
+        try {
+            const feedRef = collection(db, 'artifacts', appId, 'communityFeed');
+            await addDoc(feedRef, {
+                authorId: user.uid,
+                authorName: userProfile.displayName,
+                timestamp: new Date(),
+                reactions: { lets_go: [], sw4: [], thats_ironman: [], keep_grinding: [] },
+                ...postData,
+            });
+        } catch (err) {
+            console.warn('Community post silently failed:', err);
+        }
+    }, [db, user, userProfile.displayName]);
+
+    // Badge detection: show dot if there are posts newer than last community visit
+    useEffect(() => {
+        const lastVisit = localStorage.getItem('lastCommunityVisit');
+        if (!lastVisit) { setHasUnreadCommunity(true); return; }
+        if (!db) return;
+        const checkUnread = async () => {
+            try {
+                const feedRef = collection(db, 'artifacts', appId, 'communityFeed');
+                const q = query(feedRef, where('timestamp', '>', new Date(lastVisit)));
+                const snap = await getDocs(q);
+                setHasUnreadCommunity(!snap.empty);
+            } catch (err) { /* silent */ }
+        };
+        checkUnread();
+    }, [db]);
 
 
     // --- Monday Cut Report Logic ---
@@ -347,6 +393,39 @@ const AppContent = () => {
         }
 
         if (message) setCoachingToast({ priority, message });
+
+        // ── Community milestone detection (additive — silent fail) ────────────
+        // Check all streak types at milestone thresholds after the coaching logic fires.
+        const checkStreakMilestones = () => {
+            const allStreaks = calculateCurrentStreaks(
+                metricKey && monthlyData ? { ...monthlyData } : monthlyData,
+                lastMonthData,
+                new Date()
+            );
+            const streakKeys = ['ironman', 'exposures', 'followUps', 'nos', 'exerc', 'personalDevelopment'];
+            streakKeys.forEach(key => {
+                const streakCount = allStreaks[key] || 0;
+                if (STREAK_MILESTONES.includes(streakCount)) {
+                    const isIronman = key === 'ironman';
+                    const label = STREAK_TYPE_LABELS[key] || key;
+                    writeCommunityPost({
+                        type: isIronman ? 'ironman_streak' : 'streak_milestone',
+                        streakType: key,
+                        streakCount,
+                        message: isIronman
+                            ? `${userProfile.displayName} just completed a ${streakCount}-day Ironman streak! 🔥`
+                            : `${userProfile.displayName} just hit a ${streakCount}-day ${label} streak! 📈`,
+                    });
+                }
+            });
+        };
+        // Run milestone check after a short delay so state has settled
+        setTimeout(checkStreakMilestones, 500);
+
+        // ── Personal Best opt-in (priority 1) ────────────────────────────────
+        // The coaching toast already fires with a NEW PERSONAL BEST message.
+        // We surface the opt-in share via the toast priority flag — no extra UI needed here.
+        // (Future: add a "Share with Community" CTA inside CoachingToast for priority === 1)
 
         const newBest = Math.max(allTimeBests[metricKey] || 0, numVal);
         const updatedProfile = { 
@@ -779,7 +858,7 @@ const AppContent = () => {
             <div className="sticky top-0 z-40 bg-gray-50 pt-6">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <Header displayName={userProfile.displayName} onSignOut={() => auth.signOut()} onEditName={() => setShowNameModal(true)} />
-                    <TabBar activeTab={activeTab} setActiveTab={setActiveTab} badges={{ today: showTodayBadge }} />
+                    <TabBar activeTab={activeTab} setActiveTab={setActiveTab} badges={{ today: showTodayBadge, community: hasUnreadCommunity }} />
                 </div>
             </div>
 
@@ -837,7 +916,6 @@ const AppContent = () => {
                             dailyPar={userProfile.dailyPar}
                             onShowLegend={() => setShowScoringLegend(true)}
                         />}
-                        {activeTab === 'leaderboard' && <Leaderboard db={db} weekId={getWeekId(currentDate)} user={user} />}
                         {activeTab === 'team' && <TeamPage user={user} db={db} userProfile={userProfile} setUserProfile={setUserProfile} weekId={getWeekId(currentDate)} />}
                         {activeTab === 'hotlist' && <HotList
                             user={user} db={db}
@@ -846,6 +924,13 @@ const AppContent = () => {
                             hotlist={hotlist}
                         />}
                         {activeTab === 'analytics' && <AnalyticsDashboard db={db} user={user} />}
+                        {activeTab === 'community' && (
+                            <CommunityFeed
+                                db={db}
+                                user={user}
+                                userProfile={userProfile}
+                            />
+                        )}
                     </Suspense>
                 </main>
             </div>

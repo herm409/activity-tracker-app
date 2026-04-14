@@ -3,7 +3,7 @@ import { collection, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestor
 import { debounce } from '../utils/helpers';
 import { appId } from '../firebaseConfig';
 import confetti from 'canvas-confetti';
-import { AlertTriangle, PlayCircle, Zap, Send, CheckCircle, TrendingUp, XCircle, Trash2, Clock, MessageSquare, Archive, ArchiveRestore, Flame, Users, List, Plus, Search, SortAsc, ChevronDown, ChevronUp, Phone, Mail, Tag, Smartphone, Coffee, LayoutGrid, LayoutList } from 'lucide-react';
+import { AlertTriangle, PlayCircle, Send, CheckCircle, TrendingUp, XCircle, Trash2, Clock, MessageSquare, Archive, ArchiveRestore, Flame, Users, List, Plus, Search, SortAsc, ChevronDown, ChevronUp, Phone, Mail, Tag, Smartphone, Coffee, LayoutGrid, LayoutList } from 'lucide-react';
 
 // --- Modals for Hotlist ---
 const AddHotlistItemModal = ({ onClose, onAdd }) => {

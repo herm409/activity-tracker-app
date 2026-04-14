@@ -49,6 +49,20 @@ service cloud.firestore {
           allow read: if isAuthenticated();
           allow write: if isAuthenticated() && isOwner(userId);
       }
+
+      // Community Win Feed
+      match /communityFeed/{postId} {
+        // Any authenticated associate can read the feed
+        allow read: if isAuthenticated();
+        // You can only create posts attributed to yourself
+        allow create: if isAuthenticated()
+                      && request.resource.data.authorId == request.auth.uid;
+        // Any authenticated user can react (update reactions array) on any post
+        allow update: if isAuthenticated();
+        // Only the original author can delete their own post
+        allow delete: if isAuthenticated()
+                      && resource.data.authorId == request.auth.uid;
+      }
     }
   }
 }
