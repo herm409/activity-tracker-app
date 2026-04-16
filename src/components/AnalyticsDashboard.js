@@ -12,7 +12,9 @@ const AnalyticsDashboard = ({ db, user }) => {
         expToPresentationRatio: 0,
         presentationToEnrollRatio: 0,
         noToEnrollRatio: 0,
-        lifetimeNos: 0
+        lifetimeNos: 0,
+        lifetimeExposures: 0,
+        lifetimeEnrolls: 0
     });
     const [teamAvg, setTeamAvg] = useState({ expToPresentation: 0, presentationToEnroll: 0 });
     const [loading, setLoading] = useState(true);
@@ -71,7 +73,9 @@ const AnalyticsDashboard = ({ db, user }) => {
                 expToPresentationRatio,
                 presentationToEnrollRatio,
                 noToEnrollRatio,
-                lifetimeNos
+                lifetimeNos,
+                lifetimeExposures,
+                lifetimeEnrolls
             });
 
             const monthLabels = [];
@@ -248,10 +252,10 @@ const AnalyticsDashboard = ({ db, user }) => {
                             <div>
                                 <p className="text-sm font-bold text-blue-800">Your Personal Numbers Game Formula</p>
                                 <p className="text-xs text-blue-700 mt-1 leading-relaxed">
-                                    {stats.expToPresentationRatio > 0 && stats.presentationToEnrollRatio > 0 ? (
+                                    {(stats.lifetimeExposures >= 10 && stats.lifetimeEnrolls >= 1) ? (
                                         <span>Based on your lifetime stats, your exact formula for success is mathematically proven: <strong>{(stats.expToPresentationRatio * stats.presentationToEnrollRatio).toFixed(1)} Exposures ➡️ {stats.presentationToEnrollRatio.toFixed(1)} Presentations ➡️ 1 Membership</strong>. That means your only goal is to execute {(stats.expToPresentationRatio * stats.presentationToEnrollRatio).toFixed(1)} exposures as fast as possible. Stop worrying about the outcome and start running your formula!</span>
                                     ) : (
-                                        <span>Your ratios are your personal batting average — they tell you how efficiently your activity converts. A high exposure-to-presentation ratio means you're having lots of conversations before getting a sit-down. The good news: <strong>consistent activity automatically unlocks your exact formula!</strong> Keep logging data.</span>
+                                        <span>Your ratios are your personal batting average — they tell you how efficiently your activity converts. A high exposure-to-presentation ratio means you're having lots of conversations before getting a sit-down. The good news: <strong>consistent activity automatically unlocks your exact formula!</strong> (Unlocks at 10 Exposures & 1 Membership).</span>
                                     )}
                                 </p>
                                 {teamAvg.expToPresentation > 0 && (
@@ -264,7 +268,7 @@ const AnalyticsDashboard = ({ db, user }) => {
                     </div>
 
                     {/* Interactive Goal Calculator */}
-                    {stats.expToPresentationRatio > 0 && stats.presentationToEnrollRatio > 0 && (
+                    {(stats.lifetimeExposures >= 10 && stats.lifetimeEnrolls >= 1) ? (
                         <div className="bg-white border-2 border-indigo-100 rounded-lg p-5 shadow-sm mt-4">
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                 <div className="flex-1">
@@ -300,6 +304,17 @@ const AnalyticsDashboard = ({ db, user }) => {
                                     <span className="block text-2xl sm:text-3xl font-black text-green-600">{goalInput}</span>
                                     <span className="block text-[10px] sm:text-xs font-bold text-green-800 uppercase mt-1">Memberships</span>
                                 </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm mt-4 opacity-75">
+                            <div className="flex items-center mb-2">
+                                <Target className="h-5 w-5 text-gray-400 mr-2" /> 
+                                <h4 className="text-[15px] font-black text-gray-500 uppercase tracking-wide">Goal Calculator (Locked) 🔒</h4>
+                            </div>
+                            <p className="text-sm text-gray-500 mt-2">Log at least <strong>10 Exposures</strong> and <strong>1 Membership</strong> to unlock the AI Goal Calculator. We need a minimum baseline of data to accurately calculate your personal success formula!</p>
+                            <div className="mt-3 bg-gray-100 rounded-full h-2 w-full overflow-hidden">
+                                <div className="bg-indigo-300 h-full" style={{ width: `${Math.min(100, Math.max((stats.lifetimeExposures / 10) * 50, (stats.lifetimeEnrolls / 1) * 50))}%` }}></div>
                             </div>
                         </div>
                     )}
