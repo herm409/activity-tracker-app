@@ -9,7 +9,7 @@ export const WEIGHTS = {
     presentations: 3,
     threeWays: 3,
     enrolls: 5,
-    ironman: 15
+    ironman: 5
 };
 
 export const isIronmanDay = (data) => {

@@ -18,6 +18,7 @@ const AnalyticsDashboard = ({ db, user }) => {
     const [loading, setLoading] = useState(true);
     const [historicalData, setHistoricalData] = useState([]);
     const [monthName, setMonthName] = useState('');
+    const [goalInput, setGoalInput] = useState(1);
 
     useEffect(() => {
         const fetchAllAnalyticsData = async () => {
@@ -261,6 +262,47 @@ const AnalyticsDashboard = ({ db, user }) => {
                             </div>
                         </div>
                     </div>
+
+                    {/* Interactive Goal Calculator */}
+                    {stats.expToPresentationRatio > 0 && stats.presentationToEnrollRatio > 0 && (
+                        <div className="bg-white border-2 border-indigo-100 rounded-lg p-5 shadow-sm mt-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <div className="flex-1">
+                                    <h4 className="text-[15px] font-black text-indigo-900 uppercase tracking-wide flex items-center">
+                                        <Target className="h-5 w-5 text-indigo-500 mr-2" /> Goal Calculator
+                                    </h4>
+                                    <p className="text-xs text-gray-500 mt-1 leading-snug">Want to sell a specific number of memberships? Enter your target below and the Coach will calculate the exact hustle required based solely on your personal ratios.</p>
+                                </div>
+                                <div className="flex-shrink-0 flex items-center bg-gray-50 border rounded-lg p-2">
+                                    <label className="text-[10px] font-bold uppercase text-gray-500 mr-3">Target Memberships:</label>
+                                    <input 
+                                        type="number" 
+                                        min="1" 
+                                        value={goalInput} 
+                                        onChange={(e) => setGoalInput(Math.max(1, parseInt(e.target.value) || 1))}
+                                        className="w-16 border-gray-300 rounded-md text-center font-black text-lg text-indigo-700 py-1"
+                                    />
+                                </div>
+                            </div>
+                            
+                            <div className="mt-5 pt-4 border-t border-gray-100 flex justify-between items-center bg-indigo-50 px-2 sm:px-6 py-4 rounded-xl shadow-inner">
+                                <div className="text-center flex-1">
+                                    <span className="block text-2xl sm:text-3xl font-black text-indigo-600">{Math.ceil((stats.expToPresentationRatio * stats.presentationToEnrollRatio) * goalInput)}</span>
+                                    <span className="block text-[10px] sm:text-xs font-bold text-indigo-800 uppercase mt-1">Exposures</span>
+                                </div>
+                                <div className="text-indigo-300 px-2"><ChevronsRight className="h-5 w-5 sm:h-8 sm:w-8" /></div>
+                                <div className="text-center flex-1">
+                                    <span className="block text-2xl sm:text-3xl font-black text-purple-600">{Math.ceil(stats.presentationToEnrollRatio * goalInput)}</span>
+                                    <span className="block text-[10px] sm:text-xs font-bold text-purple-800 uppercase mt-1">Presentations</span>
+                                </div>
+                                <div className="text-purple-300 px-2"><ChevronsRight className="h-5 w-5 sm:h-8 sm:w-8" /></div>
+                                <div className="text-center flex-1">
+                                    <span className="block text-2xl sm:text-3xl font-black text-green-600">{goalInput}</span>
+                                    <span className="block text-[10px] sm:text-xs font-bold text-green-800 uppercase mt-1">Memberships</span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 
