@@ -115,23 +115,43 @@ const TimeOfDayCoaching = ({ todayPoints, dailyPar, todayData }) => {
 
     let icon, bg, border, headline, body;
 
+        // Simple hash to grab random phrase from array based on points/date so it feels fresh
+        const hash = todayPoints + new Date().getDate();
+        const getMsg = (arr) => arr[hash % arr.length];
+
     if (hour < 10) {
         // Morning: Game Plan
         icon = <Sun className="h-5 w-5 text-amber-500 flex-shrink-0" />;
         bg = 'bg-amber-50'; border = 'border-amber-200';
         headline = 'Good Morning — Game Plan';
-        body = `Your daily par is ${dailyPar} pts. Lead with exposures, water your pipeline with follow-ups, and aim for at least one No today. Let's win the morning.`;
+        body = getMsg([
+            `Wake up and win! Your daily par is ${dailyPar} pts. Drop those exposures early, water the pipeline, and don't dodge the No's. Set the tone!`,
+            `The sun is up and the board is clean. Daily par: ${dailyPar} pts. Execute the fundamentals and let's go get these wins.`,
+            `Morning huddle: Par is ${dailyPar} pts today. Don't wait for things to happen—make them happen. Drop that first exposure!`
+        ]);
     } else if (hour < 17) {
         // Afternoon: Pace Check
         icon = <TrendingUp className="h-5 w-5 text-blue-500 flex-shrink-0" />;
         bg = 'bg-blue-50'; border = 'border-blue-200';
         headline = 'Midday Pace Check';
         if (deficit > 0) {
-            body = `You're ${deficit} pt${deficit !== 1 ? 's' : ''} short of par. The afternoon is your best time to reach people — make it count with ${Math.max(1, deficit)} more activity${deficit !== 1 ? 's' : ''}.`;
+            body = getMsg([
+                `You're ${deficit} pt${deficit !== 1 ? 's' : ''} short of par. The afternoon is prime time — flip the switch and drop ${Math.max(1, deficit)} more play${deficit !== 1 ? 's' : ''}.`,
+                `Pace check reveals a ${deficit}-point deficit. Ain't no time to coast. Get active and close this gap!`,
+                `${deficit} pt${deficit !== 1 ? 's' : ''} to par. We need you off the bench and in the game. Make those calls!`
+            ]);
         } else if (E > 0 && F === 0) {
-            body = `Great exposure work this morning! Your follow-up count is at zero — afternoon is prime time to water those seeds.`;
+            body = getMsg([
+                `Solid exposure work this morning! But follow-ups are at zero — your seeds ain't gonna water themselves. Back on the line!`,
+                `You planted the seeds, now it's time to water them. Don't leave those morning exposures hanging—go follow up!`,
+                `Half the job is done. Your exposure game is strong, but the fortune is in the follow-up. Let's get it!`
+            ]);
         } else {
-            body = `You're on pace — ${todayPoints} pts so far. Push for more before the end of the day. The game isn't over until the day is.`;
+            body = getMsg([
+                `You're on pace — ${todayPoints} pts so far. Keep the momentum pushing. The game isn't over until the clock runs out!`,
+                `We see you! Sitting solid at ${todayPoints} pts. Keep duplicating this hustle to pad that lead. Let's eat!`,
+                `On pace and looking dangerous. Don't take your foot off the gas now. Finish strong!`
+            ]);
         }
     } else {
         // Evening: Close-of-Day
@@ -139,9 +159,18 @@ const TimeOfDayCoaching = ({ todayPoints, dailyPar, todayData }) => {
         bg = 'bg-indigo-50'; border = 'border-indigo-200';
         headline = 'Close of Day Recap';
         if (todayPoints >= dailyPar) {
-            body = `Day closed! You finished at ${todayPoints} pts — ${todayPoints - dailyPar >= 0 ? `${todayPoints - dailyPar} pts under par` : 'even par'}. Log anything you haven't captured yet, then rest well.`;
+            const diff = todayPoints - dailyPar;
+            body = getMsg([
+                `Day secured! You finished at ${todayPoints} pts (${diff >= 0 ? `${diff} under par` : 'even par'}). Log your final numbers, soak in the W, and rest up.`,
+                `Mission accomplished. The board says ${todayPoints} pts. Shut it down and celebrate your consistency today!`,
+                `This is what winning looks like. Finish logging your stats, grab some rest, and prepare to do it again tomorrow.`
+            ]);
         } else {
-            body = `Day closing out at ${todayPoints} pts — ${deficit} short of par. Log anything you haven't captured and set a stronger intention for tomorrow.`;
+            body = getMsg([
+                `Day closing out at ${todayPoints} pts — ${deficit} short of par. Shake it off, learn the lesson, and come back with a vengeance tomorrow.`,
+                `We fell short today by ${deficit} pts. It happens to the best of us. Rest up and bring that fire back tomorrow!`,
+                `Scoreboard check: ${deficit} shy of par. Don't dwell on it. Faith, family, fitness, and get back to the hustle tomorrow.`
+            ]);
         }
     }
 
@@ -302,13 +331,53 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
         if (activeCategories >= 3) { grade = 'A'; gradeDesc = 'Excellent Balance'; gradeColor = 'text-green-700 bg-green-100'; }
         else if (activeCategories === 2) { grade = 'B'; gradeDesc = 'Good Balance'; gradeColor = 'text-amber-700 bg-amber-100'; }
 
-        let message = "Good effort today, but your activity is focused on only one area. Try diversifying your efforts to build a healthier pipeline.";
-        if (activeCategories === 0) { message = "You haven't logged any core prospecting activities yet today! Time to plant some seeds."; grade = 'N/A'; gradeDesc = 'No Activity'; gradeColor = 'text-gray-700 bg-gray-100'; }
-        if (E > 3 && F < E) message = "You're making great new contacts! Make sure your follow-ups keep pace so prospects don't fall through the cracks.";
-        else if (F > 3 && T === 0) message = "You're doing a lot of follow-ups! Consider using a 3-way call to provide third-party validation.";
-        else if (F > 3 && E === 0) message = "Great job following up today! Remember to also plant new seeds with fresh exposures.";
-        else if (A >= 5 && N === 0) message = "You're putting in a lot of activity! Are you asking the tough questions? Don't be afraid to push for a definitive No.";
-        else if (activeCategories >= 3) message = "Outstanding balance! You're planting seeds, watering them, and asking for decisions. Keep it up!";
+        const hash = A + activeCategories;
+        const getMsg = (arr) => arr[hash % arr.length];
+
+        let message = getMsg([
+            "Good effort, but you're only swinging from one side of the plate. Diversify your efforts to build a healthier pipeline. We need all-around players.",
+            "You got some numbers on the board, but the balance is off. A true champion masters every play in the playbook.",
+            "Glad to see you active, but don't get stuck in a rut. Mix up your exposures, follow-ups, and 3-way calls!"
+        ]);
+        
+        if (activeCategories === 0) { 
+            message = getMsg([
+                "You haven't logged any core plays yet today! Faith without works is dead. Time to plant some seeds.",
+                "Zero activity logged so far. Don't let yourself get shut out—drop an exposure and get in the game!",
+                "The board is blank. We need you out there. Pick up the phone and make something happen!"
+            ]); 
+            grade = 'N/A'; gradeDesc = 'No Activity'; gradeColor = 'text-gray-700 bg-gray-100'; 
+        } else if (E > 3 && F < E) {
+            message = getMsg([
+                "You're making great new contacts! But don't let prospects fall through the cracks. The fortune is in the follow-up—go get it!",
+                "Love the fresh exposures. Just remember, a seed unwatered won't grow. Step up your follow-up game today.",
+                "Killer prospecting hustle! But you gotta circle back. Hit up those previous exposures and turn that interest into investment."
+            ]);
+        } else if (F > 3 && T === 0) {
+            message = getMsg([
+                "Heavy on the follow-ups—love the hustle! Now leverage the system. Bring a veteran in for a 3-way call and seal the deal.",
+                "You're maintaining the pipeline nicely. Stop trying to close them alone. Connect a 3-way call and watch the magic happen.",
+                "Great consistency on the follow-ups. But to break through, you need third-party validation. Schedule a 3-way call ASAP!"
+            ]);
+        } else if (F > 3 && E === 0) {
+            message = getMsg([
+                "Great job watering the seeds! But don't forget to plant new ones. Drop some fresh exposures on the board.",
+                "You're managing your existing prospects perfectly, but the pipeline is drying up. Go spark some new conversations!",
+                "Solid follow-ups. Now balance it out. A true hustler is always adding new names to the list. Make a fresh contact!"
+            ]);
+        } else if (A >= 5 && N === 0) {
+            message = getMsg([
+                "You're putting up serious numbers! But are you asking the tough questions? Don't be afraid of rejection. Go hunt for a definitive No!",
+                "Activity is high, which means people are listening. Force a decision! A 'No' is just the toll booth on the road to a 'Yes'.",
+                "You have their attention. Stop playing it safe. Push for a verdict. Rejection means you're doing the work!"
+            ]);
+        } else if (activeCategories >= 3) {
+            message = getMsg([
+                "Flawless execution! You're planting seeds, watering them, and asking for decisions. This is exactly how we build a dynasty.",
+                "Masterclass performance. Your balance is incredible today. Keep duplicating this system and you'll be unstoppable.",
+                "This is championship-level activity. You are hitting every section of the pipeline. Straight heat! 🔥"
+            ]);
+        }
 
         return { grade, gradeDesc, gradeColor, message };
     };
