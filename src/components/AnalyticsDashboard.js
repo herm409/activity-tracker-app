@@ -199,13 +199,21 @@ const AnalyticsDashboard = ({ db, user }) => {
             <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">Your Business Analytics</h2>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-1 bg-white p-4 rounded-lg shadow-sm">
+                <div className="lg:col-span-1 bg-white p-4 rounded-lg shadow-sm flex flex-col h-full">
                     <h3 className="font-semibold mb-3 text-center text-gray-700">{monthName} Funnel</h3>
-                    <div className="space-y-1">
+                    <div className="space-y-1 flex-grow flex flex-col justify-center">
                         <FunnelStep value={stats.funnelExposures} label="Exposures" color="bg-indigo-500" isTop />
-                        <div className="flex justify-center items-center text-gray-400 my-1"><ChevronsRight className="h-5 w-5" /></div>
+                        <div className="my-1 flex items-center justify-center">
+                            <div className="px-3 py-1 bg-indigo-50 border border-indigo-200 text-indigo-700 text-[11px] font-bold rounded-full shadow-sm flex items-center">
+                                🎯 {stats.expToPresentationRatio > 0 ? stats.expToPresentationRatio.toFixed(1) : '0'} : 1 Ratio
+                            </div>
+                        </div>
                         <FunnelStep value={stats.funnelPresentations} label="Presentations" color="bg-purple-500" />
-                        <div className="flex justify-center items-center text-gray-400 my-1"><ChevronsRight className="h-5 w-5" /></div>
+                        <div className="my-1 flex items-center justify-center">
+                            <div className="px-3 py-1 bg-purple-50 border border-purple-200 text-purple-700 text-[11px] font-bold rounded-full shadow-sm flex items-center">
+                                🎯 {stats.presentationToEnrollRatio > 0 ? stats.presentationToEnrollRatio.toFixed(1) : '0'} : 1 Ratio
+                            </div>
+                        </div>
                         <FunnelStep value={stats.funnelEnrolls} label="Memberships Sold" color="bg-green-500" isBottom />
                     </div>
                 </div>
@@ -237,13 +245,17 @@ const AnalyticsDashboard = ({ db, user }) => {
                         <div className="flex items-start gap-3">
                             <Info className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
                             <div>
-                                <p className="text-sm font-bold text-blue-800">Why These Ratios Matter</p>
+                                <p className="text-sm font-bold text-blue-800">Your Personal Numbers Game Formula</p>
                                 <p className="text-xs text-blue-700 mt-1 leading-relaxed">
-                                    Your ratios are your personal batting average — they tell you <strong>how efficiently your activity converts to membership sales</strong>. A high exposure-to-presentation ratio means you're having lots of conversations before getting a sit-down; focus on sharpening your initial approach. A high presentation-to-membership ratio means you're great at getting meetings but have an opportunity in your close. The good news: <strong>consistent activity improves both over time automatically</strong> — the more you do it, the better you get.
+                                    {stats.expToPresentationRatio > 0 && stats.presentationToEnrollRatio > 0 ? (
+                                        <span>Based on your lifetime stats, your exact formula for success is mathematically proven: <strong>{(stats.expToPresentationRatio * stats.presentationToEnrollRatio).toFixed(1)} Exposures ➡️ {stats.presentationToEnrollRatio.toFixed(1)} Presentations ➡️ 1 Membership</strong>. That means your only goal is to execute {(stats.expToPresentationRatio * stats.presentationToEnrollRatio).toFixed(1)} exposures as fast as possible. Stop worrying about the outcome and start running your formula!</span>
+                                    ) : (
+                                        <span>Your ratios are your personal batting average — they tell you how efficiently your activity converts. A high exposure-to-presentation ratio means you're having lots of conversations before getting a sit-down. The good news: <strong>consistent activity automatically unlocks your exact formula!</strong> Keep logging data.</span>
+                                    )}
                                 </p>
                                 {teamAvg.expToPresentation > 0 && (
-                                    <p className="text-xs text-blue-600 mt-2 font-medium">
-                                        📊 Compare yourself to the team avg above and identify your biggest leverage point.
+                                    <p className="text-xs text-blue-600 mt-2 font-medium bg-blue-100 px-2 py-1 rounded inline-block">
+                                        📊 Compare yourself to the team averages above to see your ultimate leverage points!
                                     </p>
                                 )}
                             </div>
@@ -253,20 +265,42 @@ const AnalyticsDashboard = ({ db, user }) => {
             </div>
 
             {/* 100 No's Jar */}
-            <div className="bg-white p-6 rounded-lg shadow-sm border-2 border-red-100 flex flex-col md:flex-row items-center justify-between">
+            <div className="bg-white p-6 rounded-lg shadow-sm flex flex-col md:flex-row items-center justify-between border-t-4 border-red-500">
                 <div className="md:w-1/2 mb-4 md:mb-0 md:pr-6">
-                    <h3 className="text-xl font-bold text-gray-900 flex items-center">
-                        <XCircle className="h-6 w-6 text-red-500 mr-2" />
-                        The 100 No's Jar
-                    </h3>
+                    <div className="flex justify-between items-start">
+                        <h3 className="text-xl font-bold text-gray-900 flex items-center">
+                            <XCircle className="h-6 w-6 text-red-500 mr-2" />
+                            The 100 No's Jar
+                        </h3>
+                        {Math.floor(stats.lifetimeNos / 100) > 0 && (
+                            <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-3 py-1 rounded-full text-xs font-bold flex items-center shadow-sm">
+                                🏆 {Math.floor(stats.lifetimeNos / 100)} Jars Filled!
+                            </div>
+                        )}
+                    </div>
+                    
                     <p className="text-sm text-gray-600 mt-2">
                         Your goal isn't to get a "Yes". Your daily goal is to collect "No's" and fill this jar. Every "No" is a required step towards a "Yes".
                     </p>
-                    <div className="mt-4">
-                        <span className="text-3xl font-black text-red-600">{stats.lifetimeNos % 100}</span>
-                        <span className="text-lg text-gray-500 font-semibold"> / 100</span>
-                        <p className="text-xs text-red-400 font-medium uppercase tracking-widest mt-1">
-                            Current Jar
+                    
+                    <div className="bg-red-50 p-3 rounded-md border border-red-100 mt-4 leading-snug">
+                        <span className="text-xs font-bold text-red-800 uppercase tracking-widest block mb-1">Coach's Insight:</span>
+                        <span className="text-sm text-red-700 font-medium italic">"{[
+                            "Every No pays the toll to a Yes. Keep filling the jar!",
+                            "Rejection isn't failure, it's data. Go collect more data!",
+                            "Stop playing it safe. Go hunt for No's!",
+                            "A clear No is better than a polite maybe. Clear the pipeline!",
+                            "The fastest way to a Yes is through a mountain of No's. Dig in!",
+                            "Get rejected faster! That means you're actually doing the work.",
+                            "Faith without works is dead. Don't fear the No, chase it!"
+                        ][(stats.lifetimeNos || 0) % 7]}"</span>
+                    </div>
+
+                    <div className="mt-5 flex items-end">
+                        <span className="text-4xl font-black text-red-600">{stats.lifetimeNos % 100}</span>
+                        <span className="text-xl text-gray-500 font-semibold mb-1 ml-1"> / 100</span>
+                        <p className="text-xs text-red-400 font-bold uppercase tracking-widest mb-1.5 ml-3">
+                            Current Jar Status
                         </p>
                     </div>
                 </div>
