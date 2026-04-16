@@ -166,6 +166,102 @@ const TeamDashboard = ({ teamData, teamMembers, onLeaveTeam, onShareInvite, user
         return (b.rankingScore || 0) - (a.rankingScore || 0);
     });
 
+    const topScorer = [...teamMembers].sort((a,b) => (b.rankingScore || 0) - (a.rankingScore || 0))[0];
+    const topHustler = [...teamMembers].sort((a,b) => (b.nos || 0) - (a.nos || 0))[0];
+
+    // Dynamic Team Coaching String Generator (Varied & Culturally Resonant)
+    const coachData = useMemo(() => {
+        // Hash based on activity to ensure it changes organically as people log things, but doesn't flicker wildly on re-renders
+        const seed = teamTotals.exposures + teamTotals.presentations + teamMembers.reduce((sum, m) => sum + (m.nos || 0), 0);
+        const hash = seed; // Use full seed. Modulo is applied at array access.
+        const getMsg = (arr) => arr[hash % arr.length];
+
+        if (teamTotals.exposures === 0 && teamTotals.presentations === 0) {
+            return { 
+                text: getMsg([
+                   "⚠️ Coach: Y'all moving in slow motion today! Faith without works is dead—let’s get some numbers on this board.",
+                   "⚠️ Coach: Still waiting for the opening act. We can't stack wins if nobody is swinging. Let's get it active!",
+                   "⚠️ Coach: The scoreboard is looking respectfully quiet right now. Who's stepping up to drop the first exposure?",
+                   "⚠️ Coach: Ain't nothing gonna happen sitting on the sidelines. Let's get out there and make a wave today!",
+                   "⚠️ Coach: Hello? Is the mic on? We need a spark on the board before the day runs away from us.",
+                   "⚠️ Coach: The day is young, but the clock is ticking. Let's not make it a habit of starting slow. First one on the board gets the momentum!",
+                   "⚠️ Coach: If you wait for the perfect moment to start, you'll be waiting all day. Pick up the phone and punch the clock!",
+                   "⚠️ Coach: No activity logged yet... Remember, discipline is doing it even when you don't feel like it. Let's go!",
+                   "⚠️ Coach: Big goals require big action. Let's drop that first exposure and break the seal!",
+                   "⚠️ Coach: Complacency is the enemy of progress. Shake off the dust and make that first contact right now."
+                ]), 
+                color: "text-amber-800", bg: "bg-amber-50", border: "border-amber-200" 
+            };
+        }
+        if (teamTotals.exposures > 0 && teamTotals.presentations < teamTotals.exposures / 4) {
+            return { 
+                text: getMsg([
+                    "🏆 Coach: The hustle is real today—exposures are up! But we ain't playing for participation trophies. Tag your mentors in for a 3-Way Call and let's close these out!",
+                    "🏆 Coach: Y'all are planting a ton of seeds, but it's time to harvest! Get a leader on a 3-Way so we can turn these conversations into conversions.",
+                    "🏆 Coach: Pipeline is brewing but the presentations are light. Don't carry the weight alone—bring your mentor on the line!",
+                    "🏆 Coach: Massive exposure volume! Keep the momentum pushing by locking in those 3-Way calls. Secure the bag!",
+                    "🏆 Coach: We got their attention, now let's get their commitment. Stop texting and get them on a presentation!",
+                    "🏆 Coach: Good volume, but low leverage. Connect your prospects with a mentor so they can see the bigger picture.",
+                    "🏆 Coach: I love the activity, but the closing ratio needs love. Let a veteran step in on a 3-Way call and seal the deal.",
+                    "🏆 Coach: High exposures are just the warm-up. Presentations are the main event. Let's transition these leads!",
+                    "🏆 Coach: A seed unwatered won't grow. Water these exposures with a solid presentation today.",
+                    "🏆 Coach: Let's turn this 'interest' into 'investment'. Bring in the heavy hitters for a 3-Way call!"
+                ]), 
+                color: "text-indigo-800", bg: "bg-indigo-50", border: "border-indigo-200" 
+            };
+        }
+        if (teamTotals.presentations >= teamTotals.exposures / 4 && teamTotals.presentations > 0) {
+             const nos = teamMembers.reduce((sum, m) => sum + (m.nos || 0), 0);
+             if (nos < teamTotals.presentations / 2) {
+                  return { 
+                      text: getMsg([
+                          "🔥 Coach: The pipeline is officially heavy right now! Stop playing it safe and get those decisions. Every 'No' pays the toll to a 'Yes'.",
+                          "🔥 Coach: We got them to the table, now don't leave without an answer! Ain't no room for 'maybe'. Go collect those No's!",
+                          "🔥 Coach: You're doing the heavy lifting, now it's time to cash out. Push for a definitive answer. Go hunt for No's!",
+                          "🔥 Coach: Presentations are high—people are listening. Turn that attention into a decision. A 'No' gets you closer to the bag!",
+                          "🔥 Coach: Ambiguity is the enemy. Force the issue. A clear 'No' is way better than a polite 'Let me think about it'.",
+                          "🔥 Coach: We don't get paid to present, we get paid to close. If they say no, cross 'em off and keep moving. Next!",
+                          "🔥 Coach: Stop being afraid of rejection. Go collect three No's today and watch a Yes fall right into your lap.",
+                          "🔥 Coach: You've delivered the value, now demand the verdict. Push for decisions before the end of the day!",
+                          "🔥 Coach: The follow-up is where the fortune is. Clear the pipeline—yes or no, we just need to know!",
+                          "🔥 Coach: Rejection means you're actually doing the work. Go get rejected! Add a 'No' to the board!"
+                      ]), 
+                      color: "text-red-800", bg: "bg-red-50", border: "border-red-200" 
+                  };
+             }
+             return { 
+                 text: getMsg([
+                     "🚀 Coach: Talk to 'em! The team is fully dialed in. This is what momentum looks like. Don't take your foot off the gas now!",
+                     "🚀 Coach: Straight heat! Activity is up, conversions are hitting, and the hustle is unmatched. Keep duplicating this energy.",
+                     "🚀 Coach: Faith, family, fitness, and FUN! Y'all are crushing the board today. Keep running the play!",
+                     "🚀 Coach: The entire squad is eating today! Keep pushing, keep grinding, and let's lock in this week's W.",
+                     "🚀 Coach: This is a championship-level pace right here. Love the volume and the follow-through! Elevate the standard.",
+                     "🚀 Coach: Flawless execution across the board. You are putting on a masterclass for the whole organization. Keep going!",
+                     "🚀 Coach: When preparation meets opportunity, the board looks exactly like this. Absolutely stellar day.",
+                     "🚀 Coach: No weak links today! Every metric is hitting exactly where we need it to. Pour fuel on the fire!",
+                     "🚀 Coach: The energy is contagious right now. Let's finish the day as strong as we started it. Big plays only!",
+                     "🚀 Coach: This is how leaders run the system. You’ve successfully pushed through the noise. Celebrate the W and keep grinding!"
+                 ]), 
+                 color: "text-green-800", bg: "bg-green-50", border: "border-green-200" 
+             };
+        }
+        return { 
+            text: getMsg([
+                "💡 Coach: Keep putting the reps in. The more exposures you log, the faster your team pulls ahead. Stay consistent!",
+                "💡 Coach: Brick by brick. Small wins today build the dynasty tomorrow. Go get those exposures!",
+                "💡 Coach: Stay locked in. The hustle you put in right now sets up your victories for the weekend.",
+                "💡 Coach: We see the effort! Keep reaching out. Consistency is the only cheat code we need.",
+                "💡 Coach: Don't look at the scoreboard right now, look at your daily habits. Are you hitting Par? Keep swinging.",
+                "💡 Coach: Motivation gets you going, but discipline keeps you growing. Let's stay disciplined today.",
+                "💡 Coach: Activity breeds more activity. Be the spark plug your team needs right now. Go hit someone up!",
+                "💡 Coach: Control the controllables. You can't control their answer, but you can control your exposures. Get it done.",
+                "💡 Coach: Progress > Perfection. A slightly messy exposure is better than no exposure at all. Take action!",
+                "💡 Coach: Building a business takes time. You are laying the foundation today. Keep throwing up numbers!"
+            ]), 
+            color: "text-blue-800", bg: "bg-blue-50", border: "border-blue-200" 
+        };
+    }, [teamTotals, teamMembers]);
+
     const renderIronmanBadge = (streak) => {
         if (!streak || streak < 3) return null;
         let Icon = Medal;
@@ -241,7 +337,7 @@ const TeamDashboard = ({ teamData, teamMembers, onLeaveTeam, onShareInvite, user
                         </div>
                     </div>
                     <div className="flex items-center space-x-2 mt-4 sm:mt-0">
-                        <button onClick={onShareInvite} className="flex items-center bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 shadow-sm text-sm"><Share2 className="h-4 w-4 mr-2" /> Share Invite</button>
+                        <button onClick={onShareInvite} className={`flex items-center bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 shadow-sm text-sm transition-all ${teamMembers.length <= 1 ? 'animate-pulse ring-4 ring-indigo-300' : ''}`}><Share2 className="h-4 w-4 mr-2" /> Share Invite</button>
                         <button onClick={() => setShowConfirmLeave(true)} className="flex items-center bg-red-100 text-red-700 px-4 py-2 rounded-md hover:bg-red-200 text-sm"><LogOut className="h-4 w-4 mr-2" /> Leave</button>
                     </div>
                 </div>
@@ -256,6 +352,11 @@ const TeamDashboard = ({ teamData, teamMembers, onLeaveTeam, onShareInvite, user
                             {totalTeamScore > 0 ? `+${totalTeamScore}` : totalTeamScore}
                         </p>
                     </div>
+                </div>
+
+                {/* Team Coach AI Feature */}
+                <div className={`mt-4 w-full border rounded-lg p-3 ${coachData.bg} ${coachData.border} shadow-sm flex items-start space-x-2`}>
+                    <span className={`text-sm font-semibold tracking-wide ${coachData.color} leading-snug`}>{coachData.text}</span>
                 </div>
             </div>
 
@@ -283,11 +384,22 @@ const TeamDashboard = ({ teamData, teamMembers, onLeaveTeam, onShareInvite, user
                             <div className="flex items-center">
                                 <span className="font-bold text-lg w-8">{index + 1}</span>
                                 <span className="font-medium flex flex-col">
-                                    <div className="flex items-center">
+                                    <div className="flex flex-wrap items-center mt-0.5">
                                         {member.displayName || "Unknown User"}
                                         {renderIronmanBadge(member.ironmanStreak)}
+                                        {topScorer && topScorer.uid === member.uid && (member.rankingScore > 0) && (
+                                            <span className="ml-1.5 text-[10px] bg-yellow-100 text-yellow-800 font-bold px-1.5 py-0.5 rounded-full border border-yellow-300 shadow-sm whitespace-nowrap">👑 MVP</span>
+                                        )}
+                                        {topHustler && topHustler.uid === member.uid && (member.nos > 0) && (
+                                            <span className="ml-1.5 text-[10px] bg-red-100 text-red-800 font-bold px-1.5 py-0.5 rounded-full border border-red-300 shadow-sm whitespace-nowrap">🔥 Top Hustler</span>
+                                        )}
                                     </div>
-                                    <span className="text-xs text-gray-500 font-normal">Exposures: {member.weeklyExposures || member.exposures || 0}</span>
+                                    <span className="text-xs text-gray-500 font-normal mt-0.5 flex items-center">
+                                        Exposures: {member.weeklyExposures || member.exposures || 0}
+                                        {(member.weeklyExposures || member.exposures || 0) === 0 && (
+                                            <span className="ml-2 italic text-gray-400 bg-gray-200 px-1.5 py-0.5 rounded text-[10px]">Pending Activity...</span>
+                                        )}
+                                    </span>
                                 </span>
                             </div>
                             <div className="flex items-center space-x-3">

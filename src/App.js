@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, Suspense, useMemo } from 'react';
-import { calculatePoints } from './utils/scoring';
+import { calculatePoints, isIronmanDay } from './utils/scoring';
 import * as ActionModals from './components/ActionModals';
 import { doc, setDoc, getDoc, updateDoc, collection, query, orderBy, onSnapshot, addDoc, where, getDocs } from 'firebase/firestore';
 import html2canvas from 'html2canvas';
@@ -225,9 +225,7 @@ const AppContent = () => {
 
 
 
-    // ... (existing imports)
 
-    // ... inside AppContent ...
 
     const updateLeaderboard = useCallback(async (currentMonthData, targetMonthId, dateOfChange) => {
         if (!user || !db || !userProfile.displayName || !dateOfChange) return;

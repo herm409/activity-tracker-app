@@ -166,16 +166,16 @@ const CommunityFeed = ({ db, user, userProfile }) => {
         localStorage.setItem('lastCommunityVisit', new Date().toISOString());
     }, []);
 
-    // Subscribe to last 7 days of community posts
+    // Subscribe to last 30 days of community posts
     useEffect(() => {
         if (!db) return;
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
         const feedRef = collection(db, 'artifacts', appId, 'communityFeed');
         const q = query(
             feedRef,
-            where('timestamp', '>=', sevenDaysAgo),
+            where('timestamp', '>=', thirtyDaysAgo),
             orderBy('timestamp', 'desc')
         );
 
@@ -211,7 +211,7 @@ const CommunityFeed = ({ db, user, userProfile }) => {
                         Win Feed
                     </h2>
                     <p className="text-sm text-gray-500 mt-0.5">
-                        Community milestones from the last 7 days
+                        Community milestones from the last 30 days
                     </p>
                 </div>
             </div>
@@ -237,7 +237,7 @@ const CommunityFeed = ({ db, user, userProfile }) => {
             {/* Footer */}
             {posts.length > 0 && (
                 <p className="text-center text-xs text-gray-400 pb-4">
-                    Showing wins from the last 7 days · Hit your Daily Cycle milestones to appear here!
+                    Showing wins from the last 30 days · Hit your Daily Cycle milestones to appear here!
                 </p>
             )}
         </div>
