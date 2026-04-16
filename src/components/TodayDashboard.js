@@ -454,10 +454,10 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
                         <div>
                             <h3 className="font-bold text-gray-800 text-lg flex items-center">
                                 The Daily Cycle
-                                {isIronman && <span className="ml-2 bg-orange-500 text-white text-[10px] uppercase px-2 py-0.5 rounded-full font-bold animate-pulse">+15 PTS</span>}
+                                {isIronman && <span className="ml-2 bg-orange-500 text-white text-[10px] uppercase px-2 py-0.5 rounded-full font-bold animate-pulse">+5 PTS</span>}
                             </h3>
                             <p className="text-sm text-gray-500">
-                                {isIronman ? "You crushed it! Full cycle complete." : `Complete all 6 core activities for a +15 pt bonus. (${ironmanCompleted}/6)`}
+                                {isIronman ? "You crushed it! Full cycle complete." : `Complete all 6 core activities for a +5 pt bonus. (${ironmanCompleted}/6)`}
                             </p>
                             <p className="text-[10px] text-gray-400 mt-0.5">Tap each circle to see its label</p>
                         </div>

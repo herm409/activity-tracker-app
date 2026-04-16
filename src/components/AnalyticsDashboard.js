@@ -277,32 +277,55 @@ const AnalyticsDashboard = ({ db, user }) => {
                                     </h4>
                                     <p className="text-xs text-gray-500 mt-1 leading-snug">Want to sell a specific number of memberships? Enter your target below and the Coach will calculate the exact hustle required based solely on your personal ratios.</p>
                                 </div>
-                                <div className="flex-shrink-0 flex items-center bg-gray-50 border rounded-lg p-2">
-                                    <label className="text-[10px] font-bold uppercase text-gray-500 mr-3">Target Memberships:</label>
-                                    <input 
-                                        type="number" 
-                                        min="1" 
-                                        value={goalInput} 
-                                        onChange={(e) => setGoalInput(Math.max(1, parseInt(e.target.value) || 1))}
-                                        className="w-16 border-gray-300 rounded-md text-center font-black text-lg text-indigo-700 py-1"
-                                    />
+                                <div className="flex-shrink-0 flex items-center bg-gray-50 border rounded-lg p-2 mt-3 sm:mt-0">
+                                    <label className="text-[10px] font-bold uppercase text-gray-500 mr-2 hidden sm:inline-block">Target Memberships:</label>
+                                    <label className="text-[10px] font-bold uppercase text-gray-500 mr-2 sm:hidden flex-shrink-0">Target:</label>
+                                    <div className="flex items-center">
+                                        <button 
+                                            type="button" 
+                                            onClick={() => setGoalInput(Math.max(1, (goalInput || 1) - 1))}
+                                            className="w-8 h-8 rounded-l bg-white border border-gray-300 text-indigo-600 font-bold text-lg hover:bg-gray-100 flex items-center justify-center -mr-px"
+                                        >
+                                            -
+                                        </button>
+                                        <input 
+                                            type="number" 
+                                            min="1" 
+                                            value={goalInput} 
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                setGoalInput(val === '' ? '' : parseInt(val));
+                                            }}
+                                            onBlur={() => {
+                                                if (!goalInput || goalInput < 1) setGoalInput(1);
+                                            }}
+                                            className="w-12 h-8 border-y border-x-0 border-gray-300 text-center font-black text-lg text-indigo-700 p-0 focus:ring-0 focus:border-gray-300"
+                                        />
+                                        <button 
+                                            type="button" 
+                                            onClick={() => setGoalInput((goalInput || 0) + 1)}
+                                            className="w-8 h-8 rounded-r bg-white border border-gray-300 text-indigo-600 font-bold text-lg hover:bg-gray-100 flex items-center justify-center -ml-px"
+                                        >
+                                            +
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                             
                             <div className="mt-5 pt-4 border-t border-gray-100 flex justify-between items-center bg-indigo-50 px-2 sm:px-6 py-4 rounded-xl shadow-inner">
-                                <div className="text-center flex-1">
-                                    <span className="block text-2xl sm:text-3xl font-black text-indigo-600">{Math.ceil((stats.expToPresentationRatio * stats.presentationToEnrollRatio) * goalInput)}</span>
-                                    <span className="block text-[10px] sm:text-xs font-bold text-indigo-800 uppercase mt-1">Exposures</span>
+                                <div className="text-center flex-1 min-w-0">
+                                    <span className="block text-2xl sm:text-3xl font-black text-indigo-600">{Math.ceil((stats.expToPresentationRatio * stats.presentationToEnrollRatio) * (goalInput || 1))}</span>
+                                    <span className="block text-[9px] sm:text-xs font-bold text-indigo-800 uppercase mt-1 truncate tracking-tighter sm:tracking-normal">Exposures</span>
                                 </div>
-                                <div className="text-indigo-300 px-2"><ChevronsRight className="h-5 w-5 sm:h-8 sm:w-8" /></div>
-                                <div className="text-center flex-1">
-                                    <span className="block text-2xl sm:text-3xl font-black text-purple-600">{Math.ceil(stats.presentationToEnrollRatio * goalInput)}</span>
-                                    <span className="block text-[10px] sm:text-xs font-bold text-purple-800 uppercase mt-1">Presentations</span>
+                                <div className="text-indigo-300 px-1"><ChevronsRight className="h-5 w-5 sm:h-8 sm:w-8" /></div>
+                                <div className="text-center flex-1 min-w-0">
+                                    <span className="block text-2xl sm:text-3xl font-black text-purple-600">{Math.ceil(stats.presentationToEnrollRatio * (goalInput || 1))}</span>
+                                    <span className="block text-[9px] sm:text-xs font-bold text-purple-800 uppercase mt-1 truncate tracking-tighter sm:tracking-normal">Presentations</span>
                                 </div>
-                                <div className="text-purple-300 px-2"><ChevronsRight className="h-5 w-5 sm:h-8 sm:w-8" /></div>
-                                <div className="text-center flex-1">
-                                    <span className="block text-2xl sm:text-3xl font-black text-green-600">{goalInput}</span>
-                                    <span className="block text-[10px] sm:text-xs font-bold text-green-800 uppercase mt-1">Memberships</span>
+                                <div className="text-purple-300 px-1"><ChevronsRight className="h-5 w-5 sm:h-8 sm:w-8" /></div>
+                                <div className="text-center flex-1 min-w-0">
+                                    <span className="block text-2xl sm:text-3xl font-black text-green-600">{goalInput || 1}</span>
+                                    <span className="block text-[9px] sm:text-xs font-bold text-green-800 uppercase mt-1 truncate tracking-tighter sm:tracking-normal">Memberships</span>
                                 </div>
                             </div>
                         </div>
