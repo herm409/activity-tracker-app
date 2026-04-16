@@ -90,31 +90,57 @@ export const getPeriodicCoachingAdvice = (totals, timeframe = 'week', elapsedDay
     let color = 'text-red-500';
     let bg = 'bg-red-50';
 
+    const hash = totalActivity + exposures + followUps + elapsedDays;
+    const getMsg = (arr) => arr[hash % arr.length];
+
     if (totalActivity === 0) {
         grade = 'N/A';
-        message = "No activity logged yet. Time to get started and fill that pipeline!";
+        message = getMsg([
+            "Coach's report: Blank across the board. You can't win if you don't suit up. Time to get active!",
+            "Zero activity detected. Stop spectating and start participating. Drop some exposures!",
+            "Pipeline is on empty. Faith without works is dead—let's put some numbers on the board."
+        ]);
         color = "text-gray-500";
         bg = "bg-gray-100";
     } else if (exposures < paceTarget) {
         grade = 'C';
-        message = `You are currently BEHIND SCHEDULE. To build momentum, you need more at-bats. Your exposure volume is too low for day ${elapsedDays} of this ${timeframe}. Aim for at least ${exposureTarget} total exposures by the end of the ${timeframe}.`;
+        message = getMsg([
+            `You're falling behind the curve for this ${timeframe}. We need volume right now. Ramp up your exposures before the clock runs out!`,
+            `Pace check: BEHIND. Stop playing it safe. We need serious at-bats to make this ${timeframe} count. Let's hustle.`,
+            `The math ain't mathing right now. Your exposure volume is too low for day ${elapsedDays}. Go make some noise out there!`
+        ]);
     } else if (exposures >= paceTarget && exposures < exposureTarget) {
-        // They haven't hit the FINAL target, but they are ON PACE for where they are in the timeframe!
         grade = 'B';
-        message = `You are perfectly ON PACE for this ${timeframe}! Your daily exposure habits are solid. Keep knocking out these daily wins to hit your final target of ${exposureTarget}+.`;
+        message = getMsg([
+            `You are locked exactly on pace for this ${timeframe}! Daily habits looking solid. Keep grinding to hit that ${exposureTarget}+ target.`,
+            `Pace check: ON SCHEDULE. Love the consistency. Maintain this exact rhythm and you'll crush the ${timeframe}.`,
+            `We see the work ethic! You're tracking perfectly to clear your target. Don't look back, just keep working.`
+        ]);
         color = 'text-blue-500';
         bg = 'bg-blue-50';
     } else if (followUps < followUpTarget) {
         grade = 'C';
-        message = `You are hitting your exposure targets, but dropping the ball on follow-ups. Ensure you have at least double the follow-ups (${followUpTarget}) compared to your exposures (${exposures}) to close sales.`;
+        message = getMsg([
+            `Exposure game is crazy, but you're dropping the ball on the follow-ups. You need double the follow-ups (${followUpTarget}) to your exposures (${exposures}). Don't leave money on the table!`,
+            `Great job planting the seeds, but who's watering them? Step up your follow-up game immediately.`,
+            `Stop leaving your prospects on read! Your follow-up count is way too low compared to your exposures. Circle back right now.`
+        ]);
     } else if (!hasDecisions) {
         grade = 'B';
-        message = `Great volume and follow-up habits! However, we need to see decisions being made. Don't be afraid to push for a 'No'. A 'No' means you are truly prospecting and asking.`;
+        message = getMsg([
+            `Volume and follow-ups are heavy, but where are the decisions? Force the issue! Go collect a 'No'. Stop accepting 'Let me think about it'.`,
+            `You've built a beautiful pipeline, now go close 'em out. Don't be afraid to ask for a definitive answer. Go hunt for No's!`,
+            `Stellar activity levels! But we need verdicts. Rejection means you're doing the work. Push for an answer today.`
+        ]);
         color = 'text-blue-500';
         bg = 'bg-blue-50';
     } else {
         grade = 'A';
-        message = `Outstanding work! You hit your exposures (${exposureTarget}+), maintained the 2x follow-up ratio, and are successfully driving prospects to a definitive decision. Keep duplicating this system!`;
+        message = getMsg([
+            `Flawless execution! You hit the exposures, nailed the follow-ups, and forced decisions. This is the blueprint for success.`,
+            `Masterclass. The volume is high, the pipeline is watered, and the bag is secured. Celebrate the W and keep leading from the front!`,
+            `Absolutely crushing it! This is championship-level activity across the board. You are putting the whole organization on notice.`
+        ]);
         color = 'text-green-600';
         bg = 'bg-green-50';
     }
