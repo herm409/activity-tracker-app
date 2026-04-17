@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
-import { doc, getDoc, collection, query, where, onSnapshot, writeBatch, updateDoc, deleteField } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, onSnapshot, writeBatch, updateDoc, deleteField, deleteDoc } from 'firebase/firestore';
 import { appId } from '../firebaseConfig';
 import { Share2, Settings, LogOut, Trash2, Flame, Award, Medal, CheckCircle, ClipboardCopy, Users, Trophy } from 'lucide-react';
 import { generateInviteCode as genCode } from '../utils/helpers';
@@ -74,7 +74,7 @@ const JoinTeamModal = ({ onClose, onJoinTeam }) => {
     );
 };
 
-const TeamSettingsModal = ({ teamData, onClose, onUpdateTeam }) => {
+const TeamSettingsModal = ({ teamData, onClose, onUpdateTeam, onDeleteTeam }) => {
     const [name, setName] = useState(teamData.name);
     const [handicap, setHandicap] = useState(teamData.handicap || 0);
     const [isLoading, setIsLoading] = useState(false);
@@ -101,18 +101,23 @@ const TeamSettingsModal = ({ teamData, onClose, onUpdateTeam }) => {
                         <input type="number" value={handicap} onChange={(e) => setHandicap(e.target.value)} className="mt-1 block w-full p-2 border border-gray-300 rounded-md" />
                     </div>
                 </div>
-                <div className="p-4 bg-gray-50 flex justify-end space-x-2">
-                    <button onClick={onClose} className="bg-gray-200 px-4 py-2 rounded-md">Cancel</button>
-                    <button onClick={handleSave} disabled={isLoading} className="bg-indigo-600 text-white px-4 py-2 rounded-md disabled:bg-indigo-400">
-                        {isLoading ? 'Saving...' : 'Save Changes'}
+                <div className="p-4 bg-gray-50 flex items-center justify-between">
+                    <button onClick={onDeleteTeam} disabled={isLoading} className="text-red-600 hover:text-red-800 px-4 py-2 text-sm font-semibold rounded-md hover:bg-red-50">
+                        Delete Team
                     </button>
+                    <div className="flex space-x-2">
+                        <button onClick={onClose} className="bg-gray-200 px-4 py-2 rounded-md">Cancel</button>
+                        <button onClick={handleSave} disabled={isLoading} className="bg-indigo-600 text-white px-4 py-2 rounded-md disabled:bg-indigo-400">
+                            {isLoading ? 'Saving...' : 'Save Changes'}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
     );
 };
 
-const TeamDashboard = ({ teamData, teamMembers, onLeaveTeam, onShareInvite, user, onUpdateTeam, onRemoveMember }) => {
+const TeamDashboard = ({ teamData, teamMembers, onLeaveTeam, onShareInvite, user, onUpdateTeam, onRemoveMember, onDeleteTeam }) => {
     const [showConfirmLeave, setShowConfirmLeave] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
     const [copied, setCopied] = useState(false);
@@ -294,7 +299,7 @@ const TeamDashboard = ({ teamData, teamMembers, onLeaveTeam, onShareInvite, user
 
     return (
         <div className="space-y-6">
-            {showSettings && <TeamSettingsModal teamData={teamData} onClose={() => setShowSettings(false)} onUpdateTeam={onUpdateTeam} />}
+            {showSettings && <TeamSettingsModal teamData={teamData} onClose={() => setShowSettings(false)} onUpdateTeam={onUpdateTeam} onDeleteTeam={onDeleteTeam} />}
             {showConfirmLeave && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
@@ -581,22 +586,24 @@ const TeamPage = ({ user, db, userProfile, setUserProfile, weekId }) => {
                 setTeamData({ id: docSnap.id, ...data });
                 setIsLoading(false);
 
-                // Self-Healing
+                // Auto-Eviction Logic
                 try {
                     const myId = userProfile.uid;
                     if (data.roster && !data.roster[myId]) {
-                        console.log("Self-healing roster: Adding myself...");
-                        await updateDoc(teamRef, {
-                            [`roster.${myId}`]: { displayName: userProfile.displayName, joinedAt: new Date() }
-                        });
+                        console.log("I am missing from the team roster. Auto-leaving...");
+                        handleLeaveTeam();
                     } else if (!data.roster) {
-                        console.log("Creating missing roster...");
-                        await updateDoc(teamRef, {
-                            roster: { [myId]: { displayName: userProfile.displayName, joinedAt: new Date() } }
-                        });
+                        if (data.creatorId === myId) {
+                            console.log("Creating missing roster...");
+                            await updateDoc(teamRef, {
+                                roster: { [myId]: { displayName: userProfile.displayName, joinedAt: new Date() } }
+                            });
+                        } else {
+                            handleLeaveTeam();
+                        }
                     }
                 } catch (err) {
-                    console.error("Self-healing failed:", err);
+                    console.error("Auto-eviction failed:", err);
                 }
             }, (error) => {
                 console.error("Error fetching Team Data:", error);
@@ -645,10 +652,8 @@ const TeamPage = ({ user, db, userProfile, setUserProfile, weekId }) => {
         const roster = teamData?.roster || {};
 
         const rosterIds = Object.keys(roster);
-        const statsIds = Object.keys(stats);
-        const allIds = new Set([...rosterIds, ...statsIds]);
 
-        return Array.from(allIds).map(uid => {
+        return rosterIds.map(uid => {
             const rosterUser = roster[uid] || {};
             const userStats = stats[uid] || {};
 
@@ -686,28 +691,33 @@ const TeamPage = ({ user, db, userProfile, setUserProfile, weekId }) => {
         if (user.uid !== teamData.creatorId) return;
 
         try {
-            const batch = writeBatch(db);
-            const userRef = doc(db, 'artifacts', appId, 'users', memberId);
-            batch.update(userRef, { teamId: null });
-
-            if (weekId) {
-                const statsRef = doc(db, 'artifacts', appId, 'leaderboard', weekId, 'entries', memberId);
-                batch.update(statsRef, { teamId: null });
-            }
-
             // Remove from Team Roster on Team Doc
             const teamRef = doc(db, 'artifacts', appId, 'public', 'data', 'teams', teamData.id);
-            // batch.update does not support deleteField inside dot notation easily in this SDK version context sometimes,
-            // but updateDoc does. We will do a separate await for roster removal to be safe.
-            // Actually batch can do it too, but let's prioritize the batch commit first.
-            await batch.commit();
-
             await updateDoc(teamRef, {
                 [`roster.${memberId}`]: deleteField()
             });
-
+            // The removed user will automatically clean up their own profile on their next login or snapshot update due to the Auto-Eviction logic.
         } catch (error) {
             console.error("Error removing member:", error);
+        }
+    };
+
+    const handleDeleteTeam = async () => {
+        if (!user || !db || !teamData) return;
+        if (!window.confirm("Are you sure you want to permanently delete this team? This action cannot be undone.")) return;
+        
+        setIsLoading(true);
+        try {
+            const teamRef = doc(db, 'artifacts', appId, 'public', 'data', 'teams', teamData.id);
+            await deleteDoc(teamRef);
+            
+            if (teamData.inviteCode) {
+                const codeRef = doc(db, 'artifacts', appId, 'public', 'data', 'inviteCodes', teamData.inviteCode);
+                await deleteDoc(codeRef);
+            }
+        } catch (error) {
+            console.error("Error deleting team:", error);
+            setIsLoading(false);
         }
     };
 
@@ -735,7 +745,7 @@ const TeamPage = ({ user, db, userProfile, setUserProfile, weekId }) => {
         return <div className="text-center p-10 text-gray-500">Loading Team Data...</div>;
     }
 
-    return <TeamDashboard teamData={teamData} teamMembers={teamMembers} onLeaveTeam={handleLeaveTeam} onShareInvite={handleShareInvite} user={user} onUpdateTeam={handleUpdateTeam} onRemoveMember={handleRemoveMember} />;
+    return <TeamDashboard teamData={teamData} teamMembers={teamMembers} onLeaveTeam={handleLeaveTeam} onShareInvite={handleShareInvite} user={user} onUpdateTeam={handleUpdateTeam} onRemoveMember={handleRemoveMember} onDeleteTeam={handleDeleteTeam} />;
 };
 
 // ── Team Page Shell with Sub-Navigation ────────────────────────────────────
