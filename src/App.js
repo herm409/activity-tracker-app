@@ -430,7 +430,21 @@ const AppContent = () => {
 
             streakKeys.forEach(key => {
                 const streakCount = allStreaks[key] || 0;
-                if (STREAK_MILESTONES.includes(streakCount)) {
+                
+                // Determine if this specific metric was logged TODAY.
+                // If not, the streak count belongs to yesterday and we shouldn't reward it again today.
+                const todayData = monthlyData && monthlyData[new Date().getDate()];
+                let isTodayDone = false;
+                if (todayData) {
+                    if (key === 'ironman') {
+                        isTodayDone = isIronmanDay(todayData);
+                    } else {
+                        const val = todayData[key];
+                        isTodayDone = Array.isArray(val) ? val.length > 0 : Number(val) > 0;
+                    }
+                }
+
+                if (STREAK_MILESTONES.includes(streakCount) && isTodayDone) {
                     const milestoneId = `milestone_${key}_${streakCount}`;
                     const localLockKey = `lock_${milestoneId}_${todayStr}`;
                     
