@@ -401,21 +401,45 @@ const AppContent = () => {
                 new Date()
             );
             const streakKeys = ['ironman', 'exposures', 'followUps', 'nos', 'exerc', 'personalDevelopment'];
+            const todayStr = new Date().toDateString();
+            
+            let profileUpdates = {};
+            let hasUpdates = false;
+
             streakKeys.forEach(key => {
                 const streakCount = allStreaks[key] || 0;
                 if (STREAK_MILESTONES.includes(streakCount)) {
-                    const isIronman = key === 'ironman';
-                    const label = STREAK_TYPE_LABELS[key] || key;
-                    writeCommunityPost({
-                        type: isIronman ? 'ironman_streak' : 'streak_milestone',
-                        streakType: key,
-                        streakCount,
-                        message: isIronman
-                            ? `${userProfile.displayName} just completed a ${streakCount}-day Ironman streak! 🔥`
-                            : `${userProfile.displayName} just hit a ${streakCount}-day ${label} streak! 📈`,
-                    });
+                    const milestoneId = `milestone_${key}_${streakCount}`;
+                    const localLockKey = `lock_${milestoneId}_${todayStr}`;
+                    
+                    // Use sessionStorage for immediate cross-closure lock, and userProfile for device state
+                    if (userProfile[milestoneId] !== todayStr && !sessionStorage.getItem(localLockKey)) {
+                        sessionStorage.setItem(localLockKey, "true");
+                        
+                        const isIronman = key === 'ironman';
+                        const label = STREAK_TYPE_LABELS[key] || key;
+                        writeCommunityPost({
+                            type: isIronman ? 'ironman_streak' : 'streak_milestone',
+                            streakType: key,
+                            streakCount,
+                            message: isIronman
+                                ? `${userProfile.displayName} just completed a ${streakCount}-day Ironman streak! 🔥`
+                                : `${userProfile.displayName} just hit a ${streakCount}-day ${label} streak! 📈`,
+                        });
+                        
+                        profileUpdates[milestoneId] = todayStr;
+                        hasUpdates = true;
+                        
+                        // Update local React state immediately
+                        setUserProfile(prev => ({...prev, [milestoneId]: todayStr}));
+                    }
                 }
             });
+            
+            if (hasUpdates) {
+                 const profileRef = doc(db, 'artifacts', appId, 'users', user.uid);
+                 updateDoc(profileRef, profileUpdates).catch(err => console.error(err));
+            }
         };
         // Run milestone check after a short delay so state has settled
         setTimeout(checkStreakMilestones, 500);
@@ -433,8 +457,8 @@ const AppContent = () => {
         };
         setUserProfile(updatedProfile);
         
-        const profileRef = doc(db, 'artifacts', appId, 'users', user.uid);
-        updateDoc(profileRef, { [`allTimeBests.${metricKey}`]: newBest, [`lastActivityTimestamps.${metricKey}`]: now.toISOString() }).catch(err => console.error(err));
+        const profileRefLocal = doc(db, 'artifacts', appId, 'users', user.uid);
+        updateDoc(profileRefLocal, { [`allTimeBests.${metricKey}`]: newBest, [`lastActivityTimestamps.${metricKey}`]: now.toISOString() }).catch(err => console.error(err));
     };
 
     const handleDataChange = (date, field, value) => {
