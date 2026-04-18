@@ -111,46 +111,114 @@ const TimeOfDayCoaching = ({ todayPoints, dailyPar, todayData }) => {
     const hour = new Date().getHours();
     const E = Number(todayData.exposures) || 0;
     const F = (Number(todayData.followUps) || 0) + (Number(todayData.tenacityFollowUps) || 0);
+    const N = Number(todayData.nos) || 0;
+    const Tw = Number(todayData.threeWays) || 0;
+    const Ex = !!todayData.exerc;
+    const Pd = !!(todayData.personalDevelopment || todayData.read || todayData.audio);
     const deficit = dailyPar - todayPoints;
 
     let icon, bg, border, headline, body;
 
-        // Simple hash to grab random phrase from array based on points/date so it feels fresh
-        const hash = todayPoints + new Date().getDate();
-        const getMsg = (arr) => arr[hash % arr.length];
+    // Simple hash to grab random phrase from array based on points/date so it feels fresh
+    const hash = todayPoints + new Date().getDate();
+    const getMsg = (arr) => arr[hash % arr.length];
 
     if (hour < 10) {
         // Morning: Game Plan
         icon = <Sun className="h-5 w-5 text-amber-500 flex-shrink-0" />;
         bg = 'bg-amber-50'; border = 'border-amber-200';
         headline = 'Good Morning — Game Plan';
-        body = getMsg([
-            `Wake up and win! Your daily par is ${dailyPar} pts. Drop those exposures early, water the pipeline, and don't dodge the No's. Set the tone!`,
-            `The sun is up and the board is clean. Daily par: ${dailyPar} pts. Execute the fundamentals and let's go get these wins.`,
-            `Morning huddle: Par is ${dailyPar} pts today. Don't wait for things to happen—make them happen. Drop that first exposure!`
-        ]);
+        
+        if (todayPoints === 0 && !Ex && !Pd) {
+            body = getMsg([
+                `Wake up and win! Drop an early exposure, get your workout in, or read 10 pages. Set the tone!`,
+                `The sun is up and the board is clean. Execute the fundamentals and let's go get these wins.`,
+                `Par is ${dailyPar} pts today. Don't wait for things to happen—make them happen. Drop that first exposure!`
+            ]);
+        } else if (todayPoints === 0 && (Ex || Pd)) {
+            body = getMsg([
+                `Great job knocking out your daily disciplines early! Now take that energy and drop your first exposure.`,
+                `Mind and body are primed. Let's get the business on the board. Make that first dial!`,
+                `Disciplines check out. Time to pivot to the pipeline. Go get an exposure!`
+            ]);
+        } else if (E > 0 && F === 0) {
+            body = getMsg([
+                `You've planted the seeds early, but don't forget to water yesterday's prospects. Get a follow-up on the board!`,
+                `Great early exposures! Now go follow up on the leads from yesterday. Keep that pipeline flowing.`,
+                `Off to a strong start with those exposures. Make sure you balance it out—drop a follow-up next!`
+            ]);
+        } else if (F > 0 && E === 0) {
+            body = getMsg([
+                `Great job watering the pipeline early, but we need fresh blood. Go drop a brand new exposure!`,
+                `You're managing your existing prospects perfectly this morning. Now plant a new seed!`,
+                `Follow-ups are key, but the pipeline needs new names. Make a fresh exposure your next move.`
+            ]);
+        } else if (deficit > 0) {
+            body = getMsg([
+                `Great start to the morning! You're already on the board. ${deficit} pt${deficit !== 1 ? 's' : ''} left to hit daily par. Keep that momentum!`,
+                `Early bird gets the worm. You've got ${todayPoints} pt${todayPoints !== 1 ? 's' : ''} already. Let's keep pushing towards that ${dailyPar} pt par!`,
+                `Off to a fast start! Don't slow down now—you're only ${deficit} pt${deficit !== 1 ? 's' : ''} away from par.`
+            ]);
+        } else if (deficit <= 0 && (!Ex || !Pd)) {
+            body = getMsg([
+                `Par hit before 10 AM?! Now don't forget your mind and body. Get that workout and reading in to secure the Ironman!`,
+                `Absolute champion. You cleared par early! Pivot some of that energy into your personal development today.`,
+                `Morning domination on the board! Now win the daily cycle. Go check off your exercise and reading.`
+            ]);
+        } else {
+            body = getMsg([
+                `Par hit and disciplines knocked out before 10 AM?! You are a machine. Keep running up the score!`,
+                `Flawless execution today. Business and personal habits are dialed in. Let's see how high you can take it!`,
+                `Total cycle complete early. Everything from here is extra credit. Let's pad that lead!`
+            ]);
+        }
     } else if (hour < 17) {
         // Afternoon: Pace Check
         icon = <TrendingUp className="h-5 w-5 text-blue-500 flex-shrink-0" />;
         bg = 'bg-blue-50'; border = 'border-blue-200';
         headline = 'Midday Pace Check';
-        if (deficit > 0) {
+        
+        if (todayPoints === 0) {
+            body = getMsg([
+                `It's midday and the board is still blank. Don't let the day slip away. Make that first dial!`,
+                `Half the day is gone but there's still time to turn it around. Drop an exposure and get moving.`,
+                `Pace check: You're currently at 0 pts. It's time to get off the bench and into the game!`
+            ]);
+        } else if (E > 2 && F === 0) {
+            body = getMsg([
+                `You're pitching great, but your follow-ups are at zero. Your seeds aren't gonna water themselves. Get back on the line!`,
+                `Heavy exposure work, but the fortune is in the follow-up! Go hit up those prospects right now.`,
+                `You've planted a lot of seeds today. Do not leave them hanging—go get a follow-up on the board!`
+            ]);
+        } else if (F > 2 && E === 0) {
+            body = getMsg([
+                `You're managing the pipeline perfectly, but it's going to dry up if you don't plant new seeds. Drop a fresh exposure!`,
+                `Great follow-up game today, but you need new prospects. Pivot and push an exposure!`,
+                `Solid pipeline maintenance. Now let's grow it. It's time to spark a brand new conversation.`
+            ]);
+        } else if (E > 0 && F > 0 && Tw === 0 && N === 0) {
+            body = getMsg([
+                `You're working the pipeline well, but no decisions are being made. Push for a definitive No or get a veteran on a 3-way call!`,
+                `Activity is high, but we need to close. Force the verdict—hunt for a No or connect a 3-Way.`,
+                `You're planting and watering, but are you harvesting? Push a prospect to a decision or loop in a 3-Way call!`
+            ]);
+        } else if (deficit <= 0 && (!Ex || !Pd)) {
+            body = getMsg([
+                `You're hitting your numbers, but don't neglect yourself! Make sure you get your daily exercise and reading in.`,
+                `Board is looking great. Have you fed your mind and body today? Grab a book or hit the gym!`,
+                `On pace for a great day on the score board. Don't forget that building the business requires building yourself!`
+            ]);
+        } else if (deficit > 0) {
             body = getMsg([
                 `You're ${deficit} pt${deficit !== 1 ? 's' : ''} short of par. The afternoon is prime time — flip the switch and drop ${Math.max(1, deficit)} more play${deficit !== 1 ? 's' : ''}.`,
-                `Pace check reveals a ${deficit}-point deficit. Ain't no time to coast. Get active and close this gap!`,
-                `${deficit} pt${deficit !== 1 ? 's' : ''} to par. We need you off the bench and in the game. Make those calls!`
-            ]);
-        } else if (E > 0 && F === 0) {
-            body = getMsg([
-                `Solid exposure work this morning! But follow-ups are at zero — your seeds ain't gonna water themselves. Back on the line!`,
-                `You planted the seeds, now it's time to water them. Don't leave those morning exposures hanging—go follow up!`,
-                `Half the job is done. Your exposure game is strong, but the fortune is in the follow-up. Let's get it!`
+                `Pace check reveals a ${deficit}-point deficit. You're on the board, keep pushing to close this gap!`,
+                `${deficit} pt${deficit !== 1 ? 's' : ''} to par. We need you to stay locked in. Make those calls!`
             ]);
         } else {
             body = getMsg([
-                `You're on pace — ${todayPoints} pts so far. Keep the momentum pushing. The game isn't over until the clock runs out!`,
-                `We see you! Sitting solid at ${todayPoints} pts. Keep duplicating this hustle to pad that lead. Let's eat!`,
-                `On pace and looking dangerous. Don't take your foot off the gas now. Finish strong!`
+                `You're crushing it — par hit and disciplines done. Keep duplicating this hustle to pad that lead. Let's eat!`,
+                `Total execution so far today. You're on pace and looking dangerous. Don't take your foot off the gas now!`,
+                `Sitting solid at ${todayPoints} pts with personal habits checked off. Finish the day strong!`
             ]);
         }
     } else {
@@ -158,12 +226,44 @@ const TimeOfDayCoaching = ({ todayPoints, dailyPar, todayData }) => {
         icon = <Moon className="h-5 w-5 text-indigo-500 flex-shrink-0" />;
         bg = 'bg-indigo-50'; border = 'border-indigo-200';
         headline = 'Close of Day Recap';
-        if (todayPoints >= dailyPar) {
+        
+        if (todayPoints === 0 && (!Ex && !Pd)) {
+            body = getMsg([
+                `A clean slate across the board today. Give yourself grace, rest up, and commit to a full reset tomorrow morning.`,
+                `A blank board today. Take a breath, reset, and commit to dropping that first exposure early tomorrow morning.`,
+                `We all have off days. Zero points today just means tomorrow is a chance for a massive comeback. Rest up!`
+            ]);
+        } else if (todayPoints === 0 && (Ex || Pd)) {
+            body = getMsg([
+                `Missed the mark on business activity, but you didn't quit on yourself. Good job getting your disciplines in. Better pipelining tomorrow!`,
+                `Zero points today, but a win for personal development. Channel that growth into exposures tomorrow morning.`,
+                `You fed your mind and body today, which is a win. Tomorrow, let's put that energy into the pipeline.`
+            ]);
+        } else if (E > 0 && F === 0 && deficit > 0) {
+            body = getMsg([
+                `You started strong today by planting seeds, but didn't water them. Tomorrow, start by following up on today's exposures.`,
+                `Missed par today, but you've got fresh exposures. Let's convert those into solid follow-ups tomorrow!`,
+                `The day is done. You've got seeds in the ground without water. First order of business tomorrow: Follow up!`
+            ]);
+        } else if (F > 0 && Tw === 0 && deficit > 0) {
+            body = getMsg([
+                `You followed up hard today, but missed par. Tomorrow, bring in backup. Connect a 3-way call early!`,
+                `You put in the follow-up work, but sometimes you need third-party validation. Plan for a 3-Way call tomorrow!`,
+                `Pipeline was watered today! To bump those points up tomorrow, let's leverage the team and schedule a 3-way.`
+            ]);
+        } else if (todayPoints >= dailyPar && (!Ex || !Pd)) {
             const diff = todayPoints - dailyPar;
             body = getMsg([
-                `Day secured! You finished at ${todayPoints} pts (${diff >= 0 ? `${diff} under par` : 'even par'}). Log your final numbers, soak in the W, and rest up.`,
-                `Mission accomplished. The board says ${todayPoints} pts. Shut it down and celebrate your consistency today!`,
-                `This is what winning looks like. Finish logging your stats, grab some rest, and prepare to do it again tomorrow.`
+                `Business is booming today! But you missed your workout or reading. Champions do it all—knock it out before bed!`,
+                `You dominated the board today (${diff > 0 ? `${diff} under par` : 'even par'}), but left your physical/mental reps behind. Get that reading in!`,
+                `Great hustle on the phones today. Don't forget to take care of yourself too. Finish that personal development.`
+            ]);
+        } else if (todayPoints >= dailyPar) {
+            const diff = todayPoints - dailyPar;
+            body = getMsg([
+                `Day secured! Points hit (${diff > 0 ? `${diff} under par` : 'even par'}), disciplines done. This is the definition of a perfect day. Rest up!`,
+                `Mission accomplished. The board says ${todayPoints} pts and your mind is fed. Shut it down and celebrate your consistency today!`,
+                `This is what winning looks like. Total execution. Finish logging your stats, grab some rest, and prepare to do it again tomorrow.`
             ]);
         } else {
             body = getMsg([
