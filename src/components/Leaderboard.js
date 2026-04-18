@@ -124,6 +124,24 @@ const Leaderboard = ({ db, weekId, user }) => {
         return parToDate - totalPoints;
     };
 
+    const getTier = (dailyPar) => {
+        const par = dailyPar || 2;
+        if (par >= 8) return { label: 'Champion', emoji: '🔴', bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-200' };
+        if (par >= 6) return { label: 'Elite', emoji: '🟣', bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-200' };
+        if (par >= 4) return { label: 'Pro', emoji: '🔵', bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-200' };
+        return null; // Rookie (default par=2) gets no badge — keeps the board clean
+    };
+
+    const renderTierBadge = (dailyPar) => {
+        const tier = getTier(dailyPar);
+        if (!tier) return null;
+        return (
+            <span className={`ml-2 inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${tier.bg} ${tier.text} ${tier.border} whitespace-nowrap`}>
+                {tier.emoji} {tier.label}
+            </span>
+        );
+    };
+
     const renderIronmanBadge = (streak) => {
         if (!streak || streak < 3) return null;
         let Icon = Medal;
@@ -190,8 +208,9 @@ const Leaderboard = ({ db, weekId, user }) => {
                                                 #{index + 1}
                                             </span>
                                             <div>
-                                                <p className={`font-semibold flex items-center ${entry.userId === user?.uid ? 'text-indigo-900' : 'text-gray-800'}`}>
+                                                <p className={`font-semibold flex items-center flex-wrap gap-x-1 ${entry.userId === user?.uid ? 'text-indigo-900' : 'text-gray-800'}`}>
                                                     {entry.displayName} {entry.userId === user?.uid && '(You)'}
+                                                    {renderTierBadge(entry.dailyPar)}
                                                     {renderIronmanBadge(entry.ironmanStreak)}
                                                 </p>
                                                 {/* Optional: Show individual team name? */}
