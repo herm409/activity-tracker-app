@@ -285,6 +285,53 @@ const TimeOfDayCoaching = ({ todayPoints, dailyPar, todayData }) => {
     );
 };
 
+// --- Sprint Progress Bar ---
+const SprintProgressBar = ({ sprint, onDeclareSprint }) => {
+    if (!sprint?.endDate) {
+        return (
+            <button
+                onClick={onDeclareSprint}
+                className="w-full mb-4 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border-2 border-dashed border-indigo-200 text-indigo-600 text-xs font-bold hover:bg-indigo-50 hover:border-indigo-400 transition-all"
+            >
+                <span>⚡</span> Declare a Sprint — Raise Your Standard
+            </button>
+        );
+    }
+
+    const today = new Date();
+    const endDate = sprint.endDate.toDate ? sprint.endDate.toDate() : new Date(sprint.endDate);
+    const startDate = sprint.startDate ? (sprint.startDate.toDate ? sprint.startDate.toDate() : new Date(sprint.startDate)) : new Date(endDate.getTime() - sprint.days * 86400000);
+    const totalDays = sprint.days || Math.round((endDate - startDate) / 86400000);
+    const daysElapsed = Math.max(0, Math.min(totalDays, Math.round((today - startDate) / 86400000)));
+    const daysLeft = Math.max(0, totalDays - daysElapsed);
+    const pct = Math.min(100, Math.round((daysElapsed / totalDays) * 100));
+
+    const tierColors = {
+        Pro:      { bar: 'bg-blue-500', bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', emoji: '🔵' },
+        Elite:    { bar: 'bg-purple-500', bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700', emoji: '🟣' },
+        Champion: { bar: 'bg-red-500', bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', emoji: '🔴' },
+    };
+    const colors = tierColors[sprint.tier] || tierColors.Pro;
+
+    if (daysLeft === 0) return null; // Sprint expired — don't show
+
+    return (
+        <div className={`${colors.bg} border ${colors.border} rounded-xl p-3 mb-4 flex items-center gap-3`}>
+            <span className="text-xl flex-shrink-0">{colors.emoji}</span>
+            <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between mb-1">
+                    <span className={`text-xs font-black uppercase tracking-widest ${colors.text}`}>{sprint.tier} Sprint</span>
+                    <span className="text-xs text-gray-500 font-medium">{daysLeft}d left · {sprint.par} pts/day</span>
+                </div>
+                <div className="h-1.5 bg-white rounded-full overflow-hidden border border-gray-100">
+                    <div className={`h-full ${colors.bar} rounded-full transition-all`} style={{ width: `${pct}%` }} />
+                </div>
+                <p className="text-[10px] text-gray-400 mt-0.5">Day {daysElapsed} of {totalDays}</p>
+            </div>
+        </div>
+    );
+};
+
 // --- Daily Cycle Dot with tap-to-label (#3) ---
 const CycleDot = ({ label, done }) => {
     const [showLabel, setShowLabel] = useState(false);
@@ -313,7 +360,7 @@ const CycleDot = ({ label, done }) => {
     );
 };
 
-const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAddPresentation, onShare, onShareMonthly, isSharing, onLogFollowUp, onLogExposure, dailyPar, onShowLegend, hotlist, onNavigateToPipeline, weeklyPoints, weeklyPar, onLogFollowUpForProspect }) => {
+const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAddPresentation, onShare, onShareMonthly, isSharing, onLogFollowUp, onLogExposure, dailyPar, onShowLegend, hotlist, onNavigateToPipeline, weeklyPoints, weeklyPar, onLogFollowUpForProspect, sprint, onDeclareSprint }) => {
     const [showInsight, setShowInsight] = useState(false);
     const [visibilityNudge, setVisibilityNudge] = useState(false);
     const today = new Date();
@@ -522,6 +569,9 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
 
                 {/* Time-of-Day Coaching (#1) */}
                 <TimeOfDayCoaching todayPoints={todayPoints} dailyPar={currentPar} todayData={todayData} />
+
+                {/* Sprint Progress Bar */}
+                <SprintProgressBar sprint={sprint} onDeclareSprint={onDeclareSprint} />
 
                 {/* Daily Par Progress Ring */}
                 <DailyParRing todayPoints={todayPoints} dailyPar={currentPar} />

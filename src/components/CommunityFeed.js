@@ -16,6 +16,7 @@ const POST_TYPE_META = {
     streak_milestone: { icon: '📈', color: 'from-indigo-500 to-purple-500', bg: 'bg-indigo-50',  border: 'border-indigo-200' },
     personal_best:    { icon: '💎', color: 'from-yellow-500 to-amber-500',  bg: 'bg-yellow-50',  border: 'border-yellow-200' },
     membership_sold:  { icon: '🎉', color: 'from-green-500 to-teal-500',    bg: 'bg-green-50',   border: 'border-green-200' },
+    sprint_declared:  { icon: '⚡', color: 'from-indigo-500 to-teal-500',   bg: 'bg-indigo-50',  border: 'border-indigo-300' },
 };
 
 const STREAK_LABELS = {

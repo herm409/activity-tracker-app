@@ -1,6 +1,20 @@
 import React, { useState } from 'react';
-import { X, Trophy, Plus } from 'lucide-react';
+import { X, Trophy, Plus, Zap } from 'lucide-react';
 import { CheckboxInput, NumberInput, PresentationTracker } from './FormInputs';
+
+// Sprint tier definitions
+const SPRINT_TIERS = [
+    { label: 'Pro', emoji: '🔵', par: 4, desc: 'Step up your game. 4 pts/day keeps the heat on.' },
+    { label: 'Elite', emoji: '🟣', par: 6, desc: 'High performer mode. 6 pts/day is a serious commitment.' },
+    { label: 'Champion', emoji: '🔴', par: 8, desc: 'Maximum output. Only for those who are truly all-in.' },
+];
+
+const SPRINT_DURATIONS = [
+    { label: '7 Days', days: 7, desc: 'A free week or quick test run.' },
+    { label: '30 Days', days: 30, desc: 'A full month push. Real momentum builder.' },
+    { label: '60 Days', days: 60, desc: 'Two months of elite execution.' },
+    { label: '90 Days', days: 90, desc: 'The full TNV-style campaign. All in.' },
+];
 
 export const DisplayNameModal = ({ onSave, onClose, currentName, currentPar }) => {
     const [name, setName] = useState(currentName || '');
@@ -308,3 +322,157 @@ export const ScoringLegendModal = ({ onClose }) => (
         </div>
     </div>
 );
+
+export const SprintDeclarationModal = ({ onSave, onClose, currentSprint }) => {
+    const [selectedTier, setSelectedTier] = useState(currentSprint?.tier || null);
+    const [selectedDuration, setSelectedDuration] = useState(currentSprint?.days || null);
+    const [step, setStep] = useState(0); // 0=explain, 1=pick tier, 2=pick duration, 3=confirm
+
+    const tier = SPRINT_TIERS.find(t => t.label === selectedTier);
+    const duration = SPRINT_DURATIONS.find(d => d.days === selectedDuration);
+
+    const handleSave = () => {
+        if (!tier || !duration) return;
+        onSave({ tier: tier.label, par: tier.par, days: duration.days });
+    };
+
+    const steps = [
+        // Step 0: Explain
+        <div className="space-y-4">
+            <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-xl p-5 text-white text-center">
+                <Zap className="h-10 w-10 mx-auto mb-2 text-yellow-300" />
+                <h3 className="text-xl font-black">What is a Sprint?</h3>
+            </div>
+            <div className="space-y-3 text-sm text-gray-700">
+                <p>A <strong>Sprint</strong> is a personal commitment to raise your daily par above the standard 2 pts for a set period of time.</p>
+                <p>When you declare a sprint, you're choosing to compete at a higher standard — and the app will push you accordingly.</p>
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-amber-800 text-xs">
+                    <strong>⚡ Key Rules:</strong>
+                    <ul className="list-disc list-inside mt-1 space-y-0.5">
+                        <li>You can upgrade your sprint tier anytime</li>
+                        <li>You can only downgrade once per 30 days</li>
+                        <li>Your Activity Board rank is always based on raw points — sprints never penalize you</li>
+                    </ul>
+                </div>
+                <p className="text-xs text-gray-500 text-center">A sprint declaration will be auto-posted to the Community Feed 🔥</p>
+            </div>
+        </div>,
+
+        // Step 1: Pick Tier
+        <div className="space-y-3">
+            <p className="text-sm text-gray-600 font-medium">Choose your sprint tier — this sets your daily par during the sprint:</p>
+            {SPRINT_TIERS.map(t => (
+                <button
+                    key={t.label}
+                    onClick={() => setSelectedTier(t.label)}
+                    className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
+                        selectedTier === t.label
+                            ? 'border-indigo-500 bg-indigo-50'
+                            : 'border-gray-100 bg-gray-50 hover:border-gray-200'
+                    }`}
+                >
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="font-bold text-gray-900">{t.emoji} {t.label}</p>
+                            <p className="text-xs text-gray-500 mt-0.5">{t.desc}</p>
+                        </div>
+                        <span className="text-lg font-black text-indigo-700">{t.par} pts/day</span>
+                    </div>
+                </button>
+            ))}
+        </div>,
+
+        // Step 2: Pick Duration
+        <div className="space-y-3">
+            <p className="text-sm text-gray-600 font-medium">How long are you committing to this sprint?</p>
+            {SPRINT_DURATIONS.map(d => (
+                <button
+                    key={d.days}
+                    onClick={() => setSelectedDuration(d.days)}
+                    className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
+                        selectedDuration === d.days
+                            ? 'border-indigo-500 bg-indigo-50'
+                            : 'border-gray-100 bg-gray-50 hover:border-gray-200'
+                    }`}
+                >
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="font-bold text-gray-900">{d.label}</p>
+                            <p className="text-xs text-gray-500 mt-0.5">{d.desc}</p>
+                        </div>
+                    </div>
+                </button>
+            ))}
+        </div>,
+
+        // Step 3: Confirm
+        <div className="space-y-4 text-center">
+            <div className="bg-gradient-to-br from-green-500 to-teal-600 rounded-xl p-5 text-white">
+                <p className="text-4xl mb-2">{tier?.emoji}</p>
+                <p className="text-xl font-black">{tier?.label} Sprint</p>
+                <p className="text-sm text-green-100">{duration?.label} · {tier?.par} pts/day</p>
+            </div>
+            <p className="text-sm text-gray-700">
+                You're about to commit to <strong>{tier?.par} pts/day</strong> for the next <strong>{duration?.days} days</strong>.
+                Your coaching messages, badge, and daily goals will reflect this commitment.
+            </p>
+            <p className="text-xs text-gray-400">This will be announced in the Community Feed automatically.</p>
+        </div>
+    ];
+
+    const stepTitles = ['What is a Sprint?', 'Choose Your Tier', 'Choose Duration', 'Confirm Your Commitment'];
+    const canProceed = [
+        true,
+        !!selectedTier,
+        !!selectedDuration,
+        true
+    ];
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+                <div className="p-5 border-b flex items-center justify-between">
+                    <div>
+                        <h3 className="font-black text-gray-900">{stepTitles[step]}</h3>
+                        <div className="flex gap-1 mt-1.5">
+                            {steps.map((_, i) => (
+                                <div key={i} className={`h-1 rounded-full transition-all ${
+                                    i <= step ? 'bg-indigo-600' : 'bg-gray-200'
+                                } ${i === step ? 'w-6' : 'w-3'}`} />
+                            ))}
+                        </div>
+                    </div>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 ml-3">
+                        <X className="h-5 w-5" />
+                    </button>
+                </div>
+
+                <div className="p-5 max-h-[65vh] overflow-y-auto">
+                    {steps[step]}
+                </div>
+
+                <div className="p-4 bg-gray-50 flex justify-between items-center">
+                    {step > 0 ? (
+                        <button onClick={() => setStep(s => s - 1)} className="text-gray-500 text-sm font-medium px-3 py-2 hover:text-gray-700">Back</button>
+                    ) : <div />}
+                    {step < steps.length - 1 ? (
+                        <button
+                            onClick={() => setStep(s => s + 1)}
+                            disabled={!canProceed[step]}
+                            className="bg-indigo-600 text-white px-5 py-2 rounded-xl font-bold text-sm disabled:opacity-40 disabled:cursor-not-allowed hover:bg-indigo-700 transition-colors"
+                        >
+                            {step === 0 ? "Let's Go!" : 'Next'}
+                        </button>
+                    ) : (
+                        <button
+                            onClick={handleSave}
+                            className="bg-gradient-to-r from-green-500 to-teal-600 text-white px-5 py-2 rounded-xl font-bold text-sm hover:opacity-90 transition-opacity"
+                        >
+                            🔥 Declare Sprint!
+                        </button>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};

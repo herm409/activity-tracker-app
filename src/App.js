@@ -17,7 +17,7 @@ import TodayDashboard from './components/TodayDashboard';
 import ActivityTracker from './components/ActivityTracker';
 import QuickLogFAB from './components/QuickLogFAB';
 import NotificationBanner from './components/NotificationBanner';
-import { DisplayNameModal, OnboardingModal, CutReportModal, ScoringLegendModal } from './components/GlobalModals';
+import { DisplayNameModal, OnboardingModal, CutReportModal, ScoringLegendModal, SprintDeclarationModal } from './components/GlobalModals';
 import ReportCard from './components/ReportCard';
 import CoachingToast from './components/CoachingToast';
 import { COACHING_REPOSITORY, getTieredMessage } from './utils/coachingRepository';
@@ -77,6 +77,9 @@ const AppContent = () => {
 
     // Community Win Feed — badge state
     const [hasUnreadCommunity, setHasUnreadCommunity] = useState(false);
+
+    // Sprint Declaration Modal
+    const [showSprintModal, setShowSprintModal] = useState(false);
 
     // Community post writer — fire-and-forget, silent on failure
     const writeCommunityPost = useCallback(async (postData) => {
@@ -221,6 +224,25 @@ const AppContent = () => {
         const profileRef = doc(db, 'artifacts', appId, 'users', user.uid);
         await setDoc(profileRef, { hasSeenGoalInstruction: true }, { merge: true });
         setUserProfile(prev => ({ ...prev, hasSeenGoalInstruction: true }));
+    };
+
+    const handleDeclareSprint = async ({ tier, par, days }) => {
+        if (!user || !db) return;
+        const startDate = new Date();
+        const endDate = new Date();
+        endDate.setDate(endDate.getDate() + days);
+        const sprint = { tier, par, days, startDate, endDate };
+        const newProfile = { ...userProfile, sprint };
+        const profileRef = doc(db, 'artifacts', appId, 'users', user.uid);
+        await setDoc(profileRef, { sprint }, { merge: true });
+        setUserProfile(newProfile);
+        setShowSprintModal(false);
+        // Auto-post to Community Feed
+        const tierEmojis = { Pro: '🔵', Elite: '🟣', Champion: '🔴' };
+        writeCommunityPost({
+            type: 'sprint_declared',
+            message: `${userProfile.displayName} just declared a ${tierEmojis[tier] || '⚡'} ${tier} Sprint — ${days} days at ${par} pts/day! Who's ready to push with them? 🔥`,
+        });
     };
 
 
@@ -922,9 +944,12 @@ const AppContent = () => {
                                     weeklyPoints={wPoints}
                                     weeklyPar={wPar}
                                     onLogFollowUpForProspect={handleLogFollowUpForProspect}
+                                    sprint={userProfile.sprint || null}
+                                    onDeclareSprint={() => setShowSprintModal(true)}
                                 />
                             );
                         })()}
+
 
                         {activeTab === 'tracker' && <ActivityTracker
                             date={currentDate} setDate={setCurrentDate}
@@ -970,6 +995,7 @@ const AppContent = () => {
             {showOnboarding && <OnboardingModal onDismiss={handleDismissOnboarding} />}
             {showCutReport && <CutReportModal score={cutReportScore} onClose={handleCloseCutReport} />}
             {showScoringLegend && <ScoringLegendModal onClose={() => setShowScoringLegend(false)} />}
+            {showSprintModal && <SprintDeclarationModal currentSprint={userProfile.sprint} onSave={handleDeclareSprint} onClose={() => setShowSprintModal(false)} />}
 
             {/* These should be imported from ActionModals.js which I will create */}
             {showFollowUpModal && <ActionModals.FollowUpModal
