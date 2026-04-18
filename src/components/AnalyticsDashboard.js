@@ -187,6 +187,9 @@ const AnalyticsDashboard = ({ db, user }) => {
             // Sort months chronologically
             const sortedMonths = Object.keys(exportRawData).sort();
 
+            // Grand total accumulators
+            let gExp = 0, gFu = 0, gNos = 0, gPres = 0, gTw = 0, gTs = 0, gEnrolls = 0, gPts = 0;
+
             sortedMonths.forEach(monthId => {
                 const dailyData = exportRawData[monthId];
                 const [year, month] = monthId.split('-').map(Number);
@@ -220,7 +223,16 @@ const AnalyticsDashboard = ({ db, user }) => {
                 // Monthly subtotal row
                 rows.push([`"-- ${monthLabel} TOTAL --"`, mExp, mFu, mNos, mPres, mTw, mTs, mEnrolls, '', '', mPts].join(','));
                 rows.push(''); // blank spacer
+
+                // Accumulate into grand totals
+                gExp += mExp; gFu += mFu; gNos += mNos; gPres += mPres;
+                gTw += mTw; gTs += mTs; gEnrolls += mEnrolls; gPts += mPts;
             });
+
+            // Grand total row
+            const firstMonth = sortedMonths[0] ? new Date(sortedMonths[0] + '-01').toLocaleString('default', { month: 'long', year: 'numeric' }) : '';
+            const lastMonth  = sortedMonths[sortedMonths.length - 1] ? new Date(sortedMonths[sortedMonths.length - 1] + '-01').toLocaleString('default', { month: 'long', year: 'numeric' }) : '';
+            rows.push([`"===== GRAND TOTAL (${firstMonth} – ${lastMonth}) ====="`, gExp, gFu, gNos, gPres, gTw, gTs, gEnrolls, '', '', gPts].join(','));
 
             const csv = rows.join('\n');
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
