@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { TrendingUp, Award, Lightbulb, Users, ChevronsRight, Target, XCircle, Info } from 'lucide-react';
+import { TrendingUp, Award, Lightbulb, Users, ChevronsRight, Target, XCircle, Info, Download, Lock } from 'lucide-react';
 import { appId } from '../firebaseConfig';
+import { calculatePoints } from '../utils/scoring';
 
 const AnalyticsDashboard = ({ db, user }) => {
     const [stats, setStats] = useState({
@@ -21,6 +22,9 @@ const AnalyticsDashboard = ({ db, user }) => {
     const [historicalData, setHistoricalData] = useState([]);
     const [monthName, setMonthName] = useState('');
     const [goalInput, setGoalInput] = useState(1);
+    const [exportRawData, setExportRawData] = useState({}); // monthId -> dailyData map
+    const [totalLoggedDays, setTotalLoggedDays] = useState(0);
+    const [isExporting, setIsExporting] = useState(false);
 
     useEffect(() => {
         const fetchAllAnalyticsData = async () => {
@@ -61,6 +65,16 @@ const AnalyticsDashboard = ({ db, user }) => {
                     }
                 });
             });
+
+            // Store raw data for CSV export + count total days with any activity
+            const rawMap = {};
+            let loggedDays = 0;
+            allDocsSnap.forEach(doc => {
+                rawMap[doc.id] = doc.data().dailyData || {};
+                loggedDays += Object.keys(doc.data().dailyData || {}).length;
+            });
+            setExportRawData(rawMap);
+            setTotalLoggedDays(loggedDays);
 
             const expToPresentationRatio = lifetimePresentations > 0 ? (lifetimeExposures / lifetimePresentations) : 0;
             const presentationToEnrollRatio = lifetimeEnrolls > 0 ? (lifetimePresentations / lifetimeEnrolls) : 0;
@@ -161,6 +175,68 @@ const AnalyticsDashboard = ({ db, user }) => {
             text: "Your business ratios are looking solid. Consistency is key, so continue to focus on your daily activities and filling your funnel.",
             icon: TrendingUp
         };
+    };
+
+    // --- CSV Export Logic ---
+    const handleExportCSV = () => {
+        setIsExporting(true);
+        try {
+            const headers = ['Date', 'Exposures', 'Follow Ups', 'No\'s', 'Presentations', '3-Way Calls', 'Team Support', 'Memberships Sold', 'Exercise', 'Personal Development', 'Points'];
+            const rows = [headers.join(',')];
+
+            // Sort months chronologically
+            const sortedMonths = Object.keys(exportRawData).sort();
+
+            sortedMonths.forEach(monthId => {
+                const dailyData = exportRawData[monthId];
+                const [year, month] = monthId.split('-').map(Number);
+                const monthLabel = new Date(year, month - 1, 1).toLocaleString('default', { month: 'long', year: 'numeric' });
+
+                let mExp = 0, mFu = 0, mNos = 0, mPres = 0, mTw = 0, mTs = 0, mEnrolls = 0, mPts = 0;
+
+                // Sort days numerically
+                const sortedDays = Object.keys(dailyData).map(Number).sort((a, b) => a - b);
+
+                sortedDays.forEach(day => {
+                    const d = dailyData[day];
+                    const exp   = Number(d.exposures) || 0;
+                    const fu    = (Number(d.followUps) || 0) + (Number(d.tenacityFollowUps) || 0);
+                    const nos   = Number(d.nos) || 0;
+                    const pres  = (Array.isArray(d.presentations) ? d.presentations.length : Number(d.presentations) || 0) + (Number(d.pbrs) || 0);
+                    const tw    = Number(d.threeWays) || 0;
+                    const ts    = Number(d.teamSupport) || 0;
+                    const enr   = (Number(d.enrolls) || 0) + (Array.isArray(d.sitdowns) ? d.sitdowns.filter(s => s === 'E').length : 0);
+                    const exerc = d.exerc ? 'Yes' : 'No';
+                    const pd    = (d.personalDevelopment || d.read || d.audio) ? 'Yes' : 'No';
+                    const pts   = calculatePoints(d);
+                    const date  = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+                    mExp += exp; mFu += fu; mNos += nos; mPres += pres;
+                    mTw += tw; mTs += ts; mEnrolls += enr; mPts += pts;
+
+                    rows.push([date, exp, fu, nos, pres, tw, ts, enr, exerc, pd, pts].join(','));
+                });
+
+                // Monthly subtotal row
+                rows.push([`"-- ${monthLabel} TOTAL --"`, mExp, mFu, mNos, mPres, mTw, mTs, mEnrolls, '', '', mPts].join(','));
+                rows.push(''); // blank spacer
+            });
+
+            const csv = rows.join('\n');
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `activity-history-${new Date().toISOString().slice(0, 10)}.csv`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error('CSV export failed:', err);
+        } finally {
+            setIsExporting(false);
+        }
     };
 
     if (loading) return <div className="text-center p-10">Loading Analytics...</div>;
@@ -425,6 +501,52 @@ const AnalyticsDashboard = ({ db, user }) => {
                         </BarChart>
                     </ResponsiveContainer>
                 </div>
+            </div>
+            {/* Historical Data Export */}
+            <div className="bg-white p-5 rounded-lg shadow-sm border">
+                <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                        <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                            <Download className="h-5 w-5 text-indigo-500" />
+                            Export Activity History
+                        </h3>
+                        <p className="text-sm text-gray-500 mt-1">
+                            Download a complete CSV of your daily activity—every exposure, follow-up, No, presentation, and more. Perfect for building your own charts or sharing with a coach.
+                        </p>
+                    </div>
+                    {totalLoggedDays >= 30 ? (
+                        <button
+                            onClick={handleExportCSV}
+                            disabled={isExporting}
+                            className="flex-shrink-0 flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-4 py-2.5 rounded-lg transition-colors disabled:opacity-60 disabled:cursor-wait"
+                        >
+                            <Download className="h-4 w-4" />
+                            {isExporting ? 'Exporting...' : 'Export CSV'}
+                        </button>
+                    ) : (
+                        <div className="flex-shrink-0 flex items-center gap-1.5 bg-gray-100 text-gray-400 text-sm font-bold px-4 py-2.5 rounded-lg cursor-not-allowed">
+                            <Lock className="h-4 w-4" /> Locked
+                        </div>
+                    )}
+                </div>
+                {totalLoggedDays < 30 && (
+                    <div className="mt-4">
+                        <div className="flex justify-between text-xs text-gray-500 mb-1">
+                            <span>{totalLoggedDays} days logged</span>
+                            <span>30 days required to unlock</span>
+                        </div>
+                        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div
+                                className="h-full bg-indigo-400 rounded-full transition-all"
+                                style={{ width: `${Math.min(100, Math.round((totalLoggedDays / 30) * 100))}%` }}
+                            />
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1.5">{Math.max(0, 30 - totalLoggedDays)} more days of activity needed to unlock your history export.</p>
+                    </div>
+                )}
+                {totalLoggedDays >= 30 && (
+                    <p className="text-xs text-gray-400 mt-3">CSV includes one row per day with monthly subtotals. Opens in Excel, Google Sheets, or any spreadsheet app.</p>
+                )}
             </div>
         </div>
     );
