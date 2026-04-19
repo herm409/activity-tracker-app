@@ -3,7 +3,7 @@ import { Target, Users, BarChart2, PhoneCall, UserCheck, Dumbbell, BookOpen, Sha
 import { ActivityCard, PresentationActivityCard, DisciplineCheckbox } from './ActivityCards';
 import { calculatePoints } from '../utils/scoring';
 import confetti from 'canvas-confetti';
-import TNVCampaignBanner from './TNVCampaignBanner';
+import TNVCampaignBanner, { getSprintWeek, getSprintFocus } from './TNVCampaignBanner';
 
 // --- Daily Par Progress Ring ---
 const DailyParRing = ({ todayPoints, dailyPar }) => {
@@ -107,7 +107,7 @@ const StreakRow = ({ streaks, todayData }) => {
 };
 
 // --- Time-of-Day Coaching Block (#1) ---
-const TimeOfDayCoaching = ({ todayPoints, dailyPar, todayData }) => {
+const TimeOfDayCoaching = ({ todayPoints, dailyPar, todayData, sprintFocus }) => {
     const hour = new Date().getHours();
     const E = Number(todayData.exposures) || 0;
     const F = (Number(todayData.followUps) || 0) + (Number(todayData.tenacityFollowUps) || 0);
@@ -274,12 +274,31 @@ const TimeOfDayCoaching = ({ todayPoints, dailyPar, todayData }) => {
         }
     }
 
+    // Sprint Focus nudge — injected at the end of body if user hasn't hit the sprint focus today
+    let sprintNudge = null;
+    if (sprintFocus) {
+        const focusKey = sprintFocus.key;
+        let focusDoneToday = false;
+        if (focusKey === 'presentations') {
+            focusDoneToday = ((Array.isArray(todayData.presentations) ? todayData.presentations.length : Number(todayData.presentations) || 0) + (Number(todayData.threeWays) || 0)) > 0;
+        } else {
+            const val = todayData[focusKey];
+            focusDoneToday = Array.isArray(val) ? val.length > 0 : Number(val) > 0;
+        }
+        if (!focusDoneToday) {
+            sprintNudge = ` ${sprintFocus.emoji} Sprint focus this week: ${sprintFocus.label}. You haven't logged any yet today — make it a priority!`;
+        }
+    }
+
     return (
         <div className={`${bg} border ${border} rounded-lg p-4 mb-5 flex items-start gap-3`}>
             {icon}
             <div>
                 <span className="text-xs font-bold uppercase tracking-widest text-gray-500">{headline}</span>
-                <p className="text-sm text-gray-700 mt-0.5 leading-snug">{body}</p>
+                <p className="text-sm text-gray-700 mt-0.5 leading-snug">
+                    {body}
+                    {sprintNudge && <span className="block mt-1.5 text-xs font-bold text-indigo-700">{sprintNudge}</span>}
+                </p>
             </div>
         </div>
     );
@@ -361,6 +380,9 @@ const CycleDot = ({ label, done }) => {
 };
 
 const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAddPresentation, onShare, onShareMonthly, isSharing, onLogFollowUp, onLogExposure, dailyPar, onShowLegend, hotlist, onNavigateToPipeline, weeklyPoints, weeklyPar, onLogFollowUpForProspect, sprint, onDeclareSprint }) => {
+    // --- Sprint awareness ---
+    const currentSprintWeek = getSprintWeek();
+    const currentSprintFocus = getSprintFocus(currentSprintWeek);
     const [showInsight, setShowInsight] = useState(false);
     const [visibilityNudge, setVisibilityNudge] = useState(false);
     const today = new Date();
@@ -383,6 +405,27 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
     ];
 
     const currentPar = dailyPar || 2;
+
+    // Compute this week's total for the current sprint focus metric
+    const weeklyFocusCount = useMemo(() => {
+        if (!currentSprintFocus) return 0;
+        const focusKey = currentSprintFocus.key;
+        const today = new Date();
+        const dayOfWeek = today.getDay(); // 0=Sun
+        let total = 0;
+        for (let i = 0; i <= dayOfWeek; i++) {
+            const d = new Date(today);
+            d.setDate(today.getDate() - (dayOfWeek - i));
+            const dayData = monthlyData[d.getDate()] || {};
+            if (focusKey === 'presentations') {
+                total += (Array.isArray(dayData.presentations) ? dayData.presentations.length : Number(dayData.presentations) || 0);
+                total += Number(dayData.threeWays) || 0;
+            } else {
+                total += Number(dayData[focusKey]) || 0;
+            }
+        }
+        return total;
+    }, [monthlyData, currentSprintFocus]);
     const todayPoints = calculatePoints(todayData);
 
     // Ironman Progress
@@ -532,7 +575,7 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
     return (
         <div className="space-y-8">
             <div>
-                <TNVCampaignBanner />
+                <TNVCampaignBanner weeklyFocusCount={weeklyFocusCount} />
 
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
                     <div>
@@ -568,7 +611,7 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
                 )}
 
                 {/* Time-of-Day Coaching (#1) */}
-                <TimeOfDayCoaching todayPoints={todayPoints} dailyPar={currentPar} todayData={todayData} />
+                <TimeOfDayCoaching todayPoints={todayPoints} dailyPar={currentPar} todayData={todayData} sprintFocus={currentSprintFocus} />
 
                 {/* Sprint Progress Bar */}
                 <SprintProgressBar sprint={sprint} onDeclareSprint={onDeclareSprint} />
