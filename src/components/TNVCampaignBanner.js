@@ -15,8 +15,8 @@ const SPRINT_SCHEDULE = [
 // Shared utility — also used by Leaderboard
 export const getSprintWeek = () => {
     // START_DATE is the Sunday before campaign launch so weeks align with Sun–Sat calendar weeks.
-    // April 17 (Thu) launch → anchor to Sunday April 13 → Week 1: Apr 13–19 (Exposures)
-    const START_DATE = new Date('2026-04-13T00:00:00');
+    // April 17 (Thu) launch → anchor to Sunday April 12 → Week 1: Apr 12–18, Week 2: Apr 19–25
+    const START_DATE = new Date('2026-04-12T00:00:00');
     const now = new Date();
     if (now < START_DATE) return 1; // Pre-launch preview
     const daysSinceStart = Math.floor((now - START_DATE) / (1000 * 60 * 60 * 24));
