@@ -34,9 +34,9 @@ exports.handler = async (event, context) => {
 
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
         
-        // gemini-2.0-flash: fast, generous free tier, actively supported
+        // gemini-2.5-flash: fast, generous free tier, actively supported
         const model = genAI.getGenerativeModel({ 
-            model: "gemini-2.0-flash",
+            model: "gemini-2.5-flash",
             generationConfig: {
                 maxOutputTokens: 200,
                 temperature: 0.75,
