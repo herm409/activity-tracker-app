@@ -45,8 +45,8 @@ exports.handler = async (event, context) => {
                     m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent')
                 );
                 
-                // Prioritize stable 'pro' or 'flash' routing aliases which don't carry truncation limits
-                const preferredAliases = ["gemini-pro", "gemini-flash", "gemini-2.5-pro", "gemini-2.0-pro", "gemini-2.5-flash"];
+                // Prioritize stable '1.5' routing aliases which don't carry truncation limits
+                const preferredAliases = ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-1.5-pro-latest", "gemini-1.5-flash-latest", "gemini-pro"];
                 
                 for (const alias of preferredAliases) {
                     if (textModels.some(m => m.name === `models/${alias}`)) {
@@ -65,7 +65,13 @@ exports.handler = async (event, context) => {
         }
 
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        const model = genAI.getGenerativeModel({ model: selectedModel });
+        const model = genAI.getGenerativeModel({ 
+            model: selectedModel,
+            generationConfig: {
+                maxOutputTokens: 800,
+                temperature: 0.8,
+            }
+        });
 
         const fullPrompt = `You are the Diamond Coach, an elite virtual mentor. 
 Please follow the instructions below to compose your coaching response.
@@ -83,13 +89,7 @@ ${JSON.stringify(userContext, null, 2)}
 --- YOUR COACHING RESPONSE ---
 `;
 
-        const result = await model.generateContent({
-            contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
-            generationConfig: {
-                maxOutputTokens: 800,
-                temperature: 0.8,
-            }
-        });
+        const result = await model.generateContent(fullPrompt);
         const response = await result.response;
         const text = response.text();
 
@@ -99,7 +99,7 @@ ${JSON.stringify(userContext, null, 2)}
                 ...CORS_HEADERS,
                 "Content-Type": "application/json",
             },
-            body: JSON.stringify({ text: text.trim() }),
+            body: JSON.stringify({ text: text.trim() || `[DIAGNOSTIC FACTORY: Empty response from ${selectedModel}]` }),
         };
     } catch (error) {
         console.error("[Diamond Coach Error]:", error);
