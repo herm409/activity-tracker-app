@@ -34,13 +34,8 @@ exports.handler = async (event, context) => {
 
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
         
-        // gemini-2.5-flash: fast, generous free tier, actively supported
         const model = genAI.getGenerativeModel({ 
-            model: "gemini-2.5-flash",
-            generationConfig: {
-                maxOutputTokens: 800,
-                temperature: 0.8,
-            }
+            model: "gemini-1.5-pro-latest",
         });
 
         const fullPrompt = `You are the Diamond Coach, an elite virtual mentor. 
@@ -59,7 +54,13 @@ ${JSON.stringify(userContext, null, 2)}
 --- YOUR COACHING RESPONSE ---
 `;
 
-        const result = await model.generateContent(fullPrompt);
+        const result = await model.generateContent({
+            contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
+            generationConfig: {
+                maxOutputTokens: 800,
+                temperature: 0.8,
+            }
+        });
         const response = await result.response;
         const text = response.text();
 
