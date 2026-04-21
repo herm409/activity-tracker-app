@@ -1,20 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Sparkles, Zap, Target, MessageSquare, ArrowRight, ShieldCheck, Heart, Wallet, Dumbbell, Star, Loader2 } from 'lucide-react';
+import { Send, Sparkles, Zap, ShieldCheck, Heart, Wallet, Dumbbell, Star, Loader2 } from 'lucide-react';
 import { getDiamondCoaching } from '../services/aiService';
+import { calculatePoints } from '../utils/scoring';
 
-const DiamondCoach = ({ userProfile, todayData, leaderboardData, ironmanStreak }) => {
+const DiamondCoach = ({ userProfile, todayData, ironmanStreak }) => {
     const [messages, setMessages] = useState([]);
     const [inputValue, setInputValue] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const messagesEndRef = useRef(null);
 
-    // Categories Logic (The 5 F's)
+    // Finance pillar: real points vs daily par, capped at 100%
+    const todayPoints = calculatePoints(todayData || {});
+    const dailyPar = userProfile?.dailyPar || 2;
+    const financeProgress = Math.min(100, Math.round((todayPoints / dailyPar) * 100));
+
+    // The 5 F's pillars
     const pillars = [
-        { id: 'faith', name: 'Faith', icon: ShieldCheck, color: 'text-indigo-500', bg: 'bg-indigo-50', value: 80 }, // Placeholder values
-        { id: 'family', name: 'Family', icon: Heart, color: 'text-rose-500', bg: 'bg-rose-50', value: 90 },
-        { id: 'finance', name: 'Finance', icon: Wallet, color: 'text-emerald-500', bg: 'bg-emerald-50', value: (todayData?.points || 0) * 10 },
-        { id: 'fitness', name: 'Fitness', icon: Dumbbell, color: 'text-orange-500', bg: 'bg-orange-50', value: (todayData?.exerc || todayData?.personalDevelopment) ? 100 : 0 },
-        { id: 'fun', name: 'Fun', icon: Star, color: 'text-amber-500', bg: 'bg-amber-50', value: 50 },
+        { id: 'faith',   name: 'Faith',   icon: ShieldCheck, color: 'text-indigo-500', bg: 'bg-indigo-50',  value: 80 },
+        { id: 'family',  name: 'Family',  icon: Heart,       color: 'text-rose-500',    bg: 'bg-rose-50',   value: 90 },
+        { id: 'finance', name: 'Finance', icon: Wallet,      color: 'text-emerald-500', bg: 'bg-emerald-50', value: financeProgress },
+        { id: 'fitness', name: 'Fitness', icon: Dumbbell,    color: 'text-orange-500',  bg: 'bg-orange-50', value: (todayData?.exerc || todayData?.personalDevelopment) ? 100 : 0 },
+        { id: 'fun',     name: 'Fun',     icon: Star,        color: 'text-amber-500',   bg: 'bg-amber-50',  value: 50 },
     ];
 
     const scrollToBottom = () => {
@@ -36,11 +42,11 @@ const DiamondCoach = ({ userProfile, todayData, leaderboardData, ironmanStreak }
         setIsLoading(true);
         try {
             const context = {
-                displayName: userProfile.displayName,
+                displayName: userProfile?.displayName || 'Associate',
+                todayPoints,
+                dailyPar,
                 today: todayData,
                 ironmanStreak,
-                rank: leaderboardData?.rank,
-                teamPosition: leaderboardData?.teamNetScore
             };
             const response = await getDiamondCoaching(context, "Give me a quick morning briefing and check my numbers.");
             setMessages([{ role: 'assistant', content: response }]);
@@ -62,7 +68,9 @@ const DiamondCoach = ({ userProfile, todayData, leaderboardData, ironmanStreak }
 
         try {
             const context = {
-                displayName: userProfile.displayName,
+                displayName: userProfile?.displayName || 'Associate',
+                todayPoints,
+                dailyPar,
                 today: todayData,
                 ironmanStreak,
             };
@@ -153,9 +161,25 @@ const DiamondCoach = ({ userProfile, todayData, leaderboardData, ironmanStreak }
                         {quickActions.map(action => (
                             <button
                                 key={action}
-                                onClick={() => {
-                                    setInputValue(action);
-                                    // Triggering submit manually would be better but let's just prefill
+                                onClick={async () => {
+                                    if (isLoading) return;
+                                    setMessages(prev => [...prev, { role: 'user', content: action }]);
+                                    setIsLoading(true);
+                                    try {
+                                        const context = {
+                                            displayName: userProfile?.displayName || 'Associate',
+                                            todayPoints,
+                                            dailyPar,
+                                            today: todayData,
+                                            ironmanStreak,
+                                        };
+                                        const response = await getDiamondCoaching(context, action);
+                                        setMessages(prev => [...prev, { role: 'assistant', content: response }]);
+                                    } catch {
+                                        setMessages(prev => [...prev, { role: 'assistant', content: "Felt a little disturbance in the flow. Try again!" }]);
+                                    } finally {
+                                        setIsLoading(false);
+                                    }
                                 }}
                                 className="whitespace-nowrap px-4 py-1.5 rounded-full bg-gray-50 border border-gray-200 text-xs font-bold text-gray-600 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-700 transition-all"
                             >

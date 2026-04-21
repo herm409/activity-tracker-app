@@ -1,0 +1,8 @@
+{
+  "name": "activity-tracker-functions",
+  "version": "1.0.0",
+  "description": "Netlify serverless functions for Activity Tracker",
+  "dependencies": {
+    "@google/generative-ai": "^0.13.0"
+  }
+}
