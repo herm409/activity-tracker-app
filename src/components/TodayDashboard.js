@@ -383,7 +383,6 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
     // --- Sprint awareness ---
     const currentSprintWeek = getSprintWeek();
     const currentSprintFocus = getSprintFocus(currentSprintWeek);
-    const [showInsight, setShowInsight] = useState(false);
     const [visibilityNudge, setVisibilityNudge] = useState(false);
     const today = new Date();
     const todayKey = today.getDate();
@@ -480,16 +479,7 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
         return count;
     }, [todayData]);
 
-    // Auto-show insight once when 3+ activity types are active.
-    // Uses a ref so the effect only opens it ONE time per session —
-    // after that the user's manual hide is respected.
-    const autoShownInsightRef = useRef(false);
-    useEffect(() => {
-        if (activeCategories >= 3 && !autoShownInsightRef.current) {
-            autoShownInsightRef.current = true;
-            setShowInsight(true);
-        }
-    }, [activeCategories]);
+
 
 
     // Page Visibility API — nudge when returning after 4+ hrs with no activity
@@ -509,68 +499,6 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
     }, [todayPoints]);
 
 
-    // --- Coaching Feedback ---
-    const getCoachingAdvice = () => {
-        const E = Number(todayData.exposures) || 0;
-        const F = (Number(todayData.followUps) || 0) + (Number(todayData.tenacityFollowUps) || 0);
-        const N = Number(todayData.nos) || 0;
-        const T = Number(todayData.threeWays) || 0;
-        const A = E + F + T;
-
-        let grade = 'C', gradeDesc = 'Needs More Balance', gradeColor = 'text-red-700 bg-red-100';
-        if (activeCategories >= 3) { grade = 'A'; gradeDesc = 'Excellent Balance'; gradeColor = 'text-green-700 bg-green-100'; }
-        else if (activeCategories === 2) { grade = 'B'; gradeDesc = 'Good Balance'; gradeColor = 'text-amber-700 bg-amber-100'; }
-
-        const hash = A + activeCategories;
-        const getMsg = (arr) => arr[hash % arr.length];
-
-        let message = getMsg([
-            "Good effort, but you're only swinging from one side of the plate. Diversify your efforts to build a healthier pipeline. We need all-around players.",
-            "You got some numbers on the board, but the balance is off. A true champion masters every play in the playbook.",
-            "Glad to see you active, but don't get stuck in a rut. Mix up your exposures, follow-ups, and 3-way calls!"
-        ]);
-        
-        if (activeCategories === 0) { 
-            message = getMsg([
-                "You haven't logged any core plays yet today! Faith without works is dead. Time to plant some seeds.",
-                "Zero activity logged so far. Don't let yourself get shut out—drop an exposure and get in the game!",
-                "The board is blank. We need you out there. Pick up the phone and make something happen!"
-            ]); 
-            grade = 'N/A'; gradeDesc = 'No Activity'; gradeColor = 'text-gray-700 bg-gray-100'; 
-        } else if (E > 3 && F < E) {
-            message = getMsg([
-                "You're making great new contacts! But don't let prospects fall through the cracks. The fortune is in the follow-up—go get it!",
-                "Love the fresh exposures. Just remember, a seed unwatered won't grow. Step up your follow-up game today.",
-                "Killer prospecting hustle! But you gotta circle back. Hit up those previous exposures and turn that interest into investment."
-            ]);
-        } else if (F > 3 && T === 0) {
-            message = getMsg([
-                "Heavy on the follow-ups—love the hustle! Now leverage the system. Bring a veteran in for a 3-way call and seal the deal.",
-                "You're maintaining the pipeline nicely. Stop trying to close them alone. Connect a 3-way call and watch the magic happen.",
-                "Great consistency on the follow-ups. But to break through, you need third-party validation. Schedule a 3-way call ASAP!"
-            ]);
-        } else if (F > 3 && E === 0) {
-            message = getMsg([
-                "Great job watering the seeds! But don't forget to plant new ones. Drop some fresh exposures on the board.",
-                "You're managing your existing prospects perfectly, but the pipeline is drying up. Go spark some new conversations!",
-                "Solid follow-ups. Now balance it out. A true hustler is always adding new names to the list. Make a fresh contact!"
-            ]);
-        } else if (A >= 5 && N === 0) {
-            message = getMsg([
-                "You're putting up serious numbers! But are you asking the tough questions? Don't be afraid of rejection. Go hunt for a definitive No!",
-                "Activity is high, which means people are listening. Force a decision! A 'No' is just the toll booth on the road to a 'Yes'.",
-                "You have their attention. Stop playing it safe. Push for a verdict. Rejection means you're doing the work!"
-            ]);
-        } else if (activeCategories >= 3) {
-            message = getMsg([
-                "Flawless execution! You're planting seeds, watering them, and asking for decisions. This is exactly how we build a dynasty.",
-                "Masterclass performance. Your balance is incredible today. Keep duplicating this system and you'll be unstoppable.",
-                "This is championship-level activity. You are hitting every section of the pipeline. Straight heat! 🔥"
-            ]);
-        }
-
-        return { grade, gradeDesc, gradeColor, message };
-    };
 
     return (
         <div className="space-y-8">
@@ -663,37 +591,7 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
                 </div>
 
 
-                {/* Coach's Insight */}
-                {!showInsight ? (
-                    <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg mb-6 shadow-sm flex items-center justify-between">
-                        <div className="flex items-center">
-                            <Lightbulb className="h-5 w-5 text-blue-500 mr-3" />
-                            <span className="text-sm font-bold text-blue-800">Ready for your coaching insight?</span>
-                        </div>
-                        <button onClick={() => setShowInsight(true)} className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2 px-4 rounded transition-colors whitespace-nowrap ml-3">
-                            Coach, How Am I Doing?
-                        </button>
-                    </div>
-                ) : (
-                    <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg mb-6 shadow-sm">
-                        <div className="flex justify-between items-start">
-                            <div className="flex">
-                                <Lightbulb className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
-                                <div className="ml-3">
-                                    <h3 className="text-sm font-bold text-blue-800">Coach's Insight (Activity Balance)</h3>
-                                    <p className="text-sm text-blue-700 mt-1">{getCoachingAdvice().message}</p>
-                                </div>
-                            </div>
-                            <div className="flex flex-col items-center ml-4 flex-shrink-0">
-                                <span className={`text-2xl font-black ${getCoachingAdvice().gradeColor.split(' ')[0]}`}>{getCoachingAdvice().grade}</span>
-                                <span className={`text-[10px] uppercase font-bold px-2 py-0.5 mt-1 rounded-full whitespace-nowrap ${getCoachingAdvice().gradeColor}`}>{getCoachingAdvice().gradeDesc}</span>
-                            </div>
-                        </div>
-                        <div className="mt-3 text-right">
-                            <button onClick={() => setShowInsight(false)} className="text-xs text-blue-500 hover:text-blue-700 underline">Hide Insight</button>
-                        </div>
-                    </div>
-                )}
+
 
                 {/* Pre-Action Text Wizard Banner */}
                 <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-lg mb-6 shadow-sm flex flex-col sm:flex-row items-center justify-between">

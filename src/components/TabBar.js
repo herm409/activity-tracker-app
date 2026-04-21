@@ -4,11 +4,11 @@ import { Sun, Calendar, Users, Star, List, BarChart2, Sparkles } from 'lucide-re
 const TabBar = ({ activeTab, setActiveTab, badges = {} }) => {
     const tabs = [
         { id: 'today', name: 'Today', icon: Sun },
+        { id: 'coach', name: 'Diamond Coach', icon: Sparkles },
         { id: 'tracker', name: 'Calendar', icon: Calendar },
         { id: 'team', name: 'Team', icon: Users, isBeta: true },
         { id: 'community', name: 'Community', icon: Star },
         { id: 'hotlist', name: 'Prospect Pipeline', icon: List },
-        { id: 'coach', name: 'Diamond Coach', icon: Sparkles },
         { id: 'analytics', name: 'Analytics', icon: BarChart2 }
     ];
     return (
