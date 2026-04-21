@@ -22,9 +22,9 @@ exports.handler = async (event, context) => {
 
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
         
-        // Using gemini-1.5-flash-latest for maximum compatibility
+        // Using gemini-pro for maximum stability and to resolve the 404 error
         const model = genAI.getGenerativeModel({ 
-            model: "gemini-1.5-flash-latest",
+            model: "gemini-pro",
             generationConfig: {
                 maxOutputTokens: 150,
                 temperature: 0.7,
