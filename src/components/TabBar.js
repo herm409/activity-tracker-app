@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sun, Calendar, Users, Star, List, BarChart2 } from 'lucide-react';
+import { Sun, Calendar, Users, Star, List, BarChart2, Sparkles } from 'lucide-react';
 
 const TabBar = ({ activeTab, setActiveTab, badges = {} }) => {
     const tabs = [
@@ -8,6 +8,7 @@ const TabBar = ({ activeTab, setActiveTab, badges = {} }) => {
         { id: 'team', name: 'Team', icon: Users, isBeta: true },
         { id: 'community', name: 'Community', icon: Star },
         { id: 'hotlist', name: 'Prospect Pipeline', icon: List },
+        { id: 'coach', name: 'Diamond Coach', icon: Sparkles },
         { id: 'analytics', name: 'Analytics', icon: BarChart2 }
     ];
     return (

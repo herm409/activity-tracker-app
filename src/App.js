@@ -27,6 +27,7 @@ const AnalyticsDashboard = React.lazy(() => import('./components/AnalyticsDashbo
 const TeamPage = React.lazy(() => import('./components/TeamPage'));
 const HotList = React.lazy(() => import('./components/HotList'));
 const CommunityFeed = React.lazy(() => import('./components/CommunityFeed'));
+const DiamondCoach = React.lazy(() => import('./components/DiamondCoach'));
 
 // Community milestone thresholds & streak labels
 const STREAK_MILESTONES = [7, 14, 21, 30, 60, 90];
@@ -990,6 +991,13 @@ const AppContent = () => {
                                 db={db}
                                 user={user}
                                 userProfile={userProfile}
+                            />
+                        )}
+                        {activeTab === 'coach' && (
+                            <DiamondCoach 
+                                userProfile={userProfile}
+                                todayData={todayData}
+                                ironmanStreak={currentStreaks.ironman || 0}
                             />
                         )}
                     </Suspense>
