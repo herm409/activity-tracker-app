@@ -50,11 +50,11 @@ const DiamondCoach = ({ userProfile, todayData, ironmanStreak, monthlyData, last
 
     // The 5 F's pillars
     const pillars = [
-        { id: 'faith',   name: 'Faith',   icon: ShieldCheck, color: 'text-indigo-500', bg: 'bg-indigo-50',  value: 80 },
-        { id: 'family',  name: 'Family',  icon: Heart,       color: 'text-rose-500',    bg: 'bg-rose-50',   value: 90 },
-        { id: 'finance', name: 'Finance', icon: Wallet,      color: 'text-emerald-500', bg: 'bg-emerald-50', value: financeProgress },
-        { id: 'fitness', name: 'Fitness', icon: Dumbbell,    color: 'text-orange-500',  bg: 'bg-orange-50', value: (todayData?.exerc || todayData?.personalDevelopment) ? 100 : 0 },
-        { id: 'fun',     name: 'Fun',     icon: Star,        color: 'text-amber-500',   bg: 'bg-amber-50',  value: 50 },
+        { id: 'faith',   name: 'Faith',   icon: ShieldCheck, color: 'text-indigo-500', bg: 'bg-indigo-50',  barColor: 'bg-indigo-500', value: 100 },
+        { id: 'family',  name: 'Family',  icon: Heart,       color: 'text-rose-500',    bg: 'bg-rose-50',   barColor: 'bg-rose-500', value: 100 },
+        { id: 'finance', name: 'Finance', icon: Wallet,      color: 'text-emerald-500', bg: 'bg-emerald-50', barColor: 'bg-emerald-500', value: financeProgress },
+        { id: 'fitness', name: 'Fitness', icon: Dumbbell,    color: 'text-orange-500',  bg: 'bg-orange-50', barColor: 'bg-orange-500', value: (todayData?.exerc || todayData?.personalDevelopment) ? 100 : 0 },
+        { id: 'fun',     name: 'Fun',     icon: Star,        color: 'text-amber-500',   bg: 'bg-amber-50',  barColor: 'bg-amber-500', value: 100 },
     ];
 
     const scrollToBottom = () => {
@@ -128,16 +128,17 @@ const DiamondCoach = ({ userProfile, todayData, ironmanStreak, monthlyData, last
                 <div className="grid grid-cols-5 gap-2">
                     {pillars.map(p => (
                         <div key={p.id} className="flex flex-col items-center">
-                            <div className={`p-2 rounded-xl ${p.bg} mb-1 transition-transform hover:scale-110`}>
+                            <div className={`p-2 rounded-xl ${p.bg} mb-1 transition-transform hover:scale-110`} title={p.name}>
                                 <p.icon className={`h-4 w-4 ${p.color}`} />
                             </div>
                             <div className="w-full bg-gray-100 h-1 rounded-full overflow-hidden">
                                 <div 
-                                    className={`h-full ${p.color.replace('text', 'bg')} transition-all duration-1000`} 
+                                    className={`h-full ${p.barColor} transition-all duration-1000`} 
                                     style={{ width: `${p.value}%` }}
                                 />
                             </div>
                         </div>
+
                     ))}
                 </div>
             </div>
