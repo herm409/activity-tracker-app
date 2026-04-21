@@ -88,14 +88,11 @@ ${JSON.stringify(userContext, null, 2)}
         }
 
         const rawText = successData.candidates[0]?.content?.parts?.[0]?.text || "";
-        const finishReason = successData.candidates[0]?.finishReason || "UNKNOWN";
 
         return {
             statusCode: 200,
             headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
-            body: JSON.stringify({ 
-                text: rawText.trim() + `\n\n[DIAGNOSTICS -> Reason: ${finishReason} | Model: ${successfulModel}]`
-            }),
+            body: JSON.stringify({ text: rawText.trim() }),
         };
     } catch (error) {
         console.error("[Diamond Coach Critical Error]:", error);
