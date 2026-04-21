@@ -37,14 +37,15 @@ exports.handler = async (event, context) => {
         // gemini-2.5-flash: fast, generous free tier, actively supported
         const model = genAI.getGenerativeModel({ 
             model: "gemini-2.5-flash",
-            systemInstruction: systemPrompt,
             generationConfig: {
-                maxOutputTokens: 200,
+                maxOutputTokens: 300,
                 temperature: 0.75,
             }
         });
 
-        const fullPrompt = `Here is the user's current progress snapshot:
+        const fullPrompt = `${systemPrompt}
+
+Here is the user's current progress snapshot:
 ${JSON.stringify(userContext, null, 2)}
 
 User Question/Input:
