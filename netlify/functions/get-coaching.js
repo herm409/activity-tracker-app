@@ -37,32 +37,29 @@ exports.handler = async (event, context) => {
         // gemini-2.5-flash: fast, generous free tier, actively supported
         const model = genAI.getGenerativeModel({ 
             model: "gemini-2.5-flash",
-        });
-
-        const chat = model.startChat({
-            history: [
-                {
-                    role: "user",
-                    parts: [{ text: systemPrompt }]
-                },
-                {
-                    role: "model",
-                    parts: [{ text: "Understood. I am the Diamond Coach. I will review the snapshot, stay under 80 words, provide one win, identify an activity gap, and end with 'Let's work.' Let's go." }]
-                }
-            ],
             generationConfig: {
-                maxOutputTokens: 400,
-                temperature: 0.75,
+                maxOutputTokens: 800,
+                temperature: 0.8,
             }
         });
 
-        const userPayload = `Here is the user's current progress snapshot:
+        const fullPrompt = `You are the Diamond Coach, an elite virtual mentor. 
+Please follow the instructions below to compose your coaching response.
+
+--- SYSTEM INSTRUCTIONS ---
+${systemPrompt}
+You MUST output a full, comprehensive paragraph. Read the data, acknowledge wins, identify a gap, and close it out.
+
+--- USER PROGRESS SNAPSHOT ---
 ${JSON.stringify(userContext, null, 2)}
 
-User Question/Input:
-"${userMessage || "Coach me based on my numbers today."}"`;
+--- USER QUESTION ---
+"${userMessage || "Coach me based on my numbers today."}"
 
-        const result = await chat.sendMessage(userPayload);
+--- YOUR COACHING RESPONSE ---
+`;
+
+        const result = await model.generateContent(fullPrompt);
         const response = await result.response;
         const text = response.text();
 
