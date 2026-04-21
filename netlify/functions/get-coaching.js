@@ -32,11 +32,40 @@ exports.handler = async (event, context) => {
             throw new Error("GEMINI_API_KEY is not configured in Netlify environment variables.");
         }
 
+        // Select the best available model dynamically to avoid 404 deprecations
+        let selectedModel = "gemini-pro"; // failover fallback
+        try {
+            const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${process.env.GEMINI_API_KEY}`;
+            const res = await fetch(listUrl);
+            const data = await res.json();
+            
+            if (data.models) {
+                // Filter for models that actually support text generation
+                const textModels = data.models.filter(m => 
+                    m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent')
+                );
+                
+                // Prioritize stable 'pro' or 'flash' routing aliases which don't carry truncation limits
+                const preferredAliases = ["gemini-pro", "gemini-flash", "gemini-2.5-pro", "gemini-2.0-pro", "gemini-2.5-flash"];
+                
+                for (const alias of preferredAliases) {
+                    if (textModels.some(m => m.name === `models/${alias}`)) {
+                        selectedModel = alias;
+                        break;
+                    }
+                }
+                
+                // If somehow none match our prefs, pick the first valid one available
+                if (!preferredAliases.includes(selectedModel) && textModels.length > 0) {
+                    selectedModel = textModels[0].name.replace('models/', '');
+                }
+            }
+        } catch (err) {
+            console.error("Diagnostic fetch failed:", err);
+        }
+
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        
-        const model = genAI.getGenerativeModel({ 
-            model: "gemini-1.5-pro-latest",
-        });
+        const model = genAI.getGenerativeModel({ model: selectedModel });
 
         const fullPrompt = `You are the Diamond Coach, an elite virtual mentor. 
 Please follow the instructions below to compose your coaching response.
