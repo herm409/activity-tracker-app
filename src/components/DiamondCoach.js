@@ -9,6 +9,21 @@ const DiamondCoach = ({ userProfile, todayData, ironmanStreak, monthlyData, last
     const [isLoading, setIsLoading] = useState(false);
     const messagesEndRef = useRef(null);
 
+    // AI Usage Rate Limiting (Client Side)
+    const MAX_DAILY_MESSAGES = 5;
+    const todayStr = new Date().toISOString().split('T')[0];
+    const storageKey = `diamondCoachUsage_${todayStr}`;
+    const [usageCount, setUsageCount] = useState(() => {
+        return parseInt(localStorage.getItem(storageKey) || '0', 10);
+    });
+    const isLimitReached = usageCount >= MAX_DAILY_MESSAGES;
+
+    const incrementUsage = () => {
+        const newCount = usageCount + 1;
+        setUsageCount(newCount);
+        localStorage.setItem(storageKey, newCount.toString());
+    };
+
     // Finance pillar: real points vs daily par, capped at 100%
     const todayPoints = calculatePoints(todayData || {});
     const dailyPar = userProfile?.dailyPar || 2;
@@ -98,6 +113,7 @@ const DiamondCoach = ({ userProfile, todayData, ironmanStreak, monthlyData, last
             const context = buildContext();
             const response = await getDiamondCoaching(context, userMsg);
             setMessages(prev => [...prev, { role: 'assistant', content: response }]);
+            incrementUsage();
         } catch (error) {
             setMessages(prev => [...prev, { role: 'assistant', content: "Felt a little disturbance in the flow. Try that again, let's keep the momentum going." }]);
         } finally {
@@ -138,7 +154,6 @@ const DiamondCoach = ({ userProfile, todayData, ironmanStreak, monthlyData, last
                                 />
                             </div>
                         </div>
-
                     ))}
                 </div>
             </div>
@@ -179,19 +194,20 @@ const DiamondCoach = ({ userProfile, todayData, ironmanStreak, monthlyData, last
 
             {/* Input Area */}
             <div className="p-4 bg-white border-t border-gray-100">
-                {messages.length < 5 && !isLoading && (
+                {messages.length < 5 && !isLoading && !isLimitReached && (
                     <div className="flex gap-2 overflow-x-auto pb-4 no-scrollbar">
                         {quickActions.map(action => (
                             <button
                                 key={action}
                                 onClick={async () => {
-                                    if (isLoading) return;
+                                    if (isLoading || isLimitReached) return;
                                     setMessages(prev => [...prev, { role: 'user', content: action }]);
                                     setIsLoading(true);
                                     try {
                                         const context = buildContext();
                                         const response = await getDiamondCoaching(context, action);
                                         setMessages(prev => [...prev, { role: 'assistant', content: response }]);
+                                        incrementUsage();
                                     } catch {
                                         setMessages(prev => [...prev, { role: 'assistant', content: "Felt a little disturbance in the flow. Try again!" }]);
                                     } finally {
@@ -210,14 +226,15 @@ const DiamondCoach = ({ userProfile, todayData, ironmanStreak, monthlyData, last
                         type="text"
                         value={inputValue}
                         onChange={(e) => setInputValue(e.target.value)}
-                        placeholder="Ask your coach anything..."
-                        className="w-full bg-gray-50 border-0 rounded-2xl py-3.5 pl-5 pr-12 text-sm focus:ring-2 focus:ring-indigo-500 transition-all font-medium text-gray-800 shadow-inner"
+                        placeholder={isLimitReached ? "Coach is off the clock. Go execute and report back tomorrow!" : "Ask your coach anything..."}
+                        disabled={isLimitReached}
+                        className="w-full bg-gray-50 border-0 rounded-2xl py-3.5 pl-5 pr-12 text-sm focus:ring-2 focus:ring-indigo-500 transition-all font-medium text-gray-800 shadow-inner disabled:opacity-60 disabled:cursor-not-allowed"
                     />
                     <button 
                         type="submit"
-                        disabled={isLoading || !inputValue.trim()}
+                        disabled={isLoading || (!inputValue.trim() && !isLimitReached) || isLimitReached}
                         className={`absolute right-1.5 p-2 rounded-xl transition-all ${
-                            !inputValue.trim() || isLoading 
+                            (!inputValue.trim() || isLoading || isLimitReached) 
                             ? 'bg-gray-100 text-gray-400' 
                             : 'bg-indigo-600 text-white shadow-lg hover:scale-105 active:scale-95'
                         }`}
