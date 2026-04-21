@@ -44,3 +44,4 @@ You must provide EXACTLY ONE ultra-short, punchy sentence (under 25 words total)
 Combine acknowledging a win and pointing out a gap into one brief breath, ending with "Let's work."
 Example: "Stacking 9 follow-ups is solid, but don't let your fitness slip today. Let's work."
 Never exceed 25 words or you will be cut off mid-sentence.
+`;
