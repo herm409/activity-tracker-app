@@ -834,6 +834,12 @@ const AppContent = () => {
 
             if (!isMonday) return;
 
+            // Suppress Cut Report for users enrolled less than 7 days ago
+            if (user?.metadata?.creationTime) {
+                const accountAgeDays = (Date.now() - new Date(user.metadata.creationTime).getTime()) / (1000 * 60 * 60 * 24);
+                if (accountAgeDays < 7) return;
+            }
+
             const lastReportDate = localStorage.getItem('lastCutReportDate');
             const todayStr = today.toDateString();
 
@@ -998,6 +1004,9 @@ const AppContent = () => {
                                 userProfile={userProfile}
                                 todayData={todayData}
                                 ironmanStreak={currentStreaks.ironman || 0}
+                                monthlyData={monthlyData}
+                                lastMonthData={lastMonthData}
+                                monthlyGoals={monthlyGoals}
                             />
                         )}
                     </Suspense>

@@ -3,7 +3,7 @@ import { Send, Sparkles, Zap, ShieldCheck, Heart, Wallet, Dumbbell, Star, Loader
 import { getDiamondCoaching } from '../services/aiService';
 import { calculatePoints } from '../utils/scoring';
 
-const DiamondCoach = ({ userProfile, todayData, ironmanStreak }) => {
+const DiamondCoach = ({ userProfile, todayData, ironmanStreak, monthlyData, lastMonthData, monthlyGoals }) => {
     const [messages, setMessages] = useState([]);
     const [inputValue, setInputValue] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -13,6 +13,40 @@ const DiamondCoach = ({ userProfile, todayData, ironmanStreak }) => {
     const todayPoints = calculatePoints(todayData || {});
     const dailyPar = userProfile?.dailyPar || 2;
     const financeProgress = Math.min(100, Math.round((todayPoints / dailyPar) * 100));
+
+    // Compile Context 
+    let thisMonthPoints = 0;
+    if (monthlyData) {
+        Object.values(monthlyData).forEach(day => {
+            thisMonthPoints += calculatePoints(day);
+        });
+    }
+
+    const now = new Date();
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
+    let thisWeekPoints = 0;
+    for (let i = 0; i <= 6; i++) {
+        const d = new Date(startOfWeek);
+        d.setDate(startOfWeek.getDate() + i);
+        if (d > now) break;
+        if (monthlyData && monthlyData[d.getDate()]) {
+            thisWeekPoints += calculatePoints(monthlyData[d.getDate()]);
+        }
+    }
+
+    // Extended User Context Payload
+    const buildContext = () => ({
+        displayName: userProfile?.displayName || 'Associate',
+        todayPoints,
+        dailyPar,
+        thisWeekPoints,
+        thisMonthPoints,
+        monthlyGoals: monthlyGoals || {},
+        sprint: userProfile?.sprint || 'None Active',
+        todaySnapshot: todayData,
+        ironmanStreak,
+    });
 
     // The 5 F's pillars
     const pillars = [
@@ -41,13 +75,7 @@ const DiamondCoach = ({ userProfile, todayData, ironmanStreak }) => {
     const handleProactiveGreeting = async () => {
         setIsLoading(true);
         try {
-            const context = {
-                displayName: userProfile?.displayName || 'Associate',
-                todayPoints,
-                dailyPar,
-                today: todayData,
-                ironmanStreak,
-            };
+            const context = buildContext();
             const response = await getDiamondCoaching(context, "Give me a quick morning briefing and check my numbers.");
             setMessages([{ role: 'assistant', content: response }]);
         } catch (error) {
@@ -67,13 +95,7 @@ const DiamondCoach = ({ userProfile, todayData, ironmanStreak }) => {
         setIsLoading(true);
 
         try {
-            const context = {
-                displayName: userProfile?.displayName || 'Associate',
-                todayPoints,
-                dailyPar,
-                today: todayData,
-                ironmanStreak,
-            };
+            const context = buildContext();
             const response = await getDiamondCoaching(context, userMsg);
             setMessages(prev => [...prev, { role: 'assistant', content: response }]);
         } catch (error) {
@@ -166,13 +188,7 @@ const DiamondCoach = ({ userProfile, todayData, ironmanStreak }) => {
                                     setMessages(prev => [...prev, { role: 'user', content: action }]);
                                     setIsLoading(true);
                                     try {
-                                        const context = {
-                                            displayName: userProfile?.displayName || 'Associate',
-                                            todayPoints,
-                                            dailyPar,
-                                            today: todayData,
-                                            ironmanStreak,
-                                        };
+                                        const context = buildContext();
                                         const response = await getDiamondCoaching(context, action);
                                         setMessages(prev => [...prev, { role: 'assistant', content: response }]);
                                     } catch {

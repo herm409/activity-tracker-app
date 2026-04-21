@@ -147,36 +147,6 @@ const AnalyticsDashboard = ({ db, user }) => {
         fetchAllAnalyticsData();
     }, [user, db]);
 
-    const getInsight = () => {
-        const { expToPresentationRatio, presentationToEnrollRatio } = stats;
-        if (stats.expToPresentationRatio === 0 && stats.presentationToEnrollRatio === 0) {
-            return {
-                title: "Let's Get Some Data!",
-                text: "Start logging your activities—exposures, presentations, and memberships sold—to unlock powerful insights about your business.",
-                icon: Lightbulb
-            };
-        }
-        if (expToPresentationRatio > 20 && expToPresentationRatio >= presentationToEnrollRatio) {
-            return {
-                title: "Opportunity: Improve Exposure Quality",
-                text: "Your lifetime data suggests it takes a high number of exposures to get a presentation. Focus on refining your initial approach to convert more contacts into meetings.",
-                icon: Target
-            };
-        }
-        if (presentationToEnrollRatio > 12 && presentationToEnrollRatio > expToPresentationRatio) {
-            return {
-                title: "Opportunity: Refine Your Presentation",
-                text: "You're great at getting meetings! Your lifetime data shows an opportunity to improve your closing rate. Consider practicing your presentation or follow-up process.",
-                icon: Award
-            };
-        }
-        return {
-            title: "Keep Up the Consistent Work!",
-            text: "Your business ratios are looking solid. Consistency is key, so continue to focus on your daily activities and filling your funnel.",
-            icon: TrendingUp
-        };
-    };
-
     // --- CSV Export Logic ---
     const handleExportCSV = () => {
         setIsExporting(true);
@@ -252,8 +222,6 @@ const AnalyticsDashboard = ({ db, user }) => {
     };
 
     if (loading) return <div className="text-center p-10">Loading Analytics...</div>;
-
-    const insight = getInsight();
 
     const FunnelStep = ({ value, label, color, isTop = false, isBottom = false }) => {
         let borderRadius = '';
@@ -451,18 +419,7 @@ const AnalyticsDashboard = ({ db, user }) => {
                         Your goal isn't to get a "Yes". Your daily goal is to collect "No's" and fill this jar. Every "No" is a required step towards a "Yes".
                     </p>
                     
-                    <div className="bg-red-50 p-3 rounded-md border border-red-100 mt-4 leading-snug">
-                        <span className="text-xs font-bold text-red-800 uppercase tracking-widest block mb-1">Coach's Insight:</span>
-                        <span className="text-sm text-red-700 font-medium italic">"{[
-                            "Every No pays the toll to a Yes. Keep filling the jar!",
-                            "Rejection isn't failure, it's data. Go collect more data!",
-                            "Stop playing it safe. Go hunt for No's!",
-                            "A clear No is better than a polite maybe. Clear the pipeline!",
-                            "The fastest way to a Yes is through a mountain of No's. Dig in!",
-                            "Get rejected faster! That means you're actually doing the work.",
-                            "Faith without works is dead. Don't fear the No, chase it!"
-                        ][(stats.lifetimeNos || 0) % 7]}"</span>
-                    </div>
+
 
                     <div className="mt-5 flex items-end">
                         <span className="text-4xl font-black text-red-600">{stats.lifetimeNos % 100}</span>
@@ -491,17 +448,7 @@ const AnalyticsDashboard = ({ db, user }) => {
                 </div>
             </div>
 
-            <div className="bg-indigo-50 border-l-4 border-indigo-400 p-4 rounded-r-lg">
-                <div className="flex">
-                    <div className="flex-shrink-0">
-                        <insight.icon className="h-6 w-6 text-indigo-500" />
-                    </div>
-                    <div className="ml-3">
-                        <p className="text-md font-semibold text-indigo-800">{insight.title}</p>
-                        <p className="mt-1 text-sm text-indigo-700">{insight.text}</p>
-                    </div>
-                </div>
-            </div>
+
 
             <div className="bg-white p-2 sm:p-6 rounded-lg shadow-sm">
                 <h2 className="text-xl sm:text-2xl font-semibold mb-6 text-center sm:text-left">6-Month Activity Trends</h2>
