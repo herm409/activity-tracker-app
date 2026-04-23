@@ -119,6 +119,7 @@ const AppContent = () => {
     // --- Monday Cut Report Logic ---
 
     const isDirtyRef = useRef(false);
+    const pendingUpdatesRef = useRef({});
     const monthlyDataRef = useRef(monthlyData);
     const monthlyGoalsRef = useRef(monthlyGoals);
 
@@ -174,11 +175,21 @@ const AppContent = () => {
         return () => unsubscribe();
     }, [user, db]);
 
-    // Handle initial data load
+    // Handle initial data load and visibility changes
     useEffect(() => {
         if (user && db) {
             fetchActivitiesData();
         }
+        
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible' && user && db) {
+                console.log("TRACE: Tab became visible, aggressively fetching latest data");
+                fetchActivitiesData();
+            }
+        };
+        
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
     }, [user, db, currentDate, fetchActivitiesData]);
 
     // Handle Profile Modals (Onboarding & Goals)
@@ -350,15 +361,34 @@ const AppContent = () => {
 
     const debouncedSave = useMemo(() => debounce(async (dataToSave, goalsToSave, targetMonthId, dateOfChange) => {
         if (!user || !db) return;
+        
+        const updates = { ...pendingUpdatesRef.current };
+        if (Object.keys(updates).length === 0) return; // Nothing to save via atomic updates
+        
+        pendingUpdatesRef.current = {}; // clear immediately
+        updates.lastUpdated = new Date().toISOString();
+        
         const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', targetMonthId);
         try {
-            await setDoc(docRef, { dailyData: dataToSave, monthlyGoals: goalsToSave }, { merge: true });
+            console.log("TRACE: Flushing pending atomic updates:", updates);
+            try {
+                await updateDoc(docRef, updates);
+            } catch (error) {
+                if (error.code === 'not-found') {
+                    console.log("TRACE: Document not found, creating with full data merge.");
+                    await setDoc(docRef, { dailyData: dataToSave, monthlyGoals: goalsToSave, lastUpdated: updates.lastUpdated }, { merge: true });
+                } else {
+                    throw error;
+                }
+            }
             isDirtyRef.current = false;
             if (dataToSave && dateOfChange) {
                 updateLeaderboard(dataToSave, targetMonthId, dateOfChange);
             }
         } catch (error) {
             console.error("Failed to save data:", error);
+            // Revert pending updates on failure
+            pendingUpdatesRef.current = { ...updates, ...pendingUpdatesRef.current };
         }
     }, 1500), [user, db, updateLeaderboard]);
 
@@ -510,6 +540,7 @@ const AppContent = () => {
                 const updatedData = { ...prevData, [day]: { ...prevData[day], [field]: value } };
                 
                 isDirtyRef.current = true;
+                pendingUpdatesRef.current[`dailyData.${day}.${field}`] = value;
                 debouncedSave(updatedData, monthlyGoals, monthYearId, date);
                 evaluateCoaching(date, field, value, prevValue);
                 
@@ -571,6 +602,7 @@ const AppContent = () => {
         const newGoals = { ...monthlyGoals, [goalKey]: Number(value) || 0 };
         setMonthlyGoals(newGoals);
         isDirtyRef.current = true;
+        pendingUpdatesRef.current[`monthlyGoals.${goalKey}`] = Number(value) || 0;
         debouncedSave(monthlyData, newGoals, monthYearId);
     };
 
@@ -886,8 +918,12 @@ const AppContent = () => {
     useEffect(() => {
         const handleBeforeUnload = (event) => {
             if (isDirtyRef.current) {
-                const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', monthYearId);
-                setDoc(docRef, { dailyData: monthlyDataRef.current, monthlyGoals: monthlyGoalsRef.current }, { merge: true });
+                const updates = { ...pendingUpdatesRef.current };
+                if (Object.keys(updates).length > 0) {
+                    const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', monthYearId);
+                    updates.lastUpdated = new Date().toISOString();
+                    updateDoc(docRef, updates).catch(() => {});
+                }
                 event.preventDefault();
                 event.returnValue = '';
             }
@@ -896,8 +932,12 @@ const AppContent = () => {
         return () => {
             window.removeEventListener('beforeunload', handleBeforeUnload);
             if (isDirtyRef.current) {
-                const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', monthYearId);
-                setDoc(docRef, { dailyData: monthlyDataRef.current, monthlyGoals: monthlyGoalsRef.current }, { merge: true });
+                const updates = { ...pendingUpdatesRef.current };
+                if (Object.keys(updates).length > 0) {
+                    const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'activities', monthYearId);
+                    updates.lastUpdated = new Date().toISOString();
+                    updateDoc(docRef, updates).catch(() => {});
+                }
             }
         };
     }, [db, user, monthYearId]);
