@@ -68,19 +68,15 @@ const TotalsFooter = ({ totals, onShare, onShareMonthly, isSharing, streaks, goa
                                 <div>
                                     <h4 className={`text-sm sm:text-md font-semibold text-gray-600`}>{metric.label}</h4>
                                     <div className="flex items-center mt-1">
-                                        {metric.key !== 'presentations' ? (
-                                            <div className="flex items-center space-x-3">
-                                                <button onClick={() => onQuickAdd(metric.key, -1)} className="p-2 rounded-full bg-gray-200 text-gray-600 hover:bg-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                                                    <Minus className="h-4 w-4" />
-                                                </button>
-                                                <p className={`text-4xl sm:text-5xl font-bold text-gray-900 text-center w-14`}>{metric.value}</p>
-                                                <button onClick={() => onQuickAdd(metric.key, 1)} className="p-2 rounded-full bg-gray-200 text-gray-600 hover:bg-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                                                    <Plus className="h-4 w-4" />
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            <p className={`text-4xl sm:text-5xl font-bold text-gray-900`}>{metric.value}</p>
-                                        )}
+                                        <div className="flex items-center space-x-3">
+                                            <button onClick={() => onQuickAdd(metric.key, -1)} className="p-2 rounded-full bg-gray-200 text-gray-600 hover:bg-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                                <Minus className="h-4 w-4" />
+                                            </button>
+                                            <p className={`text-4xl sm:text-5xl font-bold text-gray-900 text-center w-14`}>{metric.value}</p>
+                                            <button onClick={() => onQuickAdd(metric.key, 1)} className="p-2 rounded-full bg-gray-200 text-gray-600 hover:bg-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                                <Plus className="h-4 w-4" />
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                                 <metric.icon className={`h-8 w-8 text-${metric.color}-400`} />

@@ -581,6 +581,25 @@ const AppContent = () => {
         }
         // Use the ref which always has the latest committed data for computation
         const todayData = monthlyDataRef.current[today.getDate()] || {};
+        
+        if (metricKey === 'presentations') {
+            const currentPresentations = todayData.presentations || [];
+            let newPresentations;
+            if (Array.isArray(currentPresentations)) {
+                newPresentations = [...currentPresentations];
+            } else {
+                newPresentations = !isNaN(currentPresentations) && currentPresentations > 0 ? Array(Number(currentPresentations)).fill('P') : [];
+            }
+            
+            if (amount > 0) {
+                newPresentations.push('P'); // Default to In Person when quick adding
+            } else if (amount < 0 && newPresentations.length > 0) {
+                newPresentations.pop(); // Remove the last one
+            }
+            handleDataChange(today, metricKey, newPresentations);
+            return;
+        }
+
         const currentValue = Number(todayData[metricKey]) || 0;
         const newValue = Math.max(0, currentValue + amount);
         handleDataChange(today, metricKey, newValue);

@@ -64,6 +64,7 @@ const StreakRow = ({ streaks, todayData }) => {
             (Number(todayData.exposures) || 0) > 0,
             ((Number(todayData.followUps) || 0) + (Number(todayData.tenacityFollowUps) || 0)) > 0,
             (Number(todayData.nos) || 0) > 0,
+            ((Array.isArray(todayData.presentations) ? todayData.presentations.length : Number(todayData.presentations) || 0) + (Number(todayData.pbrs) || 0)) > 0,
             (Number(todayData.threeWays) || 0) > 0,
             !!todayData.exerc,
             !!(todayData.personalDevelopment || todayData.read || todayData.audio),
@@ -432,12 +433,13 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
         { label: 'Exposures', done: (Number(todayData.exposures) || 0) > 0 },
         { label: 'Follow Ups', done: ((Number(todayData.followUps) || 0) + (Number(todayData.tenacityFollowUps) || 0)) > 0 },
         { label: 'No\'s', done: (Number(todayData.nos) || 0) > 0 },
+        { label: 'Presentations', done: ((Array.isArray(todayData.presentations) ? todayData.presentations.length : Number(todayData.presentations) || 0) + (Number(todayData.pbrs) || 0)) > 0 },
         { label: '3-Ways', done: (Number(todayData.threeWays) || 0) > 0 },
         { label: 'Exercise', done: !!todayData.exerc },
         { label: 'Personal Dev', done: !!(todayData.personalDevelopment || todayData.read || todayData.audio) },
     ];
     const ironmanCompleted = ironmanProgress.filter(i => i.done).length;
-    const isIronman = ironmanCompleted === 6;
+    const isIronman = ironmanCompleted === 7;
 
     const currentEnrolls = (Number(todayData.enrolls) || 0) + (Array.isArray(todayData.sitdowns) ? todayData.sitdowns.filter(s => s === 'E').length : 0);
 
@@ -578,7 +580,7 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
                                 {isIronman && <span className="ml-2 bg-orange-500 text-white text-[10px] uppercase px-2 py-0.5 rounded-full font-bold animate-pulse">+5 PTS</span>}
                             </h3>
                             <p className="text-sm text-gray-500">
-                                {isIronman ? "You crushed it! Full cycle complete." : `Complete all 6 core activities for a +5 pt bonus. (${ironmanCompleted}/6)`}
+                                {isIronman ? "You crushed it! Full cycle complete." : `Complete all 7 core activities for a +5 pt bonus. (${ironmanCompleted}/7)`}
                             </p>
                             <p className="text-[10px] text-gray-400 mt-0.5">Tap each circle to see its label</p>
                         </div>
