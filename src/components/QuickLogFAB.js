@@ -11,8 +11,17 @@ const ACTIONS = [
     { key: 'enrolls',       label: 'Enrollment',  icon: UserCheck, color: '#ccfbf1', textColor: '#0f766e', type: 'direct' },
 ];
 
-const QuickLogFAB = ({ onLogExposure, onLogFollowUp, onAddPresentation, onQuickAdd }) => {
+const QuickLogFAB = ({ onLogExposure, onLogFollowUp, onAddPresentation, onQuickAdd, targetDate }) => {
     const [open, setOpen] = useState(false);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const logDate = targetDate ? new Date(targetDate) : today;
+    logDate.setHours(0, 0, 0, 0);
+    const isBackdated = logDate.getTime() < today.getTime();
+    const dateLabel = isBackdated
+        ? logDate.toLocaleDateString('default', { weekday: 'short', month: 'short', day: 'numeric' })
+        : 'Today';
 
     const close = () => setOpen(false);
     const toggle = () => setOpen(prev => !prev);
@@ -74,7 +83,23 @@ const QuickLogFAB = ({ onLogExposure, onLogFollowUp, onAddPresentation, onQuickA
                 }}>
                     {/* Sheet header */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                        <span style={{ fontWeight: 800, fontSize: 15, color: '#1e1b4b' }}>⚡ Quick Log</span>
+                        <div>
+                            <span style={{ fontWeight: 800, fontSize: 15, color: '#1e1b4b' }}>⚡ Quick Log</span>
+                            {isBackdated && (
+                                <span style={{
+                                    display: 'inline-block',
+                                    marginLeft: 8,
+                                    background: '#fef3c7',
+                                    color: '#92400e',
+                                    fontSize: 11,
+                                    fontWeight: 700,
+                                    borderRadius: 6,
+                                    padding: '2px 7px',
+                                }}>
+                                    📅 {dateLabel}
+                                </span>
+                            )}
+                        </div>
                         <button
                             onClick={close}
                             aria-label="Close Quick Log"

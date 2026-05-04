@@ -46,6 +46,7 @@ const AppContent = () => {
 
     // --- State Management ---
     const [currentDate, setCurrentDate] = useState(new Date());
+    const [quickAddDate, setQuickAddDate] = useState(new Date()); // The date the FAB will log to
 
     const [monthlyData, setMonthlyData] = useState({});
     const [lastMonthData, setLastMonthData] = useState({});
@@ -575,46 +576,60 @@ const AppContent = () => {
 
     const handleQuickAdd = (metricKey, amount) => {
         const today = new Date();
-        if (today.getFullYear() !== year || today.getMonth() !== month) {
-            alert("Quick add is only available for the current day on the current month's view.");
-            return;
+        today.setHours(0, 0, 0, 0);
+        // Determine target date — use quickAddDate but never allow future dates
+        const targetDate = new Date(quickAddDate);
+        targetDate.setHours(0, 0, 0, 0);
+        const logDate = targetDate > today ? today : targetDate;
+
+        const targetMonthId = `${logDate.getFullYear()}-${String(logDate.getMonth() + 1).padStart(2, '0')}`;
+        // Fetch day data from the correct month store
+        let logDayData = {};
+        if (targetMonthId === monthYearId) {
+            logDayData = monthlyDataRef.current[logDate.getDate()] || {};
+        } else {
+            // For prior months we read directly from Firestore via handleDataChange,
+            // so we only need the current value for presentation array handling.
+            logDayData = {};
         }
-        // Use the ref which always has the latest committed data for computation
-        const todayData = monthlyDataRef.current[today.getDate()] || {};
-        
+
         if (metricKey === 'presentations') {
-            const currentPresentations = todayData.presentations || [];
+            const currentPresentations = logDayData.presentations || [];
             let newPresentations;
             if (Array.isArray(currentPresentations)) {
                 newPresentations = [...currentPresentations];
             } else {
                 newPresentations = !isNaN(currentPresentations) && currentPresentations > 0 ? Array(Number(currentPresentations)).fill('P') : [];
             }
-            
             if (amount > 0) {
-                newPresentations.push('P'); // Default to In Person when quick adding
+                newPresentations.push('P');
             } else if (amount < 0 && newPresentations.length > 0) {
-                newPresentations.pop(); // Remove the last one
+                newPresentations.pop();
             }
-            handleDataChange(today, metricKey, newPresentations);
+            handleDataChange(logDate, metricKey, newPresentations);
             return;
         }
 
-        const currentValue = Number(todayData[metricKey]) || 0;
+        const currentValue = Number(logDayData[metricKey]) || 0;
         const newValue = Math.max(0, currentValue + amount);
-        handleDataChange(today, metricKey, newValue);
+        handleDataChange(logDate, metricKey, newValue);
     };
 
     const handleAddPresentation = (type) => {
         const today = new Date();
-        if (today.getFullYear() !== year || today.getMonth() !== month) {
-            alert("Quick add is only available for the current day on the current month's view.");
-            return;
+        today.setHours(0, 0, 0, 0);
+        const targetDate = new Date(quickAddDate);
+        targetDate.setHours(0, 0, 0, 0);
+        const logDate = targetDate > today ? today : targetDate;
+
+        let logDayData = {};
+        const targetMonthId = `${logDate.getFullYear()}-${String(logDate.getMonth() + 1).padStart(2, '0')}`;
+        if (targetMonthId === monthYearId) {
+            logDayData = monthlyDataRef.current[logDate.getDate()] || {};
         }
-        const todayData = monthlyDataRef.current[today.getDate()] || {};
-        const currentPresentations = todayData.presentations || [];
+        const currentPresentations = logDayData.presentations || [];
         const newPresentations = [...currentPresentations, type];
-        handleDataChange(today, 'presentations', newPresentations);
+        handleDataChange(logDate, 'presentations', newPresentations);
     };
 
     const handleGoalChange = (goalKey, value) => {
@@ -982,7 +997,7 @@ const AppContent = () => {
             <div className="sticky top-0 z-40 bg-gray-50 pt-6">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <Header displayName={userProfile.displayName} onSignOut={() => auth.signOut()} onEditName={() => setShowNameModal(true)} />
-                    <TabBar activeTab={activeTab} setActiveTab={setActiveTab} badges={{ today: showTodayBadge, community: hasUnreadCommunity }} />
+                    <TabBar activeTab={activeTab} setActiveTab={(tab) => { setActiveTab(tab); if (tab !== 'tracker') setQuickAddDate(new Date()); }} badges={{ today: showTodayBadge, community: hasUnreadCommunity }} />
                 </div>
             </div>
 
@@ -1042,6 +1057,7 @@ const AppContent = () => {
                             streaks={currentStreaks}
                             dailyPar={userProfile.dailyPar}
                             onShowLegend={() => setShowScoringLegend(true)}
+                            onDateContext={setQuickAddDate}
                         />}
                         {activeTab === 'team' && <TeamPage user={user} db={db} userProfile={userProfile} setUserProfile={setUserProfile} weekId={getWeekId(currentDate)} />}
                         {activeTab === 'hotlist' && <HotList
@@ -1078,6 +1094,7 @@ const AppContent = () => {
                 onLogFollowUp={() => setShowFollowUpModal(true)}
                 onAddPresentation={handleAddPresentation}
                 onQuickAdd={handleQuickAdd}
+                targetDate={quickAddDate}
             />
 
             {showNameModal && <DisplayNameModal currentName={userProfile.displayName} currentPar={userProfile.dailyPar} onSave={handleSetDisplayName} onClose={!userProfile.displayName ? null : () => setShowNameModal(false)} />}

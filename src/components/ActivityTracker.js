@@ -5,7 +5,7 @@ import { ChevronUp, ChevronDown, HelpCircle } from 'lucide-react';
 import { DayEntryModal } from './GlobalModals';
 import TotalsFooter from './TotalsFooter';
 
-const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChange, onShare, onShareMonthly, isSharing, user, userProfile, onQuickAdd, showGoalInstruction, onDismissGoalInstruction, streaks, dailyPar, onShowLegend }) => {
+const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChange, onShare, onShareMonthly, isSharing, user, userProfile, onQuickAdd, showGoalInstruction, onDismissGoalInstruction, streaks, dailyPar, onShowLegend, onDateContext }) => {
     const [selectedDay, setSelectedDay] = useState(null);
     const [viewMode, setViewMode] = useState('week');
     const [periodicInsight, setPeriodicInsight] = useState(null);
@@ -22,12 +22,29 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
         newDate.setMonth(date.getMonth() + offset);
         setDate(newDate);
         setPeriodicInsight(null);
+        // Context: when navigating to a past month, set FAB target to last day of that month
+        // (or today if it's the current/future month)
+        if (onDateContext) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const contextDate = new Date(newDate);
+            contextDate.setHours(0, 0, 0, 0);
+            onDateContext(contextDate > today ? today : contextDate);
+        }
     };
     const changeWeek = (offset) => {
         const newDate = new Date(date);
         newDate.setDate(date.getDate() + (7 * offset));
         setDate(newDate);
         setPeriodicInsight(null);
+        // Context: use the new date (clamped to today if in the future)
+        if (onDateContext) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const contextDate = new Date(newDate);
+            contextDate.setHours(0, 0, 0, 0);
+            onDateContext(contextDate > today ? today : contextDate);
+        }
     };
 
     const weekDisplayDays = useMemo(() => {
@@ -112,6 +129,14 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
     const handleDayClick = (dayObj) => {
         if (dayObj.isBlank) return;
         setSelectedDay(dayObj.date);
+        // Update the FAB's target date to this clicked day (clamped to today)
+        if (onDateContext) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const clickedDate = new Date(dayObj.date);
+            clickedDate.setHours(0, 0, 0, 0);
+            onDateContext(clickedDate > today ? today : clickedDate);
+        }
     };
     const closeModal = () => setSelectedDay(null);
     const handleModalDataChange = (field, value) => onDataChange(selectedDay, field, value);
