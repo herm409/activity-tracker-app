@@ -188,11 +188,11 @@ const ProspectCard = ({ item, onUpdate, onInstantUpdate, onDecide, onDataChange,
         else updateDailyStats('exposures');
     };
     const handleNotInterested = () => {
+        let message = `Mark ${item.name || 'this prospect'} as Not Interested? This will archive them and log a No.`;
         if (exposureCount === 0) {
-            alert("A true 'No' only counts after they've seen the information. Send them info first!");
-            return;
+            message = `⚠️ Heads up: ${item.name || 'This prospect'} hasn't seen the information yet.\n\nA "No" is most powerful after they've had a chance to review it — but you can still record this if they've definitively declined.\n\nMark as Not Interested anyway?`;
         }
-        const ok = window.confirm(`Mark ${item.name || 'this prospect'} as Not Interested? This will archive them and log a No.`);
+        const ok = window.confirm(message);
         if (!ok) return;
         confetti({ particleCount: 80, spread: 60, origin: { x: 0.8, y: 0.2 }, colors: ['#EF4444', '#F87171', '#FCA5A5'] });
         onInstantUpdate(item.id, { isArchived: true, outcome: 'Not Interested', decisionDate: new Date().toISOString() });
