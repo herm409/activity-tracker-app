@@ -624,7 +624,7 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
                         let onIncrement;
                         if (metric.key === 'followUps') onIncrement = onLogFollowUp;
                         else if (metric.key === 'exposures') onIncrement = onLogExposure;
-                        else if (metric.key === 'nos') onIncrement = () => { if (window.confirm("A true 'No' only counts after they've seen the information. Did this prospect evaluate a presentation or video?")) onQuickAdd(metric.key, 1); };
+                        else if (metric.key === 'nos') onIncrement = () => { if (window.confirm("Log a Definitive No?\n\nA 'No' is most powerful after they've evaluated the information — but log it any time a prospect has definitively declined.")) onQuickAdd(metric.key, 1); };
                         else onIncrement = () => onQuickAdd(metric.key, 1);
 
                         return (

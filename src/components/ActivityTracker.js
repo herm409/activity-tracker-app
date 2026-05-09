@@ -113,17 +113,19 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
 
     const monthlyTotals = useMemo(() => {
         // Only sum if data.current matches the view
-        if (data.current.id && data.current.id !== monthYearId) return { exposures: 0, followUps: 0, presentations: 0, threeWays: 0, teamSupport: 0, enrolls: 0 };
+        if (data.current.id && data.current.id !== monthYearId) return { exposures: 0, followUps: 0, nos: 0, presentations: 0, threeWays: 0, teamSupport: 0, enrolls: 0, tenacityFollowUps: 0 };
 
         return Object.values(data.current).reduce((acc, dayData) => {
-            acc.exposures += Number(dayData.exposures) || 0;
-            acc.followUps += Number(dayData.followUps) || 0;
-            acc.presentations += (Array.isArray(dayData.presentations) ? dayData.presentations.length : Number(dayData.presentations) || 0) + (Number(dayData.pbrs) || 0);
-            acc.threeWays += Number(dayData.threeWays) || 0;
-            acc.teamSupport += Number(dayData.teamSupport) || 0;
-            acc.enrolls += (Number(dayData.enrolls) || 0) + (Array.isArray(dayData.sitdowns) ? dayData.sitdowns.filter(s => s === 'E').length : 0);
+            acc.exposures          += Number(dayData.exposures) || 0;
+            acc.followUps          += Number(dayData.followUps) || 0;
+            acc.nos                += Number(dayData.nos) || 0;
+            acc.tenacityFollowUps  += Number(dayData.tenacityFollowUps) || 0;
+            acc.presentations      += (Array.isArray(dayData.presentations) ? dayData.presentations.length : Number(dayData.presentations) || 0) + (Number(dayData.pbrs) || 0);
+            acc.threeWays          += Number(dayData.threeWays) || 0;
+            acc.teamSupport        += Number(dayData.teamSupport) || 0;
+            acc.enrolls            += (Number(dayData.enrolls) || 0) + (Array.isArray(dayData.sitdowns) ? dayData.sitdowns.filter(s => s === 'E').length : 0);
             return acc;
-        }, { exposures: 0, followUps: 0, presentations: 0, threeWays: 0, teamSupport: 0, enrolls: 0 });
+        }, { exposures: 0, followUps: 0, nos: 0, presentations: 0, threeWays: 0, teamSupport: 0, enrolls: 0, tenacityFollowUps: 0 });
     }, [data, monthYearId]);
 
     const handleDayClick = (dayObj) => {

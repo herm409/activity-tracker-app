@@ -21,7 +21,8 @@ const ReportCard = forwardRef(({ profile, weekData, goals }, ref) => {
     ];
 
     const timeframe = reportTitle?.includes('Monthly') ? 'month' : 'week';
-    const insight = getPeriodicCoachingAdvice(totals, timeframe, elapsedDays, 5);
+    const workingDays = timeframe === 'month' ? 20 : 5;
+    const insight = getPeriodicCoachingAdvice(totals, timeframe, elapsedDays, workingDays);
 
 
     // Reverted back to 800px standard height since Pipeline summary is removed to make space for Coaching
