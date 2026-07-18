@@ -1,3 +1,4 @@
+import { getAuth } from 'firebase/auth';
 import { DIAMOND_COACH_PROMPT } from '../utils/aiPrompt';
 
 /**
@@ -9,11 +10,19 @@ import { DIAMOND_COACH_PROMPT } from '../utils/aiPrompt';
  */
 export const getDiamondCoaching = async (userContext, userMessage = "") => {
     try {
+        const auth = getAuth();
+        const user = auth.currentUser;
+        let idToken = '';
+        if (user) {
+            idToken = await user.getIdToken();
+        }
+
         // Netlify Functions are automatically served at /.netlify/functions/[filename]
         const response = await fetch('/.netlify/functions/get-coaching', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': idToken ? `Bearer ${idToken}` : '',
             },
             body: JSON.stringify({
                 systemPrompt: DIAMOND_COACH_PROMPT,

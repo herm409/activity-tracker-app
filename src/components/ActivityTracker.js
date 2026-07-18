@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { BarChart, Bar, XAxis, YAxis, ReferenceLine, ResponsiveContainer, Cell, Tooltip } from 'recharts';
 import { calculatePoints, WEIGHTS, getPeriodicCoachingAdvice } from '../utils/scoring';
 import { ChevronUp, ChevronDown, HelpCircle } from 'lucide-react';
@@ -10,7 +10,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
     const [viewMode, setViewMode] = useState('week');
     const [periodicInsight, setPeriodicInsight] = useState(null);
 
-    const getParForDate = (checkDate) => {
+    const getParForDate = useCallback((checkDate) => {
         if (userProfile?.sprint?.endDate) {
             const endDate = userProfile.sprint.endDate.toDate ? userProfile.sprint.endDate.toDate() : new Date(userProfile.sprint.endDate);
             const startDate = userProfile.sprint.startDate ? (userProfile.sprint.startDate.toDate ? userProfile.sprint.startDate.toDate() : new Date(userProfile.sprint.startDate)) : new Date(endDate.getTime() - userProfile.sprint.days * 86400000);
@@ -24,7 +24,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
             }
         }
         return dailyPar || 2;
-    };
+    }, [userProfile?.sprint, dailyPar]);
     const year = date.getFullYear();
     const month = date.getMonth();
 
@@ -180,7 +180,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
             }
         });
         return { score, points };
-    }, [weekDisplayDays, viewMode, dailyPar]);
+    }, [weekDisplayDays, viewMode, getParForDate]);
 
     const weeklyScore = weeklyStats.score; // Backward compatibility with render logic below if needed, or update render
 

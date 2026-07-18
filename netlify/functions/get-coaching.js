@@ -6,7 +6,7 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
  */
 const CORS_HEADERS = {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
@@ -17,6 +17,54 @@ exports.handler = async (event, context) => {
 
     if (event.httpMethod !== "POST") {
         return { statusCode: 405, headers: CORS_HEADERS, body: JSON.stringify({ error: "Method Not Allowed" }) };
+    }
+
+    // Authentication check: Verify user's Firebase Auth ID token
+    const authHeader = event.headers.authorization || event.headers.Authorization || "";
+    if (!authHeader.startsWith("Bearer ")) {
+        return { 
+            statusCode: 401, 
+            headers: CORS_HEADERS, 
+            body: JSON.stringify({ error: "Unauthorized: Missing or invalid token format" }) 
+        };
+    }
+
+    const idToken = authHeader.substring(7);
+    try {
+        if (!process.env.GEMINI_API_KEY) {
+            throw new Error("GEMINI_API_KEY is not configured.");
+        }
+
+        const verifyUrl = `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${process.env.GEMINI_API_KEY}`;
+        const verifyRes = await fetch(verifyUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ idToken })
+        });
+
+        if (!verifyRes.ok) {
+            return { 
+                statusCode: 401, 
+                headers: CORS_HEADERS, 
+                body: JSON.stringify({ error: "Unauthorized: Invalid or expired session" }) 
+            };
+        }
+
+        const verifyData = await verifyRes.json();
+        if (!verifyData.users || verifyData.users.length === 0) {
+            return { 
+                statusCode: 401, 
+                headers: CORS_HEADERS, 
+                body: JSON.stringify({ error: "Unauthorized: User account not found" }) 
+            };
+        }
+    } catch (authError) {
+        console.error("[Auth Check Critical Error]:", authError);
+        return {
+            statusCode: 500,
+            headers: CORS_HEADERS,
+            body: JSON.stringify({ error: "Internal Server Error during auth check", details: authError.message }),
+        };
     }
 
     try {

@@ -31,118 +31,123 @@ const AnalyticsDashboard = ({ db, user }) => {
             if (!user || !db) return;
             setLoading(true);
 
-            const today = new Date();
-            setMonthName(today.toLocaleString('default', { month: 'long' }));
-            const currentMonthYearId = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-
-            let lifetimeExposures = 0, lifetimePresentations = 0, lifetimeEnrolls = 0, lifetimeNos = 0;
-            let currentMonthExposures = 0, currentMonthPresentations = 0, currentMonthEnrolls = 0;
-
-            // OPTIMIZATION NOTE: Fetching ALL docs is expensive as data grows. 
-            // Future Plan: Use an aggregated 'stats' document that updates on daily writes.
-            const activitiesCollectionRef = collection(db, 'artifacts', appId, 'users', user.uid, 'activities');
-            const allDocsSnap = await getDocs(activitiesCollectionRef);
-
-            allDocsSnap.forEach(doc => {
-                const data = doc.data().dailyData || {};
-                const isCurrentMonth = doc.id === currentMonthYearId;
-
-                Object.values(data).forEach(day => {
-                    const exposures = Number(day.exposures) || 0;
-                    const presentations = (Array.isArray(day.presentations) ? day.presentations.length : Number(day.presentations) || 0) + (Number(day.pbrs) || 0);
-                    const enrolls = (Number(day.enrolls) || 0) + (Array.isArray(day.sitdowns) ? day.sitdowns.filter(s => s === 'E').length : 0);
-                    const nos = Number(day.nos) || 0;
-
-                    lifetimeExposures += exposures;
-                    lifetimePresentations += presentations;
-                    lifetimeEnrolls += enrolls;
-                    lifetimeNos += nos;
-
-                    if (isCurrentMonth) {
-                        currentMonthExposures += exposures;
-                        currentMonthPresentations += presentations;
-                        currentMonthEnrolls += enrolls;
-                    }
-                });
-            });
-
-            // Store raw data for CSV export + count total days with any activity
-            const rawMap = {};
-            let loggedDays = 0;
-            allDocsSnap.forEach(doc => {
-                rawMap[doc.id] = doc.data().dailyData || {};
-                loggedDays += Object.keys(doc.data().dailyData || {}).length;
-            });
-            setExportRawData(rawMap);
-            setTotalLoggedDays(loggedDays);
-
-            const expToPresentationRatio = lifetimePresentations > 0 ? (lifetimeExposures / lifetimePresentations) : 0;
-            const presentationToEnrollRatio = lifetimeEnrolls > 0 ? (lifetimePresentations / lifetimeEnrolls) : 0;
-            const noToEnrollRatio = lifetimeEnrolls > 0 ? (lifetimeNos / lifetimeEnrolls) : 0;
-
-            setStats({
-                funnelExposures: currentMonthExposures,
-                funnelPresentations: currentMonthPresentations,
-                funnelEnrolls: currentMonthEnrolls,
-                expToPresentationRatio,
-                presentationToEnrollRatio,
-                noToEnrollRatio,
-                lifetimeNos,
-                lifetimeExposures,
-                lifetimeEnrolls
-            });
-
-            const monthLabels = [];
-            let tempDate = new Date();
-            const monthlyTotals = {};
-
-            for (let i = 0; i < 6; i++) {
-                const y = tempDate.getFullYear();
-                const m = tempDate.getMonth();
-                const myId = `${y}-${String(m + 1).padStart(2, '0')}`;
-                monthLabels.unshift(tempDate.toLocaleString('default', { month: 'short' }));
-                monthlyTotals[myId] = { name: monthLabels[0], Exposures: 0, Presentations: 0 };
-                tempDate.setMonth(tempDate.getMonth() - 1);
-            }
-
-            allDocsSnap.forEach(doc => {
-                if (monthlyTotals[doc.id]) {
-                    const data = doc.data().dailyData || {};
-                    Object.values(data).forEach(day => {
-                        monthlyTotals[doc.id].Exposures += Number(day.exposures) || 0;
-                        monthlyTotals[doc.id].Presentations += (Array.isArray(day.presentations) ? day.presentations.length : Number(day.presentations) || 0) + (Number(day.pbrs) || 0);
-                    });
-                }
-            });
-
-            setHistoricalData(Object.values(monthlyTotals).reverse());
-
-            // Fetch team avg ratios from leaderboard (current week)
             try {
                 const today = new Date();
-                const wd = today.getDay();
-                const sun = new Date(today); sun.setDate(today.getDate() - wd); sun.setHours(0,0,0,0);
-                const weekId = sun.toISOString().slice(0,10);
-                const lbRef = collection(db, 'artifacts', appId, 'leaderboard', weekId, 'entries');
-                const lbSnap = await getDocs(lbRef);
-                let teamExposures = 0, teamPresentations = 0, teamEnrolls = 0, teamCount = 0;
-                lbSnap.forEach(d => {
-                    const e = d.data();
-                    if ((e.exposures || 0) > 0) {
-                        teamExposures += (e.exposures || 0);
-                        teamPresentations += (e.presentations || 0);
-                        teamEnrolls += (e.enrolls || 0);
-                        teamCount++;
+                setMonthName(today.toLocaleString('default', { month: 'long' }));
+                const currentMonthYearId = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+
+                let lifetimeExposures = 0, lifetimePresentations = 0, lifetimeEnrolls = 0, lifetimeNos = 0;
+                let currentMonthExposures = 0, currentMonthPresentations = 0, currentMonthEnrolls = 0;
+
+                // OPTIMIZATION NOTE: Fetching ALL docs is expensive as data grows.
+                // Future Plan: Use an aggregated 'stats' document that updates on daily writes.
+                const activitiesCollectionRef = collection(db, 'artifacts', appId, 'users', user.uid, 'activities');
+                const allDocsSnap = await getDocs(activitiesCollectionRef);
+
+                allDocsSnap.forEach(doc => {
+                    const data = doc.data().dailyData || {};
+                    const isCurrentMonth = doc.id === currentMonthYearId;
+
+                    Object.values(data).forEach(day => {
+                        const exposures = Number(day.exposures) || 0;
+                        const presentations = (Array.isArray(day.presentations) ? day.presentations.length : Number(day.presentations) || 0) + (Number(day.pbrs) || 0);
+                        const enrolls = (Number(day.enrolls) || 0) + (Array.isArray(day.sitdowns) ? day.sitdowns.filter(s => s === 'E').length : 0);
+                        const nos = Number(day.nos) || 0;
+
+                        lifetimeExposures += exposures;
+                        lifetimePresentations += presentations;
+                        lifetimeEnrolls += enrolls;
+                        lifetimeNos += nos;
+
+                        if (isCurrentMonth) {
+                            currentMonthExposures += exposures;
+                            currentMonthPresentations += presentations;
+                            currentMonthEnrolls += enrolls;
+                        }
+                    });
+                });
+
+                // Store raw data for CSV export + count total days with any activity
+                const rawMap = {};
+                let loggedDays = 0;
+                allDocsSnap.forEach(doc => {
+                    rawMap[doc.id] = doc.data().dailyData || {};
+                    loggedDays += Object.keys(doc.data().dailyData || {}).length;
+                });
+                setExportRawData(rawMap);
+                setTotalLoggedDays(loggedDays);
+
+                const expToPresentationRatio = lifetimePresentations > 0 ? (lifetimeExposures / lifetimePresentations) : 0;
+                const presentationToEnrollRatio = lifetimeEnrolls > 0 ? (lifetimePresentations / lifetimeEnrolls) : 0;
+                const noToEnrollRatio = lifetimeEnrolls > 0 ? (lifetimeNos / lifetimeEnrolls) : 0;
+
+                setStats({
+                    funnelExposures: currentMonthExposures,
+                    funnelPresentations: currentMonthPresentations,
+                    funnelEnrolls: currentMonthEnrolls,
+                    expToPresentationRatio,
+                    presentationToEnrollRatio,
+                    noToEnrollRatio,
+                    lifetimeNos,
+                    lifetimeExposures,
+                    lifetimeEnrolls
+                });
+
+                const monthLabels = [];
+                let tempDate = new Date();
+                const monthlyTotals = {};
+
+                for (let i = 0; i < 6; i++) {
+                    const y = tempDate.getFullYear();
+                    const m = tempDate.getMonth();
+                    const myId = `${y}-${String(m + 1).padStart(2, '0')}`;
+                    monthLabels.unshift(tempDate.toLocaleString('default', { month: 'short' }));
+                    monthlyTotals[myId] = { name: monthLabels[0], Exposures: 0, Presentations: 0 };
+                    tempDate.setMonth(tempDate.getMonth() - 1);
+                }
+
+                allDocsSnap.forEach(doc => {
+                    if (monthlyTotals[doc.id]) {
+                        const data = doc.data().dailyData || {};
+                        Object.values(data).forEach(day => {
+                            monthlyTotals[doc.id].Exposures += Number(day.exposures) || 0;
+                            monthlyTotals[doc.id].Presentations += (Array.isArray(day.presentations) ? day.presentations.length : Number(day.presentations) || 0) + (Number(day.pbrs) || 0);
+                        });
                     }
                 });
-                if (teamCount > 1) {
-                    const avgExpToPresentation = teamPresentations > 0 ? teamExposures / teamPresentations : 0;
-                    const avgPresentationToEnroll = teamEnrolls > 0 ? teamPresentations / teamEnrolls : 0;
-                    setTeamAvg({ expToPresentation: avgExpToPresentation, presentationToEnroll: avgPresentationToEnroll });
-                }
-            } catch (_) { /* team avg is optional — fail silently */ }
 
-            setLoading(false);
+                setHistoricalData(Object.values(monthlyTotals).reverse());
+
+                // Fetch team avg ratios from leaderboard (current week)
+                try {
+                    const now = new Date();
+                    const wd = now.getDay();
+                    const sun = new Date(now); sun.setDate(now.getDate() - wd); sun.setHours(0,0,0,0);
+                    const weekId = sun.toISOString().slice(0,10);
+                    const lbRef = collection(db, 'artifacts', appId, 'leaderboard', weekId, 'entries');
+                    const lbSnap = await getDocs(lbRef);
+                    let teamExposures = 0, teamPresentations = 0, teamEnrolls = 0, teamCount = 0;
+                    lbSnap.forEach(d => {
+                        const e = d.data();
+                        if ((e.exposures || 0) > 0) {
+                            teamExposures += (e.exposures || 0);
+                            teamPresentations += (e.presentations || 0);
+                            teamEnrolls += (e.enrolls || 0);
+                            teamCount++;
+                        }
+                    });
+                    if (teamCount > 1) {
+                        const avgExpToPresentation = teamPresentations > 0 ? teamExposures / teamPresentations : 0;
+                        const avgPresentationToEnroll = teamEnrolls > 0 ? teamPresentations / teamEnrolls : 0;
+                        setTeamAvg({ expToPresentation: avgExpToPresentation, presentationToEnroll: avgPresentationToEnroll });
+                    }
+                } catch (_) { /* team avg is optional — fail silently */ }
+
+            } catch (err) {
+                console.error('AnalyticsDashboard: failed to load data', err);
+            } finally {
+                setLoading(false);
+            }
         };
         fetchAllAnalyticsData();
     }, [user, db]);
