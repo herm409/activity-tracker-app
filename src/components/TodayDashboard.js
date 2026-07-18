@@ -320,7 +320,14 @@ const DailyBriefingCard = ({ userContext }) => {
         if (!force) {
             const cached = sessionStorage.getItem(cacheKey);
             if (cached) {
-                try { setBriefing(JSON.parse(cached)); return; } catch (_) {}
+                try {
+                    const parsed = JSON.parse(cached);
+                    // If the cached version has blank fields (from the old cut-off code), ignore it
+                    if (parsed && parsed.todo && parsed.focus && parsed.strengths && parsed.weaknesses) {
+                        setBriefing(parsed);
+                        return;
+                    }
+                } catch (_) {}
             }
         }
         setLoading(true);
