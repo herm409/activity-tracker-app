@@ -112,7 +112,7 @@ ${JSON.stringify(userContext, null, 2)}
                         body: JSON.stringify({
                             contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
                             generationConfig: {
-                                maxOutputTokens: 800,
+                                maxOutputTokens: 3000,
                                 temperature: 0.8
                             }
                         })

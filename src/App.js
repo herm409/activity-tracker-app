@@ -1090,16 +1090,6 @@ const AppContent = () => {
                                 userProfile={userProfile}
                             />
                         )}
-                        {activeTab === 'coach' && (
-                            <DiamondCoach 
-                                userProfile={userProfile}
-                                todayData={todayData}
-                                ironmanStreak={currentStreaks.ironman || 0}
-                                monthlyData={monthlyData}
-                                lastMonthData={lastMonthData}
-                                monthlyGoals={monthlyGoals}
-                            />
-                        )}
                     </Suspense>
                 </main>
             </div>
