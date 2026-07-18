@@ -9,6 +9,22 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
     const [selectedDay, setSelectedDay] = useState(null);
     const [viewMode, setViewMode] = useState('week');
     const [periodicInsight, setPeriodicInsight] = useState(null);
+
+    const getParForDate = (checkDate) => {
+        if (userProfile?.sprint?.endDate) {
+            const endDate = userProfile.sprint.endDate.toDate ? userProfile.sprint.endDate.toDate() : new Date(userProfile.sprint.endDate);
+            const startDate = userProfile.sprint.startDate ? (userProfile.sprint.startDate.toDate ? userProfile.sprint.startDate.toDate() : new Date(userProfile.sprint.startDate)) : new Date(endDate.getTime() - userProfile.sprint.days * 86400000);
+            
+            const checkMidnight = new Date(checkDate.getFullYear(), checkDate.getMonth(), checkDate.getDate());
+            const startMidnight = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+            const endMidnight = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+            
+            if (checkMidnight >= startMidnight && checkMidnight <= endMidnight) {
+                return userProfile.sprint.par || 2;
+            }
+        }
+        return dailyPar || 2;
+    };
     const year = date.getFullYear();
     const month = date.getMonth();
 
@@ -158,7 +174,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
             if (dayObj.date <= today) {
                 const totalPoints = calculatePoints(dayObj.data);
                 points += totalPoints;
-                const parVal = dailyPar || 2;
+                const parVal = getParForDate(dayObj.date);
                 const dailyScore = parVal - totalPoints;
                 score += dailyScore;
             }
@@ -234,7 +250,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
                                     data={weekDisplayDays.map(d => {
                                         const dayData = d.isFuture ? null : (data.current[d.date.getDate()] || {});
                                         const totalPoints = calculatePoints(dayData);
-                                        const parVal = dailyPar || 2;
+                                        const parVal = getParForDate(d.date);
                                         // Logic: Score = Par - Points.
                                         // +2 means we needed 2 more (Deficit -> Bad -> Red)
                                         // -2 means we had 2 extra (Surplus -> Good -> Green)
@@ -273,7 +289,7 @@ const ActivityTracker = ({ date, setDate, goals, onGoalChange, data, onDataChang
                                         {weekDisplayDays.map((d, index) => {
                                             const dayData = d.isFuture ? null : (data.current[d.date.getDate()] || {});
                                             const totalPoints = calculatePoints(dayData);
-                                            const parVal = dailyPar || 2;
+                                            const parVal = getParForDate(d.date);
                                             const score = d.isFuture ? 0 : (parVal - totalPoints);
                                             let fillColor = '#e5e7eb'; // gray-200 for even/future (neutral)
 

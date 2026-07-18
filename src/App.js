@@ -979,6 +979,23 @@ const AppContent = () => {
     if (loading) return <div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div></div>;
     if (!user) return <AuthPage auth={auth} />;
 
+    // Active Daily Par based on Sprint or profile value
+    const getParForDate = (checkDate) => {
+        if (userProfile?.sprint?.endDate) {
+            const endDate = userProfile.sprint.endDate.toDate ? userProfile.sprint.endDate.toDate() : new Date(userProfile.sprint.endDate);
+            const startDate = userProfile.sprint.startDate ? (userProfile.sprint.startDate.toDate ? userProfile.sprint.startDate.toDate() : new Date(userProfile.sprint.startDate)) : new Date(endDate.getTime() - userProfile.sprint.days * 86400000);
+            
+            const checkMidnight = new Date(checkDate.getFullYear(), checkDate.getMonth(), checkDate.getDate());
+            const startMidnight = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+            const endMidnight = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+            
+            if (checkMidnight >= startMidnight && checkMidnight <= endMidnight) {
+                return userProfile.sprint.par || 2;
+            }
+        }
+        return userProfile.dailyPar || 2;
+    };
+
     // Par Protocol: Calculate Badge State
     const today = new Date();
     const isSameMonth = today.getFullYear() === year && today.getMonth() === month;
@@ -986,7 +1003,7 @@ const AppContent = () => {
 
     // Weighted Par Calculation for Badge
     const todayPoints = calculatePoints(todayData);
-    const dailyPar = userProfile.dailyPar || 2; // Dynamic Par
+    const dailyPar = getParForDate(today); // Dynamic Par based on Active Sprint
     const todayScore = dailyPar - todayPoints;
     const showTodayBadge = todayScore > 0;
 
@@ -1018,7 +1035,7 @@ const AppContent = () => {
                                 if (d > now) break;
                                 const dayData = monthlyData[d.getDate()] || {};
                                 wPoints += calculatePoints(dayData);
-                                wPar += (userProfile.dailyPar || 2);
+                                wPar += getParForDate(d);
                             }
                             return (
                                 <TodayDashboard
@@ -1032,7 +1049,7 @@ const AppContent = () => {
                                     isSharing={isSharing}
                                     onLogFollowUp={() => setShowFollowUpModal(true)}
                                     onLogExposure={() => setShowExposureModal(true)}
-                                    dailyPar={userProfile.dailyPar}
+                                    dailyPar={dailyPar}
                                     onShowLegend={() => setShowScoringLegend(true)}
                                     hotlist={hotlist}
                                     onNavigateToPipeline={() => setActiveTab('hotlist')}
@@ -1055,7 +1072,7 @@ const AppContent = () => {
                             onQuickAdd={handleQuickAdd}
                             showGoalInstruction={showGoalInstruction} onDismissGoalInstruction={handleDismissGoalInstruction}
                             streaks={currentStreaks}
-                            dailyPar={userProfile.dailyPar}
+                            dailyPar={dailyPar}
                             onShowLegend={() => setShowScoringLegend(true)}
                             onDateContext={setQuickAddDate}
                         />}

@@ -3,7 +3,7 @@ import { calculatePoints } from '../utils/scoring';
 import { collection, query, orderBy, getDocs } from 'firebase/firestore';
 import { appId } from '../firebaseConfig';
 import { Trophy, Users, Flame, Award, Medal, ThumbsDown } from 'lucide-react';
-import { getSprintWeek, getSprintFocus } from './TNVCampaignBanner';
+import { getSprintWeek, getSprintFocus, TOTAL_SPRINT_WEEKS } from './TNVCampaignBanner';
 
 const Leaderboard = ({ db, weekId, user }) => {
     const [scores, setScores] = useState([]);
@@ -191,7 +191,7 @@ const Leaderboard = ({ db, weekId, user }) => {
                     {(() => {
                         const week = getSprintWeek();
                         const focus = getSprintFocus(week);
-                        if (!focus || week < 1 || week > 14) return null;
+                        if (!focus || week < 1 || week > TOTAL_SPRINT_WEEKS) return null;
                         return (
                             <span className="text-xs font-bold bg-red-900 text-white px-2.5 py-1 rounded-full border border-red-700 flex items-center gap-1">
                                 {focus.emoji} Week {week} Focus: {focus.label}

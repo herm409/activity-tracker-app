@@ -15,8 +15,8 @@ const SPRINT_SCHEDULE = [
 // Shared utility — also used by Leaderboard
 export const getSprintWeek = () => {
     // START_DATE is the Sunday before campaign launch so weeks align with Sun–Sat calendar weeks.
-    // April 17 (Thu) launch → anchor to Sunday April 12 → Week 1: Apr 12–18, Week 2: Apr 19–25
-    const START_DATE = new Date('2026-04-12T00:00:00');
+    // July 20 (Mon) launch → anchor to Sunday July 19 → Week 1: Jul 19–25, Week 2: Jul 26–Aug 1
+    const START_DATE = new Date('2026-07-19T00:00:00');
     const now = new Date();
     if (now < START_DATE) return 1; // Pre-launch preview
     const daysSinceStart = Math.floor((now - START_DATE) / (1000 * 60 * 60 * 24));
@@ -29,12 +29,12 @@ export const getSprintFocus = (weekNum) => {
     return SPRINT_SCHEDULE[index];
 };
 
-const TOTAL_SPRINT_WEEKS = 14; // Apr 13 → Jul 19 = 98 days = 14 weeks
+export const TOTAL_SPRINT_WEEKS = 13; // Jul 20 → Oct 18 = 90 days = 13 weeks
 
 const TNVCampaignBanner = ({ weeklyFocusCount }) => {
     const { db } = useAppContext();
-    const EVENT_DATE = new Date('2026-07-16T00:00:00');
-    const END_DATE   = new Date('2026-07-19T23:59:59');
+    const EVENT_DATE = new Date('2026-10-18T00:00:00');
+    const END_DATE   = new Date('2026-10-18T23:59:59');
 
     const calculateTimeLeft = () => {
         const difference = EVENT_DATE - new Date();
@@ -128,7 +128,7 @@ const TNVCampaignBanner = ({ weeklyFocusCount }) => {
                     >
                         <Target className="h-4 w-4" style={{ color: '#4cbce4' }} />
                         <span className="text-xs font-bold text-white uppercase tracking-wider">
-                            90 Day All Out Sprint to Houston
+                            90-Day Freedom Run
                         </span>
                     </div>
                     {/* New Week pulse badge */}
@@ -145,10 +145,10 @@ const TNVCampaignBanner = ({ weeklyFocusCount }) => {
                     className="text-2xl md:text-3xl font-black leading-tight tracking-tight uppercase"
                     style={{ color: '#4cbce4' }}
                 >
-                    Team NuVision Financial Independence Weekend
+                    Team NuVision 90-Day Freedom Run
                 </h3>
                 <p className="text-white text-lg md:text-xl font-bold mt-1 tracking-wide">
-                    JULY 16–19, 2026
+                    JULY 20 – OCTOBER 18, 2026
                 </p>
 
                 {/* Sprint Thermometer */}
@@ -236,7 +236,7 @@ const TNVCampaignBanner = ({ weeklyFocusCount }) => {
                     className="w-full text-black font-black uppercase text-sm py-2.5 px-4 rounded transition-colors flex items-center justify-center tracking-wide hover:opacity-90"
                     style={{ backgroundColor: '#4cbce4' }}
                 >
-                    Register Here <ExternalLink className="ml-2 h-4 w-4" />
+                    TNV Events <ExternalLink className="ml-2 h-4 w-4" />
                 </a>
             </div>
         </div>
