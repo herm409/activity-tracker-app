@@ -66,20 +66,20 @@ export const getDailyBriefing = async (userContext) => {
         // Parse the 4 labelled sections out of the raw text robustly
         const parse = (label) => {
             const escapedLabel = label.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-            const regex = new RegExp(`(?:\\*\\*|)?${escapedLabel}(?:\\*\\*|)?\\s*:\\s*([\\s\\S]*?)(?=\\n\\s*(?:\\*\\*|)?(?:WHAT TO DO TODAY|FOCUS ON|STRENGTHS|WEAKNESSES)(?:\\*\\*|)?\\s*:|$)`);
+            const regex = new RegExp(`(?:\\*\\*|)?${escapedLabel}(?:\\*\\*|)?\\s*:\\s*([\\s\\S]*?)(?=\\n\\s*(?:\\*\\*|)?(?:WHAT TO DO TODAY|FOCUS ON|STRENGTHS|WEAKNESSES)(?:\\*\\*|)?\\s*:|$)`, 'i');
             const match = raw.match(regex);
             return match ? match[1].trim() : '';
         };
 
         return {
-            todo:       parse('WHAT TO DO TODAY'),
-            focus:      parse('FOCUS ON'),
-            strengths:  parse('STRENGTHS'),
+            todo: parse('WHAT TO DO TODAY'),
+            focus: parse('FOCUS ON'),
+            strengths: parse('STRENGTHS'),
             weaknesses: parse('WEAKNESSES'),
             raw,
         };
     } catch (error) {
         console.error('[aiService getDailyBriefing]:', error);
-        throw error;
+        throw error
     }
 };
