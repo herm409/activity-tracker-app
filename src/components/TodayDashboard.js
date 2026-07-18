@@ -496,8 +496,9 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
         monthlyGoals: userProfile?.monthlyGoals || {},
         ironmanStreak: streaks?.ironman || 0,
         sprint: userProfile?.sprint || null,
+        prospects: hotlist || []
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }), [todayPoints, thisWeekPoints, thisMonthPoints]);
+    }), [todayPoints, thisWeekPoints, thisMonthPoints, hotlist]);
 
     // Ironman Progress
     const ironmanProgress = [
