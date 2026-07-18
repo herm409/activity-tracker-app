@@ -1,51 +1,84 @@
 import { getAuth } from 'firebase/auth';
-import { DIAMOND_COACH_PROMPT } from '../utils/aiPrompt';
+import { DIAMOND_COACH_PROMPT, DAILY_BRIEFING_PROMPT } from '../utils/aiPrompt';
+
+const FUNCTION_URL = '/.netlify/functions/get-coaching';
 
 /**
- * Service to communicate with the Diamond Coach backend.
- * 
- * @param {Object} userContext - Structured data about the user's current stats and team position.
- * @param {string} userMessage - (Optional) Specific message or question from the user.
- * @returns {Promise<string>} The AI's coaching response.
+ * Shared fetch helper — calls the Netlify proxy with the given prompt + context.
  */
-export const getDiamondCoaching = async (userContext, userMessage = "") => {
+const callCoachEndpoint = async (systemPrompt, userContext, userMessage) => {
+    const auth = getAuth();
+    const user = auth.currentUser;
+    let idToken = '';
+    if (user) {
+        idToken = await user.getIdToken();
+    }
+
+    const response = await fetch(FUNCTION_URL, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': idToken ? `Bearer ${idToken}` : '',
+        },
+        body: JSON.stringify({ systemPrompt, userContext, userMessage }),
+    });
+
+    if (!response.ok) {
+        let errorMessage = 'The Diamond Coach is tied up at the moment.';
+        try {
+            const errorData = await response.json();
+            errorMessage = errorData.error || errorMessage;
+        } catch (_) { /* not JSON */ }
+        throw new Error(errorMessage);
+    }
+
+    const data = await response.json();
+    return data.text;
+};
+
+/**
+ * Diamond Coach chat — interactive coaching tab.
+ */
+export const getDiamondCoaching = async (userContext, userMessage = '') => {
     try {
-        const auth = getAuth();
-        const user = auth.currentUser;
-        let idToken = '';
-        if (user) {
-            idToken = await user.getIdToken();
-        }
-
-        // Netlify Functions are automatically served at /.netlify/functions/[filename]
-        const response = await fetch('/.netlify/functions/get-coaching', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': idToken ? `Bearer ${idToken}` : '',
-            },
-            body: JSON.stringify({
-                systemPrompt: DIAMOND_COACH_PROMPT,
-                userContext,
-                userMessage
-            })
-        });
-
-        if (!response.ok) {
-            let errorMessage = 'The Diamond Coach is tied up at the moment.';
-            try {
-                const errorData = await response.json();
-                errorMessage = errorData.error || errorMessage;
-            } catch (e) {
-                // Not JSON
-            }
-            throw new Error(errorMessage);
-        }
-
-        const data = await response.json();
-        return data.text;
+        return await callCoachEndpoint(DIAMOND_COACH_PROMPT, userContext, userMessage);
     } catch (error) {
-        console.error("[aiService]:", error);
+        console.error('[aiService getDiamondCoaching]:', error);
+        throw error;
+    }
+};
+
+/**
+ * Daily Briefing — used on the Today tab (front page).
+ * Parses the structured 4-section response into a JS object.
+ *
+ * @param {Object} userContext - The user's stats payload.
+ * @returns {Promise<{todo: string, focus: string, strengths: string, weaknesses: string}>}
+ */
+export const getDailyBriefing = async (userContext) => {
+    try {
+        const raw = await callCoachEndpoint(
+            DAILY_BRIEFING_PROMPT,
+            userContext,
+            'Give me my complete daily briefing based on my numbers.'
+        );
+
+        // Parse the 4 labelled sections out of the raw text
+        const parse = (label) => {
+            const regex = new RegExp(`${label}:\\s*\\n([\\s\\S]*?)(?=\\n[A-Z ]+:|$)`, 'i');
+            const match = raw.match(regex);
+            return match ? match[1].trim() : '';
+        };
+
+        return {
+            todo:       parse('WHAT TO DO TODAY'),
+            focus:      parse('FOCUS ON'),
+            strengths:  parse('STRENGTHS'),
+            weaknesses: parse('WEAKNESSES'),
+            raw,
+        };
+    } catch (error) {
+        console.error('[aiService getDailyBriefing]:', error);
         throw error;
     }
 };

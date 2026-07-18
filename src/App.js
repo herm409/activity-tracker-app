@@ -1056,8 +1056,7 @@ const AppContent = () => {
                                     weeklyPoints={wPoints}
                                     weeklyPar={wPar}
                                     onLogFollowUpForProspect={handleLogFollowUpForProspect}
-                                    sprint={userProfile.sprint || null}
-                                    onDeclareSprint={() => setShowSprintModal(true)}
+                                    userProfile={userProfile}
                                 />
                             );
                         })()}

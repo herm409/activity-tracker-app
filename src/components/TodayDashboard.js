@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Target, Users, BarChart2, PhoneCall, UserCheck, Dumbbell, BookOpen, Share2, HelpCircle, XCircle, Flame, Lightbulb, AlertTriangle, HeartHandshake, Sun, Moon, TrendingUp } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { Target, Users, BarChart2, PhoneCall, UserCheck, Dumbbell, BookOpen, Share2, HelpCircle, XCircle, Flame, AlertTriangle, HeartHandshake, TrendingUp, Sparkles, RefreshCw, ChevronDown, ChevronUp, Zap, Sun, Moon } from 'lucide-react';
 import { ActivityCard, PresentationActivityCard, DisciplineCheckbox } from './ActivityCards';
 import { calculatePoints } from '../utils/scoring';
 import confetti from 'canvas-confetti';
-import TNVCampaignBanner, { getSprintWeek, getSprintFocus } from './TNVCampaignBanner';
+import { getDailyBriefing } from '../services/aiService';
 
 // --- Daily Par Progress Ring ---
 const DailyParRing = ({ todayPoints, dailyPar }) => {
@@ -306,48 +306,116 @@ const TimeOfDayCoaching = ({ todayPoints, dailyPar, todayData, sprintFocus }) =>
 };
 
 // --- Sprint Progress Bar ---
-const SprintProgressBar = ({ sprint, onDeclareSprint }) => {
-    if (!sprint?.endDate) {
-        return (
-            <button
-                onClick={onDeclareSprint}
-                className="w-full mb-4 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border-2 border-dashed border-indigo-200 text-indigo-600 text-xs font-bold hover:bg-indigo-50 hover:border-indigo-400 transition-all"
-            >
-                <span>⚡</span> Declare a Sprint — Raise Your Standard
-            </button>
-        );
-    }
+// --- AI Daily Briefing Card ---
+const DailyBriefingCard = ({ userContext }) => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const cacheKey = `dailyBriefing_${todayStr}_${userContext?.displayName || 'user'}`;
 
-    const today = new Date();
-    const endDate = sprint.endDate.toDate ? sprint.endDate.toDate() : new Date(sprint.endDate);
-    const startDate = sprint.startDate ? (sprint.startDate.toDate ? sprint.startDate.toDate() : new Date(sprint.startDate)) : new Date(endDate.getTime() - sprint.days * 86400000);
-    const totalDays = sprint.days || Math.round((endDate - startDate) / 86400000);
-    const daysElapsed = Math.max(0, Math.min(totalDays, Math.round((today - startDate) / 86400000)));
-    const daysLeft = Math.max(0, totalDays - daysElapsed);
-    const pct = Math.min(100, Math.round((daysElapsed / totalDays) * 100));
+    const [briefing, setBriefing] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+    const [expanded, setExpanded] = useState(true);
 
-    const tierColors = {
-        Pro:      { bar: 'bg-blue-500', bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', emoji: '🔵' },
-        Elite:    { bar: 'bg-purple-500', bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700', emoji: '🟣' },
-        Champion: { bar: 'bg-red-500', bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', emoji: '🔴' },
-    };
-    const colors = tierColors[sprint.tier] || tierColors.Pro;
+    const fetchBriefing = useCallback(async (force = false) => {
+        if (!force) {
+            const cached = sessionStorage.getItem(cacheKey);
+            if (cached) {
+                try { setBriefing(JSON.parse(cached)); return; } catch (_) {}
+            }
+        }
+        setLoading(true);
+        setError(null);
+        try {
+            const result = await getDailyBriefing(userContext);
+            setBriefing(result);
+            sessionStorage.setItem(cacheKey, JSON.stringify(result));
+        } catch (err) {
+            setError('Could not load your briefing right now. Tap refresh to try again.');
+        } finally {
+            setLoading(false);
+        }
+    }, [cacheKey, userContext]);
 
-    if (daysLeft === 0) return null; // Sprint expired — don't show
+    useEffect(() => { fetchBriefing(); }, []);
+
+    const Section = ({ emoji, label, content, borderColor }) => (
+        <div className={`border-l-4 ${borderColor} pl-3 py-1`}>
+            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-0.5">{emoji} {label}</p>
+            <p className="text-sm text-gray-800 leading-relaxed">{content}</p>
+        </div>
+    );
 
     return (
-        <div className={`${colors.bg} border ${colors.border} rounded-xl p-3 mb-4 flex items-center gap-3`}>
-            <span className="text-xl flex-shrink-0">{colors.emoji}</span>
-            <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between mb-1">
-                    <span className={`text-xs font-black uppercase tracking-widest ${colors.text}`}>{sprint.tier} Sprint</span>
-                    <span className="text-xs text-gray-500 font-medium">{daysLeft}d left · {sprint.par} pts/day</span>
+        <div className="bg-gradient-to-br from-indigo-900 via-purple-900 to-indigo-800 rounded-2xl shadow-xl mb-5 overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 pt-4 pb-2">
+                <div className="flex items-center gap-2">
+                    <div className="bg-white/10 rounded-lg p-1.5">
+                        <Sparkles className="h-4 w-4 text-indigo-200" />
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-300">Diamond Coach</p>
+                        <h3 className="text-sm font-black text-white">Your Daily Briefing</h3>
+                    </div>
                 </div>
-                <div className="h-1.5 bg-white rounded-full overflow-hidden border border-gray-100">
-                    <div className={`h-full ${colors.bar} rounded-full transition-all`} style={{ width: `${pct}%` }} />
+                <div className="flex items-center gap-1">
+                    <button
+                        onClick={() => fetchBriefing(true)}
+                        disabled={loading}
+                        title="Refresh briefing"
+                        className="text-indigo-300 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/10 disabled:opacity-40"
+                    >
+                        <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+                    </button>
+                    <button
+                        onClick={() => setExpanded(v => !v)}
+                        className="text-indigo-300 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/10"
+                    >
+                        {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                    </button>
                 </div>
-                <p className="text-[10px] text-gray-400 mt-0.5">Day {daysElapsed} of {totalDays}</p>
             </div>
+
+            {expanded && (
+                <div className="px-4 pb-4">
+                    {loading && (
+                        <div className="flex items-center gap-3 py-4">
+                            <div className="flex gap-1">
+                                <div className="h-2 w-2 bg-indigo-400 rounded-full animate-bounce" />
+                                <div className="h-2 w-2 bg-indigo-400 rounded-full animate-bounce [animation-delay:0.15s]" />
+                                <div className="h-2 w-2 bg-indigo-400 rounded-full animate-bounce [animation-delay:0.3s]" />
+                            </div>
+                            <span className="text-indigo-300 text-xs font-medium">Reading your numbers...</span>
+                        </div>
+                    )}
+
+                    {error && !loading && (
+                        <div className="bg-white/10 rounded-xl p-3 mt-2">
+                            <p className="text-indigo-200 text-xs">{error}</p>
+                        </div>
+                    )}
+
+                    {briefing && !loading && (
+                        <div className="bg-white rounded-xl p-4 mt-2 space-y-3">
+                            <Section emoji="🎯" label="What to do today" content={briefing.todo} borderColor="border-indigo-500" />
+                            <Section emoji="🔍" label="Focus on" content={briefing.focus} borderColor="border-purple-500" />
+                            <Section emoji="💪" label="Strengths" content={briefing.strengths} borderColor="border-green-500" />
+                            <Section emoji="⚠️" label="Weaknesses" content={briefing.weaknesses} borderColor="border-amber-500" />
+                        </div>
+                    )}
+
+                    {!briefing && !loading && !error && (
+                        <div className="bg-white/10 rounded-xl p-3 mt-2">
+                            <p className="text-indigo-200 text-xs">Log some activity and I'll give you a personalized briefing.</p>
+                        </div>
+                    )}
+
+                    <div className="flex items-center gap-1.5 mt-3">
+                        <Zap className="h-3 w-3 text-indigo-400" />
+                        <p className="text-[10px] text-indigo-400">Powered by Gemini · Refreshes once per day</p>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -380,10 +448,7 @@ const CycleDot = ({ label, done }) => {
     );
 };
 
-const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAddPresentation, onShare, onShareMonthly, isSharing, onLogFollowUp, onLogExposure, dailyPar, onShowLegend, hotlist, onNavigateToPipeline, weeklyPoints, weeklyPar, onLogFollowUpForProspect, sprint, onDeclareSprint }) => {
-    // --- Sprint awareness ---
-    const currentSprintWeek = getSprintWeek();
-    const currentSprintFocus = getSprintFocus(currentSprintWeek);
+const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAddPresentation, onShare, onShareMonthly, isSharing, onLogFollowUp, onLogExposure, dailyPar, onShowLegend, hotlist, onNavigateToPipeline, weeklyPoints, weeklyPar, onLogFollowUpForProspect, userProfile }) => {
     const [visibilityNudge, setVisibilityNudge] = useState(false);
     const today = new Date();
     const todayKey = today.getDate();
@@ -406,27 +471,33 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
 
     const currentPar = dailyPar || 2;
 
-    // Compute this week's total for the current sprint focus metric
-    const weeklyFocusCount = useMemo(() => {
-        if (!currentSprintFocus) return 0;
-        const focusKey = currentSprintFocus.key;
-        const today = new Date();
-        const dayOfWeek = today.getDay(); // 0=Sun
-        let total = 0;
-        for (let i = 0; i <= dayOfWeek; i++) {
-            const d = new Date(today);
-            d.setDate(today.getDate() - (dayOfWeek - i));
-            const dayData = monthlyData[d.getDate()] || {};
-            if (focusKey === 'presentations') {
-                total += (Array.isArray(dayData.presentations) ? dayData.presentations.length : Number(dayData.presentations) || 0);
-                total += Number(dayData.threeWays) || 0;
-            } else {
-                total += Number(dayData[focusKey]) || 0;
-            }
-        }
-        return total;
-    }, [monthlyData, currentSprintFocus]);
     const todayPoints = calculatePoints(todayData);
+
+    // Build the AI context payload for the briefing card
+    const now2 = new Date();
+    const startOfWeek2 = new Date(now2);
+    startOfWeek2.setDate(now2.getDate() - now2.getDay());
+    let thisWeekPoints = 0;
+    for (let i = 0; i <= 6; i++) {
+        const d = new Date(startOfWeek2);
+        d.setDate(startOfWeek2.getDate() + i);
+        if (d > now2) break;
+        thisWeekPoints += calculatePoints(monthlyData[d.getDate()] || {});
+    }
+    let thisMonthPoints = 0;
+    Object.values(monthlyData).forEach(day => { thisMonthPoints += calculatePoints(day); });
+    const aiContext = useMemo(() => ({
+        displayName: userProfile?.displayName || 'Associate',
+        todaySnapshot: todayData,
+        todayPoints,
+        dailyPar: currentPar,
+        thisWeekPoints,
+        thisMonthPoints,
+        monthlyGoals: userProfile?.monthlyGoals || {},
+        ironmanStreak: streaks?.ironman || 0,
+        sprint: userProfile?.sprint || null,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }), [todayPoints, thisWeekPoints, thisMonthPoints]);
 
     // Ironman Progress
     const ironmanProgress = [
@@ -505,7 +576,8 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
     return (
         <div className="space-y-8">
             <div>
-                <TNVCampaignBanner weeklyFocusCount={weeklyFocusCount} />
+                {/* AI Daily Briefing Card */}
+                <DailyBriefingCard userContext={aiContext} />
 
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
                     <div>
@@ -540,11 +612,8 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
                     </div>
                 )}
 
-                {/* Time-of-Day Coaching (#1) */}
-                <TimeOfDayCoaching todayPoints={todayPoints} dailyPar={currentPar} todayData={todayData} sprintFocus={currentSprintFocus} />
-
-                {/* Sprint Progress Bar */}
-                <SprintProgressBar sprint={sprint} onDeclareSprint={onDeclareSprint} />
+                {/* Time-of-Day Coaching */}
+                <TimeOfDayCoaching todayPoints={todayPoints} dailyPar={currentPar} todayData={todayData} sprintFocus={null} />
 
                 {/* Daily Par Progress Ring */}
                 <DailyParRing todayPoints={todayPoints} dailyPar={currentPar} />

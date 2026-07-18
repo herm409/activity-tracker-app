@@ -31,32 +31,34 @@ exports.handler = async (event, context) => {
 
     const idToken = authHeader.substring(7);
     try {
-        if (!process.env.GEMINI_API_KEY) {
-            throw new Error("GEMINI_API_KEY is not configured.");
-        }
+        const firebaseWebApiKey = process.env.FIREBASE_WEB_API_KEY || "AIzaSyB3vzQe54l3ajY2LrwF_ZlwImxvhKwvLLw";
+        if (!firebaseWebApiKey) {
+            // If FIREBASE_WEB_API_KEY not set, fall through (dev mode)
+            console.warn("[Auth]: FIREBASE_WEB_API_KEY not set — skipping token verification.");
+        } else {
+            const verifyUrl = `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${firebaseWebApiKey}`;
+            const verifyRes = await fetch(verifyUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ idToken })
+            });
 
-        const verifyUrl = `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${process.env.GEMINI_API_KEY}`;
-        const verifyRes = await fetch(verifyUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ idToken })
-        });
+            if (!verifyRes.ok) {
+                return {
+                    statusCode: 401,
+                    headers: CORS_HEADERS,
+                    body: JSON.stringify({ error: "Unauthorized: Invalid or expired session" })
+                };
+            }
 
-        if (!verifyRes.ok) {
-            return { 
-                statusCode: 401, 
-                headers: CORS_HEADERS, 
-                body: JSON.stringify({ error: "Unauthorized: Invalid or expired session" }) 
-            };
-        }
-
-        const verifyData = await verifyRes.json();
-        if (!verifyData.users || verifyData.users.length === 0) {
-            return { 
-                statusCode: 401, 
-                headers: CORS_HEADERS, 
-                body: JSON.stringify({ error: "Unauthorized: User account not found" }) 
-            };
+            const verifyData = await verifyRes.json();
+            if (!verifyData.users || verifyData.users.length === 0) {
+                return {
+                    statusCode: 401,
+                    headers: CORS_HEADERS,
+                    body: JSON.stringify({ error: "Unauthorized: User account not found" })
+                };
+            }
         }
     } catch (authError) {
         console.error("[Auth Check Critical Error]:", authError);
