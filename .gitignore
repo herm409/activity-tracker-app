@@ -24,3 +24,6 @@ yarn-error.log*
 .env
 # Local Netlify folder
 .netlify
+
+# Firebase Cloud Functions deps
+functions/node_modules

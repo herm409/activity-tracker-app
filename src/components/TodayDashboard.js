@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Target, Users, BarChart2, PhoneCall, UserCheck, Dumbbell, BookOpen, Share2, HelpCircle, XCircle, Flame, AlertTriangle, HeartHandshake, TrendingUp, Sparkles, RefreshCw, ChevronDown, ChevronUp, Zap, Sun, Moon } from 'lucide-react';
+import { Target, Users, BarChart2, PhoneCall, UserCheck, Dumbbell, BookOpen, Share2, HelpCircle, XCircle, Flame, AlertTriangle, HeartHandshake, TrendingUp, Sparkles, RefreshCw, ChevronDown, ChevronUp, Zap, Sun, Moon, Lock, ArrowUpRight } from 'lucide-react';
 import { ActivityCard, PresentationActivityCard, DisciplineCheckbox } from './ActivityCards';
 import { calculatePoints } from '../utils/scoring';
 import confetti from 'canvas-confetti';
 import { getDailyBriefing } from '../services/aiService';
+import { UPGRADE_URL } from '../utils/planAccess';
 
 // --- Daily Par Progress Ring ---
 const DailyParRing = ({ todayPoints, dailyPar }) => {
@@ -305,6 +306,46 @@ const TimeOfDayCoaching = ({ todayPoints, dailyPar, todayData, sprintFocus }) =>
     );
 };
 
+// --- Upgrade banner for Free members (AI Daily Briefing is Pro / Platinum) ---
+const DailyBriefingUpgradeBanner = () => (
+    <div className="relative overflow-hidden rounded-2xl mb-5 border border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-violet-50 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 sm:p-5">
+            <div className="flex-shrink-0 h-12 w-12 rounded-xl bg-indigo-600 flex items-center justify-center shadow-md">
+                <Sparkles className="h-6 w-6 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-2 mb-1">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-600">Diamond Coach</p>
+                    <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                        Pro &amp; Platinum
+                    </span>
+                </div>
+                <h3 className="text-base font-bold text-gray-900 mb-1">Unlock your AI Daily Briefing</h3>
+                <p className="text-sm text-gray-600 leading-relaxed">
+                    Pro and Platinum members get a personalized Diamond Coach briefing every day — strengths,
+                    focus areas, and a clear game plan based on your activity and pipeline.
+                    Upgrade in the TNV App, then sign out and sign back in with Team NuVision so your plan refreshes.
+                </p>
+            </div>
+            <div className="flex-shrink-0 flex flex-col gap-2 sm:items-end">
+                <a
+                    href={UPGRADE_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm"
+                >
+                    Upgrade to Pro
+                    <ArrowUpRight className="h-4 w-4" />
+                </a>
+                <p className="text-[11px] text-gray-400 flex items-center gap-1">
+                    <Lock className="h-3 w-3" />
+                    Included with Pro Access &amp; Platinum Access
+                </p>
+            </div>
+        </div>
+    </div>
+);
+
 // --- Sprint Progress Bar ---
 // --- AI Daily Briefing Card ---
 const DailyBriefingCard = ({ userContext }) => {
@@ -455,7 +496,7 @@ const CycleDot = ({ label, done }) => {
     );
 };
 
-const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAddPresentation, onShare, onShareMonthly, isSharing, onLogFollowUp, onLogExposure, dailyPar, onShowLegend, hotlist, onNavigateToPipeline, weeklyPoints, weeklyPar, onLogFollowUpForProspect, userProfile }) => {
+const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAddPresentation, onShare, onShareMonthly, isSharing, onLogFollowUp, onLogExposure, dailyPar, onShowLegend, hotlist, onNavigateToPipeline, weeklyPoints, weeklyPar, onLogFollowUpForProspect, userProfile, enableDailyBriefing = false }) => {
     const [visibilityNudge, setVisibilityNudge] = useState(false);
     const today = new Date();
     const todayKey = today.getDate();
@@ -584,8 +625,12 @@ const TodayDashboard = ({ monthlyData, streaks, onQuickAdd, onHabitChange, onAdd
     return (
         <div className="space-y-8">
             <div>
-                {/* AI Daily Briefing Card */}
-                <DailyBriefingCard userContext={aiContext} />
+                {/* AI Daily Briefing: full card for Pro/Platinum; upgrade banner for Free */}
+                {enableDailyBriefing ? (
+                    <DailyBriefingCard userContext={aiContext} />
+                ) : (
+                    <DailyBriefingUpgradeBanner />
+                )}
 
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
                     <div>

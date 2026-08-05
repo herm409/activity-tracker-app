@@ -21,6 +21,7 @@ import { DisplayNameModal, OnboardingModal, CutReportModal, ScoringLegendModal, 
 import ReportCard from './components/ReportCard';
 import CoachingToast from './components/CoachingToast';
 import { COACHING_REPOSITORY, getTieredMessage } from './utils/coachingRepository';
+import { canAccess } from './utils/planAccess';
 
 // Components (Lazy Load)
 const AnalyticsDashboard = React.lazy(() => import('./components/AnalyticsDashboard'));
@@ -42,7 +43,7 @@ const STREAK_TYPE_LABELS = {
 
 // --- Main App Content Component ---
 const AppContent = () => {
-    const { db, auth, user, userProfile, setUserProfile, loading } = useAppContext();
+    const { db, auth, user, userProfile, setUserProfile, loading, authError, plan, signOut, iframeAutoLogin, isMightyIframe } = useAppContext();
 
     // --- State Management ---
     const [currentDate, setCurrentDate] = useState(new Date());
@@ -976,8 +977,19 @@ const AppContent = () => {
         };
     }, [db, user, monthYearId]);
 
-    if (loading) return <div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div></div>;
-    if (!user) return <AuthPage auth={auth} />;
+    if (loading || iframeAutoLogin) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-screen gap-3 px-4">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600" />
+                {iframeAutoLogin && (
+                    <p className="text-sm text-gray-600 text-center">
+                        Signing you in with Team NuVision…
+                    </p>
+                )}
+            </div>
+        );
+    }
+    if (!user) return <AuthPage auth={auth} authError={authError} isMightyIframe={isMightyIframe} />;
 
     // Active Daily Par based on Sprint or profile value
     const getParForDate = (checkDate) => {
@@ -1013,8 +1025,17 @@ const AppContent = () => {
             
             <div className="sticky top-0 z-40 bg-gray-50 pt-6">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <Header displayName={userProfile.displayName} onSignOut={() => auth.signOut()} onEditName={() => setShowNameModal(true)} />
-                    <TabBar activeTab={activeTab} setActiveTab={(tab) => { setActiveTab(tab); if (tab !== 'tracker') setQuickAddDate(new Date()); }} badges={{ today: showTodayBadge, community: hasUnreadCommunity }} />
+                    <Header
+                        displayName={userProfile.displayName}
+                        plan={plan}
+                        onSignOut={signOut}
+                        onEditName={() => setShowNameModal(true)}
+                    />
+                    <TabBar
+                        activeTab={activeTab}
+                        setActiveTab={(tab) => { setActiveTab(tab); if (tab !== 'tracker') setQuickAddDate(new Date()); }}
+                        badges={{ today: showTodayBadge, community: hasUnreadCommunity }}
+                    />
                 </div>
             </div>
 
@@ -1052,6 +1073,7 @@ const AppContent = () => {
                                     dailyPar={dailyPar}
                                     onShowLegend={() => setShowScoringLegend(true)}
                                     hotlist={hotlist}
+                                    enableDailyBriefing={canAccess(plan, 'dailyBriefing')}
                                     onNavigateToPipeline={() => setActiveTab('hotlist')}
                                     weeklyPoints={wPoints}
                                     weeklyPar={wPar}
@@ -1062,26 +1084,30 @@ const AppContent = () => {
                         })()}
 
 
-                        {activeTab === 'tracker' && <ActivityTracker
-                            date={currentDate} setDate={setCurrentDate}
-                            goals={monthlyGoals} onGoalChange={handleGoalChange}
-                            data={{ current: { ...monthlyData, id: monthYearId }, last: { ...lastMonthData, id: lastMonthYearId } }} onDataChange={handleDataChange}
-                            onShare={handleShare} onShareMonthly={handleShareMonthly} isSharing={isSharing}
-                            user={user} userProfile={userProfile}
-                            onQuickAdd={handleQuickAdd}
-                            showGoalInstruction={showGoalInstruction} onDismissGoalInstruction={handleDismissGoalInstruction}
-                            streaks={currentStreaks}
-                            dailyPar={dailyPar}
-                            onShowLegend={() => setShowScoringLegend(true)}
-                            onDateContext={setQuickAddDate}
-                        />}
+                        {activeTab === 'tracker' && (
+                            <ActivityTracker
+                                date={currentDate} setDate={setCurrentDate}
+                                goals={monthlyGoals} onGoalChange={handleGoalChange}
+                                data={{ current: { ...monthlyData, id: monthYearId }, last: { ...lastMonthData, id: lastMonthYearId } }} onDataChange={handleDataChange}
+                                onShare={handleShare} onShareMonthly={handleShareMonthly} isSharing={isSharing}
+                                user={user} userProfile={userProfile}
+                                onQuickAdd={handleQuickAdd}
+                                showGoalInstruction={showGoalInstruction} onDismissGoalInstruction={handleDismissGoalInstruction}
+                                streaks={currentStreaks}
+                                dailyPar={dailyPar}
+                                onShowLegend={() => setShowScoringLegend(true)}
+                                onDateContext={setQuickAddDate}
+                            />
+                        )}
                         {activeTab === 'team' && <TeamPage user={user} db={db} userProfile={userProfile} setUserProfile={setUserProfile} weekId={getWeekId(currentDate)} />}
-                        {activeTab === 'hotlist' && <HotList
-                            user={user} db={db}
-                            onDataChange={(date, field, val) => handleDataChange(date, field, val)}
-                            monthlyData={monthlyData}
-                            hotlist={hotlist}
-                        />}
+                        {activeTab === 'hotlist' && (
+                            <HotList
+                                user={user} db={db}
+                                onDataChange={(date, field, val) => handleDataChange(date, field, val)}
+                                monthlyData={monthlyData}
+                                hotlist={hotlist}
+                            />
+                        )}
                         {activeTab === 'analytics' && <AnalyticsDashboard db={db} user={user} />}
                         {activeTab === 'community' && (
                             <CommunityFeed
