@@ -1,6 +1,10 @@
 /**
  * Mighty iframe embed helpers (Approach A: auto-login via central bridge).
  * Reuse this pattern in other Netlify apps that share the auth bridge.
+ *
+ * Mobile note: OAuth (and often Cloud Run redirects) fail or 404 when run
+ * *inside* a nested iframe/WebView. Always prefer top-level navigation for
+ * the bridge login URL when framed.
  */
 
 const AUTO_LOGIN_FLAG = 'mighty_iframe_auto_login';
@@ -17,6 +21,13 @@ export function isInIframe() {
         // Access denied comparing windows → almost certainly framed
         return true;
     }
+}
+
+/** Rough mobile / in-app WebView detection (Mighty iOS/Android app). */
+export function isMobileOrInAppBrowser() {
+    if (typeof navigator === 'undefined') return false;
+    const ua = navigator.userAgent || '';
+    return /Android|iPhone|iPad|iPod|Mobile|webOS|IEMobile|BlackBerry/i.test(ua);
 }
 
 /**
@@ -125,6 +136,30 @@ export function clearIframeAutoLoginAttempt() {
 }
 
 /**
+ * Navigate to the Mighty bridge login URL.
+ * When framed (especially mobile WebViews), OAuth must not run inside the
+ * nested iframe — that often produces a blank page or 404. Prefer top window.
+ */
+export function navigateToMightyLogin(loginUrl) {
+    if (!loginUrl || typeof window === 'undefined') return;
+
+    // Prefer breaking out of the iframe so OAuth + redirects run full-window.
+    try {
+        if (window.top && window.top !== window.self) {
+            window.top.location.assign(loginUrl);
+            return;
+        }
+    } catch (err) {
+        console.warn(
+            '[MightyEmbed] Could not navigate top window (will use same frame):',
+            err?.message || err
+        );
+    }
+
+    window.location.assign(loginUrl);
+}
+
+/**
  * Decide whether to auto-redirect to the Mighty bridge right now.
  *
  * @param {{ isSignedIn: boolean, loginUrl: string }} opts
@@ -146,16 +181,23 @@ export function shouldAutoLoginViaBridge({ isSignedIn, loginUrl }) {
     if (!loginUrl) {
         return { shouldRedirect: false, reason: 'missing-login-url' };
     }
+
+    // Mobile: still auto-login, but startMightyIframeAutoLogin will break out
+    // to top. If that still fails in-app, AuthPage is the fallback after flag.
     return { shouldRedirect: true, reason: 'mighty-iframe-unsigned' };
 }
 
 /**
- * Start Approach A auto-login. Navigates the iframe (or top if preferred).
- * Uses same-window navigation so the embed returns to redirect_uri after OAuth.
+ * Start Approach A auto-login (once per session).
  */
 export function startMightyIframeAutoLogin(loginUrl) {
     markIframeAutoLoginAttempted();
-    // Navigate this frame to the bridge. OAuth runs in this browsing context;
-    // after bridge callback, member returns to the app URL (often re-embedded).
-    window.location.assign(loginUrl);
+    console.log(
+        '[MightyEmbed] Starting bridge login',
+        'framed=',
+        isInIframe(),
+        'mobile=',
+        isMobileOrInAppBrowser()
+    );
+    navigateToMightyLogin(loginUrl);
 }

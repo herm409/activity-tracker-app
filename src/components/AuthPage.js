@@ -5,7 +5,11 @@ import {
     sendPasswordResetEmail,
 } from 'firebase/auth';
 import { getMightyLoginUrl } from '../firebaseConfig';
-import { clearIframeAutoLoginAttempt } from '../utils/mightyEmbed';
+import {
+    clearIframeAutoLoginAttempt,
+    navigateToMightyLogin,
+    isMobileOrInAppBrowser,
+} from '../utils/mightyEmbed';
 
 const AuthPage = ({ auth, authError: bridgeAuthError, isMightyIframe = false }) => {
     const [email, setEmail] = useState('');
@@ -21,8 +25,8 @@ const AuthPage = ({ auth, authError: bridgeAuthError, isMightyIframe = false }) 
         setMightyRedirecting(true);
         // Allow a fresh auto-login attempt next time if this manual path is used
         clearIframeAutoLoginAttempt();
-        // Full-page (or iframe) redirect to central Mighty ↔ Firebase bridge
-        window.location.href = getMightyLoginUrl();
+        // Break out of iframe when embedded so OAuth works on mobile WebViews
+        navigateToMightyLogin(getMightyLoginUrl());
     };
 
     const handleAuthAction = async (e) => {
@@ -88,8 +92,9 @@ const AuthPage = ({ auth, authError: bridgeAuthError, isMightyIframe = false }) 
 
                 {isMightyIframe && (
                     <p className="text-xs text-center text-amber-800 bg-amber-50 border border-amber-100 rounded-md px-3 py-2">
-                        Opened inside Team NuVision. If you weren&apos;t signed in automatically,
-                        tap the button below (one-time if sign-in was cancelled).
+                        Opened inside Team NuVision
+                        {isMobileOrInAppBrowser() ? ' (mobile app)' : ''}. Sign-in opens full
+                        screen so login works reliably. If you saw an error, tap the button below.
                     </p>
                 )}
 
@@ -105,6 +110,16 @@ const AuthPage = ({ auth, authError: bridgeAuthError, isMightyIframe = false }) 
                             ? 'Redirecting to Team NuVision…'
                             : 'Continue with Team NuVision'}
                     </button>
+                    {/* target=_top helps when JS is restricted inside mobile WebViews */}
+                    <a
+                        href={getMightyLoginUrl()}
+                        target="_top"
+                        rel="noopener"
+                        className="block w-full text-center text-xs text-indigo-600 hover:underline py-1"
+                        onClick={() => clearIframeAutoLoginAttempt()}
+                    >
+                        Having trouble? Open sign-in full screen
+                    </a>
                     <p className="text-xs text-center text-gray-500">
                         Sign in with your Mighty Networks membership. Your plan (Free / Pro /
                         Platinum) unlocks the right tools automatically.
