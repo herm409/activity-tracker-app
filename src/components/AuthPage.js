@@ -11,21 +11,35 @@ import {
     isMobileOrInAppBrowser,
 } from '../utils/mightyEmbed';
 
+const APP_HOME = typeof window !== 'undefined' ? window.location.origin : 'https://activity.wearetnv.com';
+
 const AuthPage = ({ auth, authError: bridgeAuthError, isMightyIframe = false }) => {
+    const isMobile = isMobileOrInAppBrowser();
+    // Mobile in-app WebViews break OAuth redirects (often show 404). Prefer email there.
+    const preferEmailFirst = isMightyIframe && isMobile;
+
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [isSignUp, setIsSignUp] = useState(false);
-    const [showEmailForm, setShowEmailForm] = useState(false);
+    const [showEmailForm, setShowEmailForm] = useState(preferEmailFirst);
     const [error, setError] = useState('');
     const [infoMessage, setInfoMessage] = useState('');
     const [mightyRedirecting, setMightyRedirecting] = useState(false);
 
     const handleMightyLogin = () => {
         setError('');
+        // On mobile WebView, do not navigate to the bridge (causes 404).
+        // Ask them to open the site in Safari/Chrome instead.
+        if (isMobile) {
+            setError(
+                'Team NuVision mobile app cannot complete Mighty sign-in inside this screen. Use email below, or open Activity Tracker in your phone browser.'
+            );
+            setShowEmailForm(true);
+            setMightyRedirecting(false);
+            return;
+        }
         setMightyRedirecting(true);
-        // Allow a fresh auto-login attempt next time if this manual path is used
         clearIframeAutoLoginAttempt();
-        // Break out of iframe when embedded so OAuth works on mobile WebViews
         navigateToMightyLogin(getMightyLoginUrl());
     };
 
@@ -90,41 +104,59 @@ const AuthPage = ({ auth, authError: bridgeAuthError, isMightyIframe = false }) 
                     <p className="text-sm text-gray-500">Team NuVision</p>
                 </div>
 
-                {isMightyIframe && (
+                {preferEmailFirst && (
+                    <div className="text-xs text-center text-amber-900 bg-amber-50 border border-amber-200 rounded-md px-3 py-3 space-y-2">
+                        <p className="font-semibold">Mobile app note</p>
+                        <p>
+                            Sign-in with Mighty does not work reliably inside the Team NuVision
+                            mobile app (it often shows a 404). Use <strong>email sign-in</strong>{' '}
+                            below, or open the tracker in your phone&apos;s browser:
+                        </p>
+                        <a
+                            href={APP_HOME}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center justify-center w-full py-2 px-3 rounded-md bg-indigo-600 text-white font-semibold hover:bg-indigo-700"
+                        >
+                            Open in browser
+                        </a>
+                    </div>
+                )}
+
+                {isMightyIframe && !preferEmailFirst && (
                     <p className="text-xs text-center text-amber-800 bg-amber-50 border border-amber-100 rounded-md px-3 py-2">
-                        Opened inside Team NuVision
-                        {isMobileOrInAppBrowser() ? ' (mobile app)' : ''}. Sign-in opens full
-                        screen so login works reliably. If you saw an error, tap the button below.
+                        Opened inside Team NuVision. If sign-in was cancelled, tap Continue below.
                     </p>
                 )}
 
-                {/* Primary: Mighty bridge login */}
-                <div className="space-y-3">
-                    <button
-                        type="button"
-                        onClick={handleMightyLogin}
-                        disabled={mightyRedirecting || !auth}
-                        className="w-full py-3 px-4 font-semibold text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-60 transition-colors"
-                    >
-                        {mightyRedirecting
-                            ? 'Redirecting to Team NuVision…'
-                            : 'Continue with Team NuVision'}
-                    </button>
-                    {/* target=_top helps when JS is restricted inside mobile WebViews */}
-                    <a
-                        href={getMightyLoginUrl()}
-                        target="_top"
-                        rel="noopener"
-                        className="block w-full text-center text-xs text-indigo-600 hover:underline py-1"
-                        onClick={() => clearIframeAutoLoginAttempt()}
-                    >
-                        Having trouble? Open sign-in full screen
-                    </a>
-                    <p className="text-xs text-center text-gray-500">
-                        Sign in with your Mighty Networks membership. Your plan (Free / Pro /
-                        Platinum) unlocks the right tools automatically.
-                    </p>
-                </div>
+                {/* Mighty bridge — desktop / non-mobile primary */}
+                {!preferEmailFirst && (
+                    <div className="space-y-3">
+                        <button
+                            type="button"
+                            onClick={handleMightyLogin}
+                            disabled={mightyRedirecting || !auth}
+                            className="w-full py-3 px-4 font-semibold text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-60 transition-colors"
+                        >
+                            {mightyRedirecting
+                                ? 'Redirecting to Team NuVision…'
+                                : 'Continue with Team NuVision'}
+                        </button>
+                        <a
+                            href={getMightyLoginUrl()}
+                            target="_top"
+                            rel="noopener"
+                            className="block w-full text-center text-xs text-indigo-600 hover:underline py-1"
+                            onClick={() => clearIframeAutoLoginAttempt()}
+                        >
+                            Having trouble? Open sign-in full screen
+                        </a>
+                        <p className="text-xs text-center text-gray-500">
+                            Sign in with your Mighty Networks membership. Your plan (Free / Pro /
+                            Platinum) unlocks the right tools automatically.
+                        </p>
+                    </div>
+                )}
 
                 {displayError && (
                     <p className="text-sm text-red-600 text-center bg-red-50 rounded-md px-3 py-2">
@@ -132,15 +164,16 @@ const AuthPage = ({ auth, authError: bridgeAuthError, isMightyIframe = false }) 
                     </p>
                 )}
 
-                {/* Secondary: email/password (legacy / admin) */}
-                <div className="relative py-2">
-                    <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                        <div className="w-full border-t border-gray-200" />
+                {!preferEmailFirst && (
+                    <div className="relative py-2">
+                        <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                            <div className="w-full border-t border-gray-200" />
+                        </div>
+                        <div className="relative flex justify-center text-xs">
+                            <span className="bg-white px-2 text-gray-400">or</span>
+                        </div>
                     </div>
-                    <div className="relative flex justify-center text-xs">
-                        <span className="bg-white px-2 text-gray-400">or</span>
-                    </div>
-                </div>
+                )}
 
                 {!showEmailForm ? (
                     <button
@@ -164,6 +197,7 @@ const AuthPage = ({ auth, authError: bridgeAuthError, isMightyIframe = false }) 
                                     onChange={(e) => setEmail(e.target.value)}
                                     className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
                                     required
+                                    autoComplete="email"
                                 />
                             </div>
                             <div>
@@ -176,6 +210,7 @@ const AuthPage = ({ auth, authError: bridgeAuthError, isMightyIframe = false }) 
                                     onChange={(e) => setPassword(e.target.value)}
                                     className="w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
                                     required
+                                    autoComplete={isSignUp ? 'new-password' : 'current-password'}
                                 />
                             </div>
                             {infoMessage && (
@@ -213,6 +248,20 @@ const AuthPage = ({ auth, authError: bridgeAuthError, isMightyIframe = false }) 
                             </button>
                         </p>
                     </div>
+                )}
+
+                {preferEmailFirst && (
+                    <p className="text-[11px] text-center text-gray-400">
+                        On desktop or in a phone browser, you can use{' '}
+                        <button
+                            type="button"
+                            className="text-indigo-600 underline"
+                            onClick={handleMightyLogin}
+                        >
+                            Continue with Team NuVision
+                        </button>
+                        .
+                    </p>
                 )}
             </div>
         </div>

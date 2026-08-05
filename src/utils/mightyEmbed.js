@@ -182,8 +182,14 @@ export function shouldAutoLoginViaBridge({ isSignedIn, loginUrl }) {
         return { shouldRedirect: false, reason: 'missing-login-url' };
     }
 
-    // Mobile: still auto-login, but startMightyIframeAutoLogin will break out
-    // to top. If that still fails in-app, AuthPage is the fallback after flag.
+    // CRITICAL: Mighty mobile app WebViews commonly 404 when the embed
+    // navigates to external OAuth / Cloud Run URLs (even with top.location).
+    // Never auto-redirect on mobile — show AuthPage and let the member
+    // choose email login or open the app in an external browser.
+    if (isMobileOrInAppBrowser()) {
+        return { shouldRedirect: false, reason: 'mobile-no-auto-redirect' };
+    }
+
     return { shouldRedirect: true, reason: 'mighty-iframe-unsigned' };
 }
 
