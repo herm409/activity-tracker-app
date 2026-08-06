@@ -20,8 +20,10 @@ import NotificationBanner from './components/NotificationBanner';
 import { DisplayNameModal, OnboardingModal, CutReportModal, ScoringLegendModal, SprintDeclarationModal } from './components/GlobalModals';
 import ReportCard from './components/ReportCard';
 import CoachingToast from './components/CoachingToast';
+import PlanOverridesAdmin from './components/PlanOverridesAdmin';
 import { COACHING_REPOSITORY, getTieredMessage } from './utils/coachingRepository';
 import { canAccess } from './utils/planAccess';
+import { isPlanOverridesAdminPath } from './utils/adminConfig';
 
 // Components (Lazy Load)
 const AnalyticsDashboard = React.lazy(() => import('./components/AnalyticsDashboard'));
@@ -990,6 +992,11 @@ const AppContent = () => {
         );
     }
     if (!user) return <AuthPage auth={auth} authError={authError} isMightyIframe={isMightyIframe} />;
+
+    // Hidden host admin (bookmark /admin/overrides — not in main nav)
+    if (typeof window !== 'undefined' && isPlanOverridesAdminPath(window.location.pathname)) {
+        return <PlanOverridesAdmin db={db} user={user} onSignOut={signOut} />;
+    }
 
     // Active Daily Par based on Sprint or profile value
     const getParForDate = (checkDate) => {
